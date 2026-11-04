@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Exports · bembel</title>
+<link rel="stylesheet" href="../assets/bembel.css">
+<link rel="stylesheet" href="../assets/shell.css">
+<link rel="stylesheet" href="../assets/dns.css">
+</head>
+<body data-page="exports">
+<a class="skip" href="#main">Skip to content</a>
+<div class="app">
+<!-- SHELL: top bar. Copy it unchanged to each page; change only aria-current in the sidebar and the VRF in the switcher. -->
+<header class="topbar">
+  <a class="icon-btn nav-toggle" href="#nav" aria-controls="nav" aria-expanded="false" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></a>
+  <a class="brand" href="overview.html" aria-label="bembel: overview"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M12.6 7h6.8M13.6 7v2.6C9.9 11 8.4 13.6 8.4 16.8c0 3.2 1.4 5.7 3.1 7.2h9c1.7-1.5 3.1-4 3.1-7.2 0-3.2-1.5-5.8-5.2-7.2V7M19.4 8.3c4.4-.3 6.9 1.4 6.9 4.4 0 2.3-1.1 3.9-2.5 4.8M9.4 15.6h13.2"/></svg></span><span class="brand-name">bembel</span></a>
+  <details class="set-menu vrf-menu">
+    <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+    <div class="set-pop">
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+    </div>
+  </details>
+  <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
+    <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
+  <span class="spacer"></span>
+  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
+  <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
+  <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
+    <div class="more-pop" role="menu">
+      <div class="um-head"><b>Dennis Klein</b><span class="mono">d.klein · id.example.org</span><span class="muted small">groups netops, hpc-ops</span></div>
+      <a href="#" role="menuitem">My access</a><a href="#" role="menuitem">Tokens</a><a href="#" role="menuitem">Sign out</a></div></details>
+  <button class="icon-btn" type="button" data-help aria-label="Help (?)">?</button>
+  <button class="icon-btn" type="button" data-theme-toggle aria-label="Theme: auto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/></svg></button>
+</header>
+<!-- SHELL: sidebar. Groups and icons follow the glossary domains (docs/assets/glossary-data.js). -->
+<nav class="sidebar" id="nav" aria-label="Navigation">
+  <a class="nav-item" href="overview.html" data-key="o"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview<span class="count attn">6</span></a>
+  <div class="nav-label" data-domain="addr"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 1.8h3v3h-3Z M2 11.2h3v3H2Z M11 11.2h3v3h-3Z M8 4.8v3.2 M3.5 11.2V8h9v3.2"/></svg>Addressing</div>
+  <a class="nav-item" data-domain="addr" href="prefixes.html" data-key="p"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v4H4zM4 16h6v4H4zM14 10h6v4h-6z"/><path d="M7 8v8M10 12h4"/></svg>Prefixes</a>
+  <a class="nav-item" data-domain="addr" href="hosts.html" data-key="h"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>Hosts</a>
+  <a class="nav-item" data-domain="addr" href="vlans.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/><path d="M8 3v18"/></svg>VLANs and partitions</a>
+  <a class="nav-item" data-domain="addr" href="fabrics.html" data-key="f"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8M7.5 7.5l9 9"/></svg>Fabrics</a>
+  <a class="nav-item" data-domain="addr" href="routing.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h4a4 4 0 004-4V8"/></svg>Routing and groups</a>
+  <div class="nav-label" data-domain="dns"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 1 0 0 12.4A6.2 6.2 0 0 0 8 1.8Z M1.8 8h12.4 M8 1.8C6 3.8 5.4 5.8 5.4 8S6 12.2 8 14.2 M8 1.8c2 2 2.6 4 2.6 6.2S10 12.2 8 14.2"/></svg>DNS and DHCP</div>
+  <a class="nav-item" data-domain="dns" href="zones.html" data-key="z"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-2.5 2.6-3.5 5.6-3.5 9s1 6.4 3.5 9M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9"/></svg>Zones</a>
+  <a class="nav-item" data-domain="dhcp" href="dhcp.html" data-key="d"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12l4 5-4 5H3z"/><path d="M7 12h5"/></svg>DHCP scopes</a>
+  <a class="nav-item" data-domain="integ" href="exports.html" data-key="e" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Exports<span class="count attn">1 diff</span></a>
+  <div class="nav-label" data-domain="assets"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 1.8h8.8v12.4H3.6Z M3.6 5h8.8 M3.6 8.2h8.8 M3.6 11.4h8.8 M5.6 3.4h1.2 M5.6 6.6h1.2 M5.6 9.8h1.2"/></svg>Assets</div>
+  <a class="nav-item" data-domain="assets" href="floor.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 3v16M15 5v16"/></svg>Floor map</a>
+  <a class="nav-item" data-domain="assets" href="rack.html" data-key="r"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="1.5"/><path d="M5 8h14M5 13.5h14M8 5.3h2M8 10.8h2M8 16.5h2"/></svg>Racks</a>
+  <a class="nav-item" data-domain="assets" href="sync-review.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0114-5.3L20 9M20 12a8 8 0 01-14 5.3L4 15"/><path d="M20 4v5h-5M4 20v-5h5"/></svg>Sync review<span class="count attn">4</span></a>
+  <div class="nav-label" data-domain="access"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 3.6v4.1c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.6Z M5.9 8l1.5 1.5 2.8-3"/></svg>Access</div>
+  <a class="nav-item" data-domain="access" href="bindings.html" data-key="b"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.4c1.8.9 3 2.9 3 5.6"/></svg>Roles and bindings</a>
+  <a class="nav-item" data-domain="access" href="changes.html" data-key="c"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg>Change requests<span class="count attn">2</span></a>
+  <a class="nav-item" data-domain="access" href="audit.html" data-key="a"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Audit log</a>
+  <div class="nav-label" data-domain="integ"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h9 M8.6 2.6 11 5 8.6 7.4 M14 11H5 M7.4 8.6 5 11l2.4 2.4"/></svg>Integrations</div>
+  <a class="nav-item" data-domain="integ" href="integrations.html" data-key="i"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0z"/><path d="M12 16v5"/></svg>Sources and syncs</a>
+  <a class="nav-item" data-domain="integ" href="import.html" data-key="m"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6M9 15l2.5 2.5L16 13"/></svg>ONA migration<span class="count attn">214</span></a>
+  <div class="side-foot">bembel v0.1.0 · api v1</div>
+</nav>
+<!-- /SHELL -->
+
+<main class="main" id="main">
+<div class="banner err offline" role="alert"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M2 8.5a15 15 0 0120 0M5 12a10 10 0 0114 0M8.5 15.5a5 5 0 017 0M12 19h.01M3 3l18 18"/></svg>
+  <div class="grow"><b>Offline.</b> <span data-why>The event stream of bembel stopped. The page shows old data.</span> The page tries again every 5 s.</div>
+  <button class="btn btn-sm" type="button" onclick="location.reload()">Reload</button></div>
+
+
+<div class="page-head">
+  <div><h1>Exports</h1>
+    <div class="sub"><span><b>8</b> delivery targets</span><span class="sep">·</span><span>7 current, <b>1 stale</b></span><span class="sep">·</span><span>last build <span class="id" title="sha256:7c41e0">b-7c41e0</span> today 17:57</span><span class="sep">·</span><span>ONA <span class="src">ona-import</span> parallel run night 12 of 14</span></div></div>
+  <div class="actions">
+    <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
+      <div class="cli-pop"><span class="c"># build all targets whose content changed</span>
+bembel export build --all
+<span class="c"># build one target and show the files without a write</span>
+bembel export preview ns1
+bembel export bind --server ns1 --out ./ns1 --mode compat
+bembel export dhcpd --server dhcp1 --out ./dhcp1
+<span class="c"># state of all targets</span>
+bembel export ls</div></details>
+    <button class="btn btn-agent" type="button" data-assistant="export-diff" title="Runs the assistant with the advisory export-diff. Tools: read only. It changes nothing.">Why does the export differ?</button>
+    <a class="btn" href="#">Preview…</a>
+    <button class="btn btn-primary" type="button">Build now</button>
+  </div>
+</div>
+
+<div class="banner warn" role="status"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+  <div class="grow"><b>sm-kestrel has not pulled for 26 hours.</b> The last pull was on 2026-11-03 at 16:04. The bundle <span class="id" title="sha256:3a90d1">b-3a90d1</span> is the newest one for this target, so the content is not wrong. The agent on <span class="mono">sm-kestrel</span> reports no error. The partition table that OpenSM uses may be older than bembel knows.</div>
+  <div class="acts"><a class="btn btn-sm" href="#">Pull log</a><a class="btn btn-sm" href="#">Silence 24 h…</a></div></div>
+
+<div class="tg-bar"><div class="chips"><a class="chip on" href="#" aria-pressed="true">All <span class="n">8</span></a><a class="chip" href="#">DNS <span class="n">3</span></a><a class="chip" href="#">DHCP <span class="n">2</span></a><a class="chip" href="#">Fabric, firewall, routing <span class="n">3</span></a><a class="chip" href="#">Stale <span class="n">1</span></a></div>
+  <span class="muted small">Servers pull over HTTPS with <span class="mono">If-None-Match</span>. A pull that finds no change returns 304.</span></div>
+
+<div class="tg-grid">
+<article class="card tg" aria-labelledby="t-ns1">
+  <div class="card-head"><span class="tg-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-2.5 2.6-3.5 5.6-3.5 9s1 6.4 3.5 9M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9"/></svg></span><h2 id="t-ns1" class="mono">ns1</h2><span class="tag">BIND primary</span>
+    <span class="right"><span class="pill st-ok">current</span> <span class="mode compat" title="compat: byte-for-byte like the ONA output, for the parallel run">compat</span></span></div>
+  <div class="tg-body"><dl class="kv tg-kv"><dt>Content</dt><dd>3 views, 41 <a class="gl" href="../../glossary.html#zone" data-gl="zone" data-domain="dns">zones</a>, 1 named.conf fragment</dd><dt>Bundle</dt><dd><span class="id" title="sha256:7c41e0a9b">b-7c41e0</span></dd><dt>Built</dt><dd>today 17:57:41</dd><dt>Pulled</dt><dd>today 17:58:12 by <span class="mono">bembel-agent@ns1</span> · 200</dd><dt>ETag</dt><dd><span class="mono">"7c41e0a9…"</span> <button class="copy" type="button" data-copy="7c41e0a9" aria-label="Copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button></dd></dl>
+    <ul class="ckl"><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">named-checkconf -z ok</span></li><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">named-checkzone 41 of 41 ok</span></li></ul><div class="tg-note"><span class="qs warn">Parallel run night 12 of 14</span> 3 lines differ from ONA. <a href="export-diff.html">Show diff</a></div></div>
+  <div class="card-foot"><a class="btn btn-sm" href="#">Preview</a><a class="btn btn-sm" href="#">Pull log</a><span class="right"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for ns1">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Build now</a><a href="#" role="menuitem">Download the bundle</a><a href="#" role="menuitem">Edit target…</a></div></details></span></div>
+</article>
+<article class="card tg" aria-labelledby="t-ns2">
+  <div class="card-head"><span class="tg-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-2.5 2.6-3.5 5.6-3.5 9s1 6.4 3.5 9M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9"/></svg></span><h2 id="t-ns2" class="mono">ns2</h2><span class="tag">BIND secondary</span>
+    <span class="right"><span class="pill st-ok">current</span> <span class="mode compat" title="compat: byte-for-byte like the ONA output, for the parallel run">compat</span></span></div>
+  <div class="tg-body"><dl class="kv tg-kv"><dt>Content</dt><dd>3 views, 41 <a class="gl" href="../../glossary.html#zone" data-gl="zone" data-domain="dns">zones</a>, fragment with <span class="mono">primaries { ns1; }</span></dd><dt>Bundle</dt><dd><span class="id" title="sha256:7c41e0a9b">b-7c41e0</span></dd><dt>Built</dt><dd>today 17:57:41</dd><dt>Pulled</dt><dd>today 17:58:14 by <span class="mono">bembel-agent@ns2</span> · 200</dd><dt>ETag</dt><dd><span class="mono">"7c41e0a9…"</span> <button class="copy" type="button" data-copy="7c41e0a9" aria-label="Copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button></dd></dl>
+    <ul class="ckl"><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">named-checkconf -z ok</span></li><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">serial of kestrel.example.org 2026110417 on all</span></li></ul></div>
+  <div class="card-foot"><a class="btn btn-sm" href="#">Preview</a><a class="btn btn-sm" href="#">Pull log</a><span class="right"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for ns2">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Build now</a><a href="#" role="menuitem">Download the bundle</a><a href="#" role="menuitem">Edit target…</a></div></details></span></div>
+</article>
+<article class="card tg" aria-labelledby="t-ns3">
+  <div class="card-head"><span class="tg-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-2.5 2.6-3.5 5.6-3.5 9s1 6.4 3.5 9M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9"/></svg></span><h2 id="t-ns3" class="mono">ns3</h2><span class="tag">BIND secondary</span>
+    <span class="right"><span class="pill st-ok">current</span> <span class="mode compat" title="compat: byte-for-byte like the ONA output, for the parallel run">compat</span></span></div>
+  <div class="tg-body"><dl class="kv tg-kv"><dt>Content</dt><dd>2 views, 38 <a class="gl" href="../../glossary.html#zone" data-gl="zone" data-domain="dns">zones</a>, no view <a class="gl" href="../../glossary.html#fabric" data-gl="fabric" data-domain="addr">fabric</a></dd><dt>Bundle</dt><dd><span class="id" title="sha256:7c41e0a9b">b-7c41e0</span></dd><dt>Built</dt><dd>today 17:57:41</dd><dt>Pulled</dt><dd>today 17:58:15 by <span class="mono">bembel-agent@ns3</span> · 304</dd><dt>ETag</dt><dd><span class="mono">"7c41e0a9…"</span> <button class="copy" type="button" data-copy="7c41e0a9" aria-label="Copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button></dd></dl>
+    <ul class="ckl"><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">named-checkconf -z ok</span></li><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">serial of kestrel.example.org 2026110417 on all</span></li></ul></div>
+  <div class="card-foot"><a class="btn btn-sm" href="#">Preview</a><a class="btn btn-sm" href="#">Pull log</a><span class="right"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for ns3">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Build now</a><a href="#" role="menuitem">Download the bundle</a><a href="#" role="menuitem">Edit target…</a></div></details></span></div>
+</article>
+<article class="card tg" aria-labelledby="t-dhcp1">
+  <div class="card-head"><span class="tg-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h12l4 5-4 5H3z"/><path d="M7 12h5"/></svg></span><h2 id="t-dhcp1" class="mono">dhcp1</h2><span class="tag">ISC dhcpd primary</span>
+    <span class="right"><span class="pill st-ok">current</span> <span class="mode compat" title="compat: byte-for-byte like the ONA output, for the parallel run">compat</span></span></div>
+  <div class="tg-body"><dl class="kv tg-kv"><dt>Content</dt><dd>1 failover peer, 412 <a class="gl" href="../../glossary.html#subnet" data-gl="subnet" data-domain="addr">subnets</a>, 9 802 <a class="gl" href="../../glossary.html#host" data-gl="host" data-domain="addr">hosts</a></dd><dt>Bundle</dt><dd><span class="id" title="sha256:7c41e0a9b">b-7c41e0</span></dd><dt>Built</dt><dd>today 17:57:41</dd><dt>Pulled</dt><dd>today 17:58:20 by <span class="mono">bembel-agent@dhcp1</span> · 200</dd><dt>ETag</dt><dd><span class="mono">"7c41e0a9…"</span> <button class="copy" type="button" data-copy="7c41e0a9" aria-label="Copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button></dd></dl>
+    <ul class="ckl"><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">dhcpd -t -cf dhcpd.conf.new ok</span></li><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">applied 17:59:10, restarted after dhcp2</span></li></ul></div>
+  <div class="card-foot"><a class="btn btn-sm" href="#">Preview</a><a class="btn btn-sm" href="#">Pull log</a><span class="right"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for dhcp1">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Build now</a><a href="#" role="menuitem">Download the bundle</a><a href="#" role="menuitem">Edit target…</a></div></details></span></div>
+</article>
+<article class="card tg" aria-labelledby="t-dhcp2">
+  <div class="card-head"><span class="tg-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h12l4 5-4 5H3z"/><path d="M7 12h5"/></svg></span><h2 id="t-dhcp2" class="mono">dhcp2</h2><span class="tag">ISC dhcpd secondary</span>
+    <span class="right"><span class="pill st-ok">current</span> <span class="mode compat" title="compat: byte-for-byte like the ONA output, for the parallel run">compat</span></span></div>
+  <div class="tg-body"><dl class="kv tg-kv"><dt>Content</dt><dd>1 failover peer, 412 <a class="gl" href="../../glossary.html#subnet" data-gl="subnet" data-domain="addr">subnets</a>, 9 802 <a class="gl" href="../../glossary.html#host" data-gl="host" data-domain="addr">hosts</a></dd><dt>Bundle</dt><dd><span class="id" title="sha256:7c41e0a9b">b-7c41e0</span></dd><dt>Built</dt><dd>today 17:57:41</dd><dt>Pulled</dt><dd>today 17:58:21 by <span class="mono">bembel-agent@dhcp2</span> · 200</dd><dt>ETag</dt><dd><span class="mono">"7c41e0a9…"</span> <button class="copy" type="button" data-copy="7c41e0a9" aria-label="Copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button></dd></dl>
+    <ul class="ckl"><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">dhcpd -t -cf dhcpd.conf.new ok</span></li><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">applied 17:58:40, restarted first</span></li></ul></div>
+  <div class="card-foot"><a class="btn btn-sm" href="#">Preview</a><a class="btn btn-sm" href="#">Pull log</a><span class="right"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for dhcp2">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Build now</a><a href="#" role="menuitem">Download the bundle</a><a href="#" role="menuitem">Edit target…</a></div></details></span></div>
+</article>
+<article class="card tg stale" aria-labelledby="t-sm-kestrel">
+  <div class="card-head"><span class="tg-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8"/></svg></span><h2 id="t-sm-kestrel" class="mono">sm-kestrel</h2><span class="tag">OpenSM partitions.conf</span>
+    <span class="right"><span class="pill st-warn">stale</span> <span class="mode native" title="native: the clean bembel format">native</span></span></div>
+  <div class="tg-body"><dl class="kv tg-kv"><dt>Content</dt><dd><a class="gl" href="../../glossary.html#ib-partition" data-gl="ib-partition" data-domain="addr">partitions</a> <span class="mono">0x8001</span> kestrel-ipoib (full, ipoib), 1 default</dd><dt>Bundle</dt><dd><span class="id" title="sha256:3a90d1">b-3a90d1</span> <span class="muted small">unchanged</span></dd><dt>Built</dt><dd>2026-11-03 15:58:02</dd><dt>Pulled</dt><dd><b class="warn-t">2026-11-03 16:04 · 26 h ago</b> by <span class="mono">bembel-agent@sm-kestrel</span></dd><dt>ETag</dt><dd><span class="mono">"3a90d1c4…"</span> <button class="copy" type="button" data-copy="3a90d1c4" aria-label="Copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button></dd></dl>
+    <ul class="ckl"><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">partitions.conf lint ok</span></li><li><span class="ck-i warn" aria-hidden="true">!</span><span class="mono">no pull since 2026-11-03 16:04</span> <span class="muted small">expected every 5 min · alert after 1 h</span></li></ul><div class="tg-note"><span class="qs warn">The agent reports no error.</span> The host may be down, or the timer may be stopped.</div></div>
+  <div class="card-foot"><a class="btn btn-sm" href="#">Preview</a><a class="btn btn-sm" href="#">Pull log</a><span class="right"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for sm-kestrel">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Build now</a><a href="#" role="menuitem">Download the bundle</a><a href="#" role="menuitem">Edit target…</a></div></details></span></div>
+</article>
+<article class="card tg" aria-labelledby="t-fw-edge">
+  <div class="card-head"><span class="tg-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/></svg></span><h2 id="t-fw-edge" class="mono">fw-edge</h2><span class="tag">Feed login-nodes</span>
+    <span class="right"><span class="pill st-ok">current</span> <span class="mode native" title="native: the clean bembel format">native</span></span></div>
+  <div class="tg-body"><dl class="kv tg-kv"><dt>Content</dt><dd>external dynamic list, 6 entries (4 <a class="gl" href="../../glossary.html#host" data-gl="host" data-domain="addr">hosts</a>, 2 <a class="gl" href="../../glossary.html#prefix" data-gl="prefix" data-domain="addr">prefixes</a>)</dd><dt>URL</dt><dd><span class="mono small">/v1/feeds/login-nodes.txt</span></dd><dt>Bundle</dt><dd><span class="id" title="sha256:b2c46f1e0">b-b2c46f</span></dd><dt>Built</dt><dd>today 17:52:07</dd><dt>Pulled</dt><dd>today 17:55:00 by <span class="mono">fw-edge</span> · 200</dd><dt>ETag</dt><dd><span class="mono">"b2c46f1e…"</span> <button class="copy" type="button" data-copy="b2c46f1e" aria-label="Copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button></dd></dl>
+    <ul class="ckl"><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">one entry per line, IPv4 and IPv6 valid</span></li><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">no entry in 0.0.0.0/8, 127.0.0.0/8</span></li></ul></div>
+  <div class="card-foot"><a class="btn btn-sm" href="#">Preview</a><a class="btn btn-sm" href="#">Pull log</a><span class="right"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for fw-edge">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Build now</a><a href="#" role="menuitem">Download the bundle</a><a href="#" role="menuitem">Edit target…</a></div></details></span></div>
+</article>
+<article class="card tg" aria-labelledby="t-frr-core">
+  <div class="card-head"><span class="tg-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h4a4 4 0 004-4V8"/></svg></span><h2 id="t-frr-core" class="mono">frr-core</h2><span class="tag">FRR prefix list</span>
+    <span class="right"><span class="pill st-ok">current</span> <span class="mode native" title="native: the clean bembel format">native</span></span></div>
+  <div class="tg-body"><dl class="kv tg-kv"><dt>Content</dt><dd>prefix-list <span class="mono">BEMBEL-ANNOUNCE-v4</span> and <span class="mono">-v6</span>, 9 <a class="gl" href="../../glossary.html#prefix" data-gl="prefix" data-domain="addr">prefixes</a></dd><dt>Bundle</dt><dd><span class="id" title="sha256:0f19a2d74">b-0f19a2</span></dd><dt>Built</dt><dd>2026-11-02 11:20:55</dd><dt>Pulled</dt><dd>today 17:40:00 by <span class="mono">ansible-pull@frr-core</span> · 304</dd><dt>ETag</dt><dd><span class="mono">"0f19a2d7…"</span> <button class="copy" type="button" data-copy="0f19a2d7" aria-label="Copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button></dd></dl>
+    <ul class="ckl"><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">prefix-list syntax ok (frr)</span></li><li><span class="ck-i ok" aria-hidden="true">✓</span><span class="mono">every prefix has announce=true</span></li></ul></div>
+  <div class="card-foot"><a class="btn btn-sm" href="#">Preview</a><a class="btn btn-sm" href="#">Pull log</a><span class="right"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for frr-core">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Build now</a><a href="#" role="menuitem">Download the bundle</a><a href="#" role="menuitem">Edit target…</a></div></details></span></div>
+</article>
+</div>
+
+<section class="card" id="bundles" aria-labelledby="bh-t">
+  <div class="card-head"><h2 id="bh-t">Bundle history</h2><span class="right">8 of 1 204 · bundles are kept for 90 days</span></div>
+  <div class="table-wrap"><table class="table bh">
+    <thead><tr><th>Bundle</th><th>Trigger</th><th>Targets</th><th>Built</th><th>Duration</th><th class="num">Zones changed</th><th class="num">Lines</th><th class="num">Files changed</th><th>Checks</th><th>Diff</th></tr></thead>
+    <tbody>
+<tr><td><span class="id" title="sha256:b-7c41e0">b-7c41e0</span></td><td>3 changes · a.berger, m.huber</td><td>ns1 ns2 ns3 dhcp1 dhcp2</td><td class="mono">today 17:57</td><td class="mono">6.2 s</td><td class="num">2</td><td class="num"><span class="plus">+3</span> <span class="minus">−1</span></td><td class="num">4</td><td><span class="qs ok">ok</span></td><td><a href="export-diff.html">vs ONA</a></td></tr>
+<tr><td><span class="id" title="sha256:b-5e08c3">b-5e08c3</span></td><td>change · a.berger allocated 10.20.4.51</td><td>ns1 ns2 ns3 dhcp1 dhcp2</td><td class="mono">today 16:12</td><td class="mono">5.9 s</td><td class="num">2</td><td class="num"><span class="plus">+2</span> <span class="minus">−0</span></td><td class="num">4</td><td><span class="qs ok">ok</span></td><td><a href="export-diff.html">vs ONA</a></td></tr>
+<tr><td><span class="id" title="sha256:b-2d77f9">b-2d77f9</span></td><td>schedule 06:00 · serial day roll</td><td>ns1 ns2 ns3</td><td class="mono">today 06:00</td><td class="mono">5.1 s</td><td class="num">0</td><td class="num"><span class="plus">+0</span> <span class="minus">−0</span></td><td class="num">0</td><td><span class="qs cur">no change</span></td><td>–</td></tr>
+<tr><td><span class="id" title="sha256:b-a1c0be">b-a1c0be</span></td><td>manual · d.klein Build now</td><td>ns1 ns2 ns3 dhcp1 dhcp2</td><td class="mono">yesterday 21:40</td><td class="mono">5.4 s</td><td class="num">5</td><td class="num"><span class="plus">+31</span> <span class="minus">−12</span></td><td class="num">9</td><td><span class="qs ok">ok</span></td><td><a href="export-diff.html">vs ONA</a></td></tr>
+<tr><td><span class="id" title="sha256:b-3a90d1">b-3a90d1</span></td><td>change · a.berger added partition 0x8001</td><td>sm-kestrel</td><td class="mono">2026-11-03 15:58</td><td class="mono">0.4 s</td><td class="num">–</td><td class="num"><span class="plus">+6</span> <span class="minus">−0</span></td><td class="num">1</td><td><span class="qs ok">ok</span></td><td>–</td></tr>
+<tr><td><span class="id" title="sha256:b-f0a912">b-f0a912</span></td><td>change · m.huber</td><td>ns1 ns2 ns3</td><td class="mono">2026-11-03 11:05</td><td class="mono">5.0 s</td><td class="num">1</td><td class="num"><span class="plus">+1</span> <span class="minus">−1</span></td><td class="num">1</td><td><span class="qs ok">ok</span></td><td><a href="export-diff.html">vs ONA</a></td></tr>
+<tr><td><span class="id" title="sha256:b-9be4d0">b-9be4d0</span></td><td>change · a.berger</td><td>dhcp1 dhcp2</td><td class="mono">2026-11-02 14:31</td><td class="mono">3.3 s</td><td class="num">–</td><td class="num"><span class="plus">+2</span> <span class="minus">−0</span></td><td class="num">1</td><td><span class="qs ok">ok</span></td><td><a href="export-diff.html">vs ONA</a></td></tr>
+<tr><td><span class="id" title="sha256:b-77de02">b-77de02</span></td><td>build failed · named-checkzone</td><td>ns1 ns2 ns3</td><td class="mono">2026-11-02 09:48</td><td class="mono">4.7 s</td><td class="num">1</td><td class="num"><span class="plus">+1</span> <span class="minus">−0</span></td><td class="num">1</td><td><span class="pill st-failed">failed</span></td><td><a href="#">log</a></td></tr>
+    </tbody></table></div>
+  <div class="card-foot"><span>A bundle is immutable. Its id is the start of its SHA-256 digest. The ETag of a target is the digest of the files for that target.</span><span class="right"><a class="btn btn-sm" href="#">Older</a></span></div>
+</section>
+
+</main>
+</div>
+
+<dialog id="help" class="dlg" aria-labelledby="help-t">
+  <header><h2 id="help-t">Keyboard shortcuts</h2><span class="step-n">Esc closes</span></header>
+  <div class="body"><table class="keys">
+    <tr><td><kbd>g</kbd> <kbd>o</kbd></td><td>Overview</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>p</kbd></td><td>Prefixes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>h</kbd></td><td>Hosts</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>z</kbd></td><td>Zones</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>d</kbd></td><td>DHCP scopes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>e</kbd></td><td>Exports</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>r</kbd></td><td>Racks</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>c</kbd></td><td>Change requests</td></tr>
+    <tr><td><kbd>/</kbd></td><td>Jump to an IP, prefix, MAC, host, zone or page</td></tr>
+    <tr><td><kbd>Shift</kbd> <kbd>A</kbd></td><td>Open the assistant</td></tr>
+    <tr><td><kbd>?</kbd></td><td>Help for the element under the pointer, else for this page</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Close a dialog, a menu or a pane</td></tr>
+  </table><p class="muted">No key <a class="gl" href="../../glossary.html#allocate" data-gl="allocate" data-domain="addr">allocates</a>, deletes or <a class="gl" href="../../glossary.html#approve" data-gl="approve" data-domain="access">approves</a>.</p></div>
+  <footer><form method="dialog"><button class="btn">Close</button></form></footer>
+</dialog>
+<script src="../assets/shell.js"></script>
+<script src="../../../assets/glossary-data.js"></script>
+<script src="../../../assets/glossary.js"></script>
+</body>
+</html>

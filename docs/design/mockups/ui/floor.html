@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Floor map · bembel</title>
+<link rel="stylesheet" href="../assets/bembel.css">
+<link rel="stylesheet" href="../assets/shell.css">
+<link rel="stylesheet" href="../assets/assets.css">
+</head>
+<body data-page="floor" data-shot-mobile>
+<a class="skip" href="#main">Skip to content</a>
+<div class="app">
+<!-- SHELL: top bar. Copy it unchanged to each page; change only aria-current in the sidebar and the VRF in the switcher. -->
+<header class="topbar">
+  <a class="icon-btn nav-toggle" href="#nav" aria-controls="nav" aria-expanded="false" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></a>
+  <a class="brand" href="overview.html" aria-label="bembel: overview"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M12.6 7h6.8M13.6 7v2.6C9.9 11 8.4 13.6 8.4 16.8c0 3.2 1.4 5.7 3.1 7.2h9c1.7-1.5 3.1-4 3.1-7.2 0-3.2-1.5-5.8-5.2-7.2V7M19.4 8.3c4.4-.3 6.9 1.4 6.9 4.4 0 2.3-1.1 3.9-2.5 4.8M9.4 15.6h13.2"/></svg></span><span class="brand-name">bembel</span></a>
+  <details class="set-menu vrf-menu">
+    <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+    <div class="set-pop">
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+    </div>
+  </details>
+  <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
+    <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
+  <span class="spacer"></span>
+  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
+  <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
+  <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
+    <div class="more-pop" role="menu">
+      <div class="um-head"><b>Dennis Klein</b><span class="mono">d.klein · id.example.org</span><span class="muted small">groups netops, hpc-ops</span></div>
+      <a href="#" role="menuitem">My access</a><a href="#" role="menuitem">Tokens</a><a href="#" role="menuitem">Sign out</a></div></details>
+  <button class="icon-btn" type="button" data-help aria-label="Help (?)">?</button>
+  <button class="icon-btn" type="button" data-theme-toggle aria-label="Theme: auto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/></svg></button>
+</header>
+<!-- SHELL: sidebar. Groups and icons follow the glossary domains (docs/assets/glossary-data.js). -->
+<nav class="sidebar" id="nav" aria-label="Navigation">
+  <a class="nav-item" href="overview.html" data-key="o"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview<span class="count attn">6</span></a>
+  <div class="nav-label" data-domain="addr"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 1.8h3v3h-3Z M2 11.2h3v3H2Z M11 11.2h3v3h-3Z M8 4.8v3.2 M3.5 11.2V8h9v3.2"/></svg>Addressing</div>
+  <a class="nav-item" data-domain="addr" href="prefixes.html" data-key="p"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v4H4zM4 16h6v4H4zM14 10h6v4h-6z"/><path d="M7 8v8M10 12h4"/></svg>Prefixes</a>
+  <a class="nav-item" data-domain="addr" href="hosts.html" data-key="h"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>Hosts</a>
+  <a class="nav-item" data-domain="addr" href="vlans.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/><path d="M8 3v18"/></svg>VLANs and partitions</a>
+  <a class="nav-item" data-domain="addr" href="fabrics.html" data-key="f"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8M7.5 7.5l9 9"/></svg>Fabrics</a>
+  <a class="nav-item" data-domain="addr" href="routing.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h4a4 4 0 004-4V8"/></svg>Routing and groups</a>
+  <div class="nav-label" data-domain="dns"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 1 0 0 12.4A6.2 6.2 0 0 0 8 1.8Z M1.8 8h12.4 M8 1.8C6 3.8 5.4 5.8 5.4 8S6 12.2 8 14.2 M8 1.8c2 2 2.6 4 2.6 6.2S10 12.2 8 14.2"/></svg>DNS and DHCP</div>
+  <a class="nav-item" data-domain="dns" href="zones.html" data-key="z"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-2.5 2.6-3.5 5.6-3.5 9s1 6.4 3.5 9M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9"/></svg>Zones</a>
+  <a class="nav-item" data-domain="dhcp" href="dhcp.html" data-key="d"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12l4 5-4 5H3z"/><path d="M7 12h5"/></svg>DHCP scopes</a>
+  <a class="nav-item" data-domain="integ" href="exports.html" data-key="e"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Exports<span class="count attn">1 diff</span></a>
+  <div class="nav-label" data-domain="assets"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 1.8h8.8v12.4H3.6Z M3.6 5h8.8 M3.6 8.2h8.8 M3.6 11.4h8.8 M5.6 3.4h1.2 M5.6 6.6h1.2 M5.6 9.8h1.2"/></svg>Assets</div>
+  <a class="nav-item" data-domain="assets" href="floor.html" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 3v16M15 5v16"/></svg>Floor map</a>
+  <a class="nav-item" data-domain="assets" href="rack.html" data-key="r"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="1.5"/><path d="M5 8h14M5 13.5h14M8 5.3h2M8 10.8h2M8 16.5h2"/></svg>Racks</a>
+  <a class="nav-item" data-domain="assets" href="sync-review.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0114-5.3L20 9M20 12a8 8 0 01-14 5.3L4 15"/><path d="M20 4v5h-5M4 20v-5h5"/></svg>Sync review<span class="count attn">4</span></a>
+  <div class="nav-label" data-domain="access"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 3.6v4.1c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.6Z M5.9 8l1.5 1.5 2.8-3"/></svg>Access</div>
+  <a class="nav-item" data-domain="access" href="bindings.html" data-key="b"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.4c1.8.9 3 2.9 3 5.6"/></svg>Roles and bindings</a>
+  <a class="nav-item" data-domain="access" href="changes.html" data-key="c"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg>Change requests<span class="count attn">2</span></a>
+  <a class="nav-item" data-domain="access" href="audit.html" data-key="a"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Audit log</a>
+  <div class="nav-label" data-domain="integ"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h9 M8.6 2.6 11 5 8.6 7.4 M14 11H5 M7.4 8.6 5 11l2.4 2.4"/></svg>Integrations</div>
+  <a class="nav-item" data-domain="integ" href="integrations.html" data-key="i"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0z"/><path d="M12 16v5"/></svg>Sources and syncs</a>
+  <a class="nav-item" data-domain="integ" href="import.html" data-key="m"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6M9 15l2.5 2.5L16 13"/></svg>ONA migration<span class="count attn">214</span></a>
+  <div class="side-foot">bembel v0.1.0 · api v1</div>
+</nav>
+<!-- /SHELL -->
+
+<main class="main" id="main">
+<div class="banner err offline" role="alert"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M2 8.5a15 15 0 0120 0M5 12a10 10 0 0114 0M8.5 15.5a5 5 0 017 0M12 19h.01M3 3l18 18"/></svg>
+  <div class="grow"><b>Offline.</b> <span data-why>The event stream of bembel stopped. The page shows old data.</span> The page tries again every 5 s.</div>
+  <button class="btn btn-sm" type="button" onclick="location.reload()">Reload</button></div>
+
+<div class="crumbs"><a href="floor.html">Assets</a><span class="sep">›</span><span>Hall 2</span><span class="sep">›</span><span>Ground floor</span></div>
+<div class="page-head">
+  <div><h1>Floor map</h1>
+    <div class="sub"><span>Hall 2 · Ground floor · 4 rows · <b>10</b> racks</span><span class="sep">·</span><span class="src managed">fnt</span><span class="sync-t">synced 17:45</span></div></div>
+  <div class="actions">
+    <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
+      <div class="cli-pop">bembel site tree --site hall-2
+bembel rack ls --floor ground
+bembel sync fnt --status</div></details>
+    <button class="btn btn-agent" type="button" data-assistant="find-space" title="Runs the assistant with the advisory find-space. Tools: read only. It changes nothing.">Find space for a 4U box</button>
+    <a class="btn" href="#" title="Opens the floor in FNT Command. bembel never writes to FNT.">Open in FNT <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg></a>
+  </div>
+</div>
+<div class="stack">
+<div class="card rk-bar" role="toolbar" aria-label="Asset view">
+  <div class="rk-nav">
+    <div class="ftabs" role="tablist" aria-label="Floor"><a class="ftab" role="tab" aria-selected="true" href="floor.html">Ground floor</a><a class="ftab" role="tab" aria-selected="false" href="#">First floor</a><a class="ftab add" href="#" aria-label="Floors are read only. FNT Command owns them." title="Floors come from FNT Command">+</a></div>
+    <span class="rk-pick"><button class="icon-btn" type="button" aria-label="Previous row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <label class="rk-sel"><span class="sr-only">Row</span><select class="select" aria-label="Row"><option>Row A</option><option>Row B</option><option>Row C (planned)</option><option>Row D</option></select></label>
+      <button class="icon-btn" type="button" aria-label="Next row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></span>
+  </div>
+  <div class="rk-tools">
+    <span class="seg" role="group" aria-label="View"><a href="rack.html" >Elevation</a><a href="floor.html" aria-current="page">Floor map</a></span>
+    
+  </div>
+</div>
+<div class="fl" data-ov="team">
+<div class="fl-main">
+<section class="card sheet-card" aria-label="Ground floor of Hall 2">
+  <div class="sheet-bar">
+    <span class="seg" role="group" aria-label="Overlay" data-ovseg><button type="button" aria-pressed="true" data-ov="team">Team</button><button type="button" aria-pressed="false" data-ov="ip">IP status</button><button type="button" aria-pressed="false" data-ov="pw">Power</button></span>
+    <span class="muted small">Click a rack to open its elevation.</span>
+  </div>
+  <div class="sheet-scroll"><div class="sheet fl-sheet">
+<svg class="scene fl-svg" viewBox="0 0 1100 540" role="img" aria-labelledby="fl-t fl-d" xmlns="http://www.w3.org/2000/svg">
+<title id="fl-t">Floor map of Hall 2, ground floor, top view</title>
+<desc id="fl-d">Four rows of racks. Row A has racks A01 to A03, row B has B01 to B03, row C is planned and not built, row D has D01 to D04. Row A is selected.</desc>
+<defs><pattern id="g-min" width="20" height="20" patternUnits="userSpaceOnUse"><path class="gmin" d="M20 0H0V20"/></pattern>
+<pattern id="g-maj" width="100" height="100" patternUnits="userSpaceOnUse"><path class="gmaj" d="M100 0H0V100"/></pattern>
+<pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hat" d="M0 0V6"/></pattern></defs>
+<rect class="paper" width="1100" height="540"/><rect width="1100" height="540" fill="url(#g-min)"/><rect width="1100" height="540" fill="url(#g-maj)"/><rect class="border" x="8" y="8" width="1084" height="524"/>
+<rect class="wall" x="30" y="30" width="1040" height="480"/>
+<path class="doorgap" d="M60 510H120"/><path class="doorarc" d="M60 510A60 60 0 0 1 120 450"/><path class="doorleaf" d="M120 510V450"/><text class="cap" x="60" y="478">DOOR</text>
+<g class="crac"><rect x="150" y="36" width="96" height="30" rx="2"/><text x="198" y="55" text-anchor="middle">CRAC 1</text></g>
+<g class="crac"><rect x="470" y="36" width="96" height="30" rx="2"/><text x="518" y="55" text-anchor="middle">CRAC 2</text></g>
+<g class="crac"><rect x="790" y="36" width="96" height="30" rx="2"/><text x="838" y="55" text-anchor="middle">CRAC 3</text></g>
+<rect class="aisle" x="70" y="214" width="468" height="68" fill="url(#hatch)"/>
+<text class="aisle-t" x="304" y="252" text-anchor="middle"><tspan class="bgt">COLD AISLE · A/B · containment</tspan></text>
+<rect class="aisle" x="586" y="214" width="468" height="68" fill="url(#hatch)"/>
+<text class="aisle-t" x="820" y="252" text-anchor="middle"><tspan class="bgt">COLD AISLE · C/D · containment</tspan></text>
+<g class="rowlab"><circle cx="52" cy="156.0" r="13"/><text x="52" y="162.0" text-anchor="middle">A</text></g>
+<rect class="rowsel" x="68" y="96" width="476" height="120" rx="4"/>
+<a href="rack.html"><g class="rk t-hpc-ops ip-warn pw-warn"><title>A01 · hpc-ops · 9.1 kW of 12.0 kW · IP state warn</title><rect class="rk-r" x="76" y="104" width="52" height="104" rx="2"/><rect class="rk-front" x="78" y="204" width="48" height="3"/><text class="rk-n" x="102.0" y="148" text-anchor="middle">A01</text><text class="rk-k" x="102.0" y="164" text-anchor="middle">9.1 kW</text></g></a>
+<a href="rack.html"><g class="rk t-hpc-ops ip-failed pw-failed"><title>A02 · hpc-ops · 11.4 kW of 12.0 kW · IP state failed</title><rect class="rk-r" x="134" y="104" width="52" height="104" rx="2"/><rect class="rk-front" x="136" y="204" width="48" height="3"/><text class="rk-n" x="160.0" y="148" text-anchor="middle">A02</text><text class="rk-k" x="160.0" y="164" text-anchor="middle">11.4 kW</text></g></a>
+<a href="rack.html"><g class="rk t-storage ip-ok pw-ok"><title>A03 · storage · 5.7 kW of 12.0 kW · IP state ok</title><rect class="rk-r" x="192" y="104" width="52" height="104" rx="2"/><rect class="rk-front" x="194" y="204" width="48" height="3"/><text class="rk-n" x="218.0" y="148" text-anchor="middle">A03</text><text class="rk-k" x="218.0" y="164" text-anchor="middle">5.7 kW</text></g></a>
+<g class="rk-free"><rect x="250" y="104" width="52" height="104" rx="2"/><text x="276.0" y="160.0" text-anchor="middle">A04</text></g>
+<g class="rk-free"><rect x="308" y="104" width="52" height="104" rx="2"/><text x="334.0" y="160.0" text-anchor="middle">A05</text></g>
+<g class="rk-free"><rect x="366" y="104" width="52" height="104" rx="2"/><text x="392.0" y="160.0" text-anchor="middle">A06</text></g>
+<g class="rk-free"><rect x="424" y="104" width="52" height="104" rx="2"/><text x="450.0" y="160.0" text-anchor="middle">A07</text></g>
+<g class="rk-free"><rect x="482" y="104" width="52" height="104" rx="2"/><text x="508.0" y="160.0" text-anchor="middle">A08</text></g>
+<g class="rowlab"><circle cx="52" cy="340.0" r="13"/><text x="52" y="346.0" text-anchor="middle">B</text></g>
+<a href="rack.html"><g class="rk t-netops ip-ok pw-ok"><title>B01 · netops · 0.9 kW of 12.0 kW · IP state ok</title><rect class="rk-r" x="76" y="288" width="52" height="104" rx="2"/><rect class="rk-front" x="78" y="289" width="48" height="3"/><text class="rk-n" x="102.0" y="338" text-anchor="middle">B01</text><text class="rk-k" x="102.0" y="354" text-anchor="middle">0.9 kW</text></g></a>
+<a href="rack.html"><g class="rk t-openstack ip-ok pw-warn"><title>B02 · openstack · 9.9 kW of 12.0 kW · IP state ok</title><rect class="rk-r" x="134" y="288" width="52" height="104" rx="2"/><rect class="rk-front" x="136" y="289" width="48" height="3"/><text class="rk-n" x="160.0" y="338" text-anchor="middle">B02</text><text class="rk-k" x="160.0" y="354" text-anchor="middle">9.9 kW</text></g></a>
+<a href="rack.html"><g class="rk t-openstack ip-warn pw-failed"><title>B03 · openstack · 11.1 kW of 12.0 kW · IP state warn</title><rect class="rk-r" x="192" y="288" width="52" height="104" rx="2"/><rect class="rk-front" x="194" y="289" width="48" height="3"/><text class="rk-n" x="218.0" y="338" text-anchor="middle">B03</text><text class="rk-k" x="218.0" y="354" text-anchor="middle">11.1 kW</text></g></a>
+<g class="rk-free"><rect x="250" y="288" width="52" height="104" rx="2"/><text x="276.0" y="344.0" text-anchor="middle">B04</text></g>
+<g class="rk-free"><rect x="308" y="288" width="52" height="104" rx="2"/><text x="334.0" y="344.0" text-anchor="middle">B05</text></g>
+<g class="rk-free"><rect x="366" y="288" width="52" height="104" rx="2"/><text x="392.0" y="344.0" text-anchor="middle">B06</text></g>
+<g class="rk-free"><rect x="424" y="288" width="52" height="104" rx="2"/><text x="450.0" y="344.0" text-anchor="middle">B07</text></g>
+<g class="rk-free"><rect x="482" y="288" width="52" height="104" rx="2"/><text x="508.0" y="344.0" text-anchor="middle">B08</text></g>
+<g class="rowlab"><circle cx="568" cy="156.0" r="13"/><text x="568" y="162.0" text-anchor="middle">C</text></g>
+<g class="rk-plan"><rect x="592" y="104" width="52" height="104" rx="2" fill="url(#hatch)"/><text x="618.0" y="160.0" text-anchor="middle">C01</text></g>
+<g class="rk-plan"><rect x="650" y="104" width="52" height="104" rx="2" fill="url(#hatch)"/><text x="676.0" y="160.0" text-anchor="middle">C02</text></g>
+<g class="rk-plan"><rect x="708" y="104" width="52" height="104" rx="2" fill="url(#hatch)"/><text x="734.0" y="160.0" text-anchor="middle">C03</text></g>
+<g class="rk-plan"><rect x="766" y="104" width="52" height="104" rx="2" fill="url(#hatch)"/><text x="792.0" y="160.0" text-anchor="middle">C04</text></g>
+<g class="rk-plan"><rect x="824" y="104" width="52" height="104" rx="2" fill="url(#hatch)"/><text x="850.0" y="160.0" text-anchor="middle">C05</text></g>
+<g class="rk-plan"><rect x="882" y="104" width="52" height="104" rx="2" fill="url(#hatch)"/><text x="908.0" y="160.0" text-anchor="middle">C06</text></g>
+<g class="rowlab"><circle cx="568" cy="340.0" r="13"/><text x="568" y="346.0" text-anchor="middle">D</text></g>
+<a href="rack.html"><g class="rk t-ceph ip-ok pw-ok"><title>D01 · ceph · 7.2 kW of 12.0 kW · IP state ok</title><rect class="rk-r" x="592" y="288" width="52" height="104" rx="2"/><rect class="rk-front" x="594" y="289" width="48" height="3"/><text class="rk-n" x="618.0" y="338" text-anchor="middle">D01</text><text class="rk-k" x="618.0" y="354" text-anchor="middle">7.2 kW</text></g></a>
+<a href="rack.html"><g class="rk t-ceph ip-ok pw-ok"><title>D02 · ceph · 7.0 kW of 12.0 kW · IP state ok</title><rect class="rk-r" x="650" y="288" width="52" height="104" rx="2"/><rect class="rk-front" x="652" y="289" width="48" height="3"/><text class="rk-n" x="676.0" y="338" text-anchor="middle">D02</text><text class="rk-k" x="676.0" y="354" text-anchor="middle">7.0 kW</text></g></a>
+<a href="rack.html"><g class="rk t-storage ip-ok pw-warn"><title>D03 · storage · 8.4 kW of 12.0 kW · IP state ok</title><rect class="rk-r" x="708" y="288" width="52" height="104" rx="2"/><rect class="rk-front" x="710" y="289" width="48" height="3"/><text class="rk-n" x="734.0" y="338" text-anchor="middle">D03</text><text class="rk-k" x="734.0" y="354" text-anchor="middle">8.4 kW</text></g></a>
+<a href="rack.html"><g class="rk t-storage ip-ok pw-ok"><title>D04 · storage · 4.1 kW of 12.0 kW · IP state ok</title><rect class="rk-r" x="766" y="288" width="52" height="104" rx="2"/><rect class="rk-front" x="768" y="289" width="48" height="3"/><text class="rk-n" x="792.0" y="338" text-anchor="middle">D04</text><text class="rk-k" x="792.0" y="354" text-anchor="middle">4.1 kW</text></g></a>
+<g class="rk-free"><rect x="824" y="288" width="52" height="104" rx="2"/><text x="850.0" y="344.0" text-anchor="middle">D05</text></g>
+<g class="rk-free"><rect x="882" y="288" width="52" height="104" rx="2"/><text x="908.0" y="344.0" text-anchor="middle">D06</text></g>
+<g class="rk-free"><rect x="940" y="288" width="52" height="104" rx="2"/><text x="966.0" y="344.0" text-anchor="middle">D07</text></g>
+<g class="rk-free"><rect x="998" y="288" width="52" height="104" rx="2"/><text x="1024.0" y="344.0" text-anchor="middle">D08</text></g>
+<text class="plan-note" x="764" y="94" text-anchor="middle">Row C planned in FNT, not built · prefix 10.20.16.0/22 planned</text>
+<g class="scale"><path d="M180 470H232M180 465V475M232 465V475"/><text x="180" y="488">0</text><text x="232" y="488" text-anchor="middle">0.6 m</text></g>
+<g class="tb"><rect class="tb-f" x="752" y="410" width="300" height="92"/><path class="tb-l" d="M942 410V502M752 440H1052M752 471H1052"/>
+<text class="tc" x="760" y="420">DRAWING · BEMBEL</text><text class="tn" x="760" y="436">Hall 2 · Ground floor</text>
+<text class="tc" x="950" y="420">SYNCED FROM FNT</text><text class="tv xs" x="950" y="434">2026-11-04 17:45</text>
+<text class="tc" x="760" y="450">LOCATION</text><text class="tv" x="760" y="463">Hall 2 › Ground floor</text>
+<text class="tc" x="950" y="450">RACKS</text><text class="tv" x="950" y="463">10 · 4 rows</text>
+<text class="tc" x="760" y="481">VIEW</text><text class="tv sm" x="760" y="494">top view · rack 600 × 1200 mm</text>
+<text class="tc" x="950" y="481">SHEET</text><text class="tv sm" x="950" y="494">1 / 1</text></g>
+</svg>
+  </div></div>
+  <div class="card-foot fl-legend">
+    <div class="legend lg-team"><span class="t-hpc-ops"><i class="sw-sq"></i>hpc-ops</span><span class="t-openstack"><i class="sw-sq"></i>openstack</span><span class="t-ceph"><i class="sw-sq"></i>ceph</span><span class="t-storage"><i class="sw-sq"></i>storage</span><span class="t-netops"><i class="sw-sq"></i>netops</span><span><i class="sw-free"></i>free position</span><span><i class="sw-plan"></i>planned</span></div>
+    <div class="legend lg-ip"><span><i class="sd-i ok"></i>all records ok</span><span><i class="sd-i warn"></i>stale or drift</span><span><i class="sd-i failed"></i>conflict</span><span class="muted">worst state of the devices in a rack</span></div>
+    <div class="legend lg-pw"><span><i class="sd-i ok"></i>below 70 % of 12.0 kW</span><span><i class="sd-i warn"></i>70 to 90 %</span><span><i class="sd-i failed"></i>above 90 %</span></div>
+  </div>
+</section>
+<section class="card" aria-labelledby="rows-t">
+  <div class="card-head"><h2 id="rows-t">Rows of the ground floor</h2><span class="right"><span class="src managed">fnt</span></span></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Row</th><th>Racks</th><th>Space</th><th>Power</th><th>Teams</th><th>IP state</th></tr></thead>
+    <tbody>
+      <tr><td><a href="rack.html"><b>Row A</b></a></td><td class="num">3</td><td><span class="meter" style="--v:61" aria-hidden="true"></span> <span class="meter-t">86 / 141 U</span></td><td><span class="meter-t">26.2 / 36.0 kW</span></td><td><span class="team t-hpc-ops"><i></i>hpc-ops</span> <span class="team t-storage"><i></i>storage</span> <span class="team t-ceph"><i></i>ceph</span></td><td><span class="pill st-failed">1 conflict</span> <span class="pill st-warn">3 stale</span></td></tr>
+      <tr><td><a href="#"><b>Row B</b></a></td><td class="num">3</td><td><span class="meter" style="--v:44" aria-hidden="true"></span> <span class="meter-t">62 / 141 U</span></td><td><span class="meter-t">21.9 / 36.0 kW</span></td><td><span class="team t-netops"><i></i>netops</span> <span class="team t-openstack"><i></i>openstack</span></td><td><span class="pill st-warn">2 stale</span></td></tr>
+      <tr><td><a href="#"><b>Row C</b></a></td><td class="num">0 <span class="muted">of 6 planned</span></td><td class="muted">not built</td><td class="muted">–</td><td class="muted">–</td><td class="muted">–</td></tr>
+      <tr><td><a href="#"><b>Row D</b></a></td><td class="num">4</td><td><span class="meter" style="--v:52" aria-hidden="true"></span> <span class="meter-t">98 / 188 U</span></td><td><span class="meter-t">26.7 / 48.0 kW</span></td><td><span class="team t-ceph"><i></i>ceph</span> <span class="team t-storage"><i></i>storage</span></td><td><span class="qs ok">ok</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+</div>
+<div class="fl-side">
+<section class="card" aria-labelledby="rowa-t">
+  <div class="card-head"><h2 id="rowa-t">Row A</h2><span class="right"><span class="src managed">fnt</span></span></div>
+  <div class="card-body rowa-sum">
+    <div class="statline"><span><b>3</b> racks</span><span><b>56</b> devices</span><span><b>54</b> with a host</span></div>
+    <div class="usage"><div class="u-h"><span>Space</span><span class="meter-t">86 of 141 U · 61 %</span></div><span class="meter wide" style="--v:61" aria-hidden="true"></span></div>
+    <div class="usage"><div class="u-h"><span>Power</span><span class="meter-t">26.2 of 36.0 kW · 73 %</span></div><span class="meter wide warn" style="--v:73" aria-hidden="true"></span></div>
+    <div class="teams-in"><div class="cap-h">Teams in the row</div><span class="team t-hpc-ops"><i></i>hpc-ops <span class="muted">40 U</span></span><span class="team t-storage"><i></i>storage <span class="muted">24 U</span></span><span class="team t-ceph"><i></i>ceph <span class="muted">12 U</span></span><span class="team t-netops"><i></i>netops <span class="muted">6 U</span></span><span class="team t-openstack"><i></i>openstack <span class="muted">4 U</span></span></div>
+  </div>
+  <ul class="rows mini racks-l"><li><span class="t"><a href="rack.html"><b class="mono">A01</b></a> <span class="muted">26 / 47 U · 9.1 kW</span></span><span class="s"><span class="qs warn">2 stale addresses</span></span>
+      <span class="acts"><span class="meter" style="--v:55" aria-hidden="true"></span></span></li><li><span class="t"><a href="rack.html"><b class="mono">A02</b></a> <span class="muted">34 / 47 U · 11.4 kW</span></span><span class="s"><span class="qs bad">1 conflict · 2 without host</span></span>
+      <span class="acts"><span class="meter warn" style="--v:72" aria-hidden="true"></span></span></li><li><span class="t"><a href="rack.html"><b class="mono">A03</b></a> <span class="muted">26 / 47 U · 5.7 kW</span></span><span class="s"><span class="qs ok">all records ok</span></span>
+      <span class="acts"><span class="meter" style="--v:55" aria-hidden="true"></span></span></li>
+  </ul>
+  <div class="card-foot"><a class="btn btn-primary" href="rack.html">Open elevation</a><a class="btn" href="#">Open in FNT <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg></a></div>
+</section>
+<section class="card" aria-labelledby="sync-t">
+  <div class="card-head"><h2 id="sync-t">Source</h2><span class="right"><a href="sync-review.html">Sync review</a></span></div>
+  <ul class="rows mini">
+    <li><span class="t"><span class="src managed">fnt</span> FNT Command</span><span class="s">Delta 17:45 ok · nightly full 03:00 ok</span></li>
+    <li><span class="t"><b>2 311</b> devices · 4 unmatched</span><span class="s">2 of them are in Row A (gpu-009, gpu-010)</span></li>
+    <li><span class="t">Row C is planned in FNT</span><span class="s">6 <a class="gl" href="../../glossary.html#rack" data-gl="rack" data-domain="assets">racks</a>, none built. <a class="gl" href="../../glossary.html#prefix" data-gl="prefix" data-domain="addr">Prefix</a> 10.20.16.0/22 is planned in bembel.</span></li>
+  </ul>
+</section>
+</div>
+</div>
+</div>
+<script>
+(function(){var fl=document.querySelector('.fl');document.querySelectorAll('[data-ovseg] button').forEach(function(b){b.addEventListener('click',function(){fl.setAttribute('data-ov',b.dataset.ov);document.querySelectorAll('[data-ovseg] button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')})})})})();
+</script>
+</main>
+</div>
+
+<dialog id="help" class="dlg" aria-labelledby="help-t">
+  <header><h2 id="help-t">Keyboard shortcuts</h2><span class="step-n">Esc closes</span></header>
+  <div class="body"><table class="keys">
+    <tr><td><kbd>g</kbd> <kbd>o</kbd></td><td>Overview</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>p</kbd></td><td>Prefixes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>h</kbd></td><td>Hosts</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>z</kbd></td><td>Zones</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>d</kbd></td><td>DHCP scopes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>e</kbd></td><td>Exports</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>r</kbd></td><td>Racks</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>c</kbd></td><td>Change requests</td></tr>
+    <tr><td><kbd>/</kbd></td><td>Jump to an IP, prefix, MAC, host, zone or page</td></tr>
+    <tr><td><kbd>Shift</kbd> <kbd>A</kbd></td><td>Open the assistant</td></tr>
+    <tr><td><kbd>?</kbd></td><td>Help for the element under the pointer, else for this page</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Close a dialog, a menu or a pane</td></tr>
+  </table><p class="muted">No key <a class="gl" href="../../glossary.html#allocate" data-gl="allocate" data-domain="addr">allocates</a>, deletes or <a class="gl" href="../../glossary.html#approve" data-gl="approve" data-domain="access">approves</a>.</p></div>
+  <footer><form method="dialog"><button class="btn">Close</button></form></footer>
+</dialog>
+<script src="../assets/shell.js"></script>
+<script src="../../../assets/glossary-data.js"></script>
+<script src="../../../assets/glossary.js"></script>
+</body>
+</html>

@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UI: DNS and DHCP</title>
+<meta name="description" content="Page specs of the bembel web UI for DNS, DHCP, exports and routing: Zones, Zone, record dialog, DHCP scope, Exports, export diff and Routing and groups.">
+</head>
+<body>
+<h1>UI: DNS and DHCP</h1>
+<p class="lede">This chapter specifies the web UI pages for names, leases and delivery: Zones, one Zone, the record dialog, a DHCP scope, Exports, the parallel-run diff, and Routing and groups. The shell and the common parts are in <a href="ui.html">ui.html</a>. Each page below has a screenshot of the mockup, its purpose, its parts with the reason for each part, its states, and its URL, API calls and CLI commands.</p>
+<ul class="keypoints">
+  <li>The screenshots show one moment of the story: 4 November 2026, 18:02. Bundle <code>b-7c41e0</code> is on all servers, and night 12 of 14 of the parallel run with ONA is over.</li>
+  <li>A record shows where it comes from. A <b>derived</b> record has a lock and a link to its address. A <b>manual</b> record has a checkbox and an edit action. The user never edits an A, AAAA or PTR record in a zone.</li>
+  <li>Every dialog and every page shows the CLI command of its action, and an assistant button where a known tool plan exists. The assistant only reads. It proposes drafts.</li>
+  <li>The Exports page is the place that says "the servers have what bembel knows". A target that does not pull is a warning, not an error.</li>
+  <li>The diff page makes the parallel run decidable: three lines, one known, two unexplained, each with a reason and a next step.</li>
+</ul>
+
+<h2 id="common">Common parts</h2>
+<p>All pages use the shell of <a href="ui.html#layout">ui.html</a>: top bar, sidebar, main area. Zones is in the group "DNS and DHCP", with DHCP scopes and Exports. Routing and groups is in the group "Addressing". The page head of each page has the title, one line of facts, a CLI toggle, at most one assistant button and at most one filled button for the real next step.</p>
+<figure class="diagram">
+<svg viewBox="0 0 960 250" role="img" aria-labelledby="fig-write-t">
+<title id="fig-write-t">Two ways to a record: a derived record comes from an address, a manual record is written in the zone; both end in the zone file of a view and in a bundle</title>
+<rect class="box-soft" x="16" y="24" width="210" height="84" rx="10"/>
+<text class="t-title" x="32" y="52">Address</text>
+<text class="t-small" x="32" y="72">10.20.4.44 · cn-004</text>
+<text class="t-small t-muted" x="32" y="90">edited on the address page</text>
+<rect class="box-soft" x="16" y="142" width="210" height="84" rx="10"/>
+<text class="t-title" x="32" y="170">User with dns-editor</text>
+<text class="t-small" x="32" y="190">CNAME, MX, SRV, TXT, CAA</text>
+<text class="t-small t-muted" x="32" y="208">record dialog or inline row</text>
+<rect class="box-accent" x="320" y="64" width="210" height="122" rx="10"/>
+<text class="t-title t-on" x="336" y="92">Zone, one view</text>
+<text class="t-small t-on" x="336" y="114">derived rows: lock, link</text>
+<text class="t-small t-on" x="336" y="132">manual rows: edit, delete</text>
+<text class="t-small t-on" x="336" y="150">rules: CNAME alone at its name</text>
+<text class="t-small t-on" x="336" y="168">serial: raised on change</text>
+<rect class="box" x="624" y="64" width="150" height="122" rx="10"/>
+<text class="t-title" x="640" y="92">Zone file</text>
+<text class="t-small" x="640" y="114">per view</text>
+<text class="t-small" x="640" y="132">named-checkzone</text>
+<text class="t-small t-muted" x="640" y="150">in a bundle</text>
+<rect class="box-ok" x="820" y="64" width="124" height="122" rx="10"/>
+<text class="t-title" x="836" y="92">ns1, ns2, ns3</text>
+<text class="t-small" x="836" y="114">pull with ETag</text>
+<path class="edge" d="M226,66 L318,100" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="258" y="64">A, AAAA, PTR</text>
+<path class="edge" d="M226,184 L318,150" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="258" y="206">POST …/records</text>
+<path class="edge" d="M530,125 L622,125" marker-end="url(#arrow)"/>
+<path class="edge" d="M774,125 L818,125" marker-end="url(#arrow)"/>
+</svg>
+<figcaption>Write paths to a record. The zone page shows the origin of each row, so a user knows where to make a change.</figcaption>
+</figure>
+<p>Four rules hold on all pages of this chapter.</p>
+<ul>
+  <li><b>Origin before edit.</b> A derived record is read only. The lock has a tooltip: "Derived from an address. Change the address to change this record." The row links to the address (<code>409 record.derived</code> is the API answer to a write).</li>
+  <li><b>One list for all states.</b> A pill shows only a state that needs a look (stale, failed, new, unexplained). The normal state is a dot and a word.</li>
+  <li><b>Preview before write.</b> The record dialog shows the zone file line. The export page offers Preview. A user sees the text that a server will read.</li>
+  <li><b>Names as values.</b> An FQDN, an IP, a MAC and a prefix use the value classes of the shared components: mono, no break inside, muted domain part.</li>
+</ul>
+
+<h2 id="zones">Zones</h2>
+<figure class="shot"><a href="mockups/ui/zones.html"><img src="img/ui-zones.webp" alt="Zones page: forward and reverse zones as a tree with views, record counts, derived and manual split, serial, DNS servers, team, last export and status" loading="lazy"></a><figcaption>Zones at 18:02. 41 zones in 3 views; kestrel.example.org is a child of example.org; lab.example.org has 5 orphans from the ONA import.</figcaption></figure>
+<p>Purpose: the page lists all zones that the user may see, and says which one needs a look. It is the start of every DNS task.</p>
+<h3 id="zones-layout">Layout</h3>
+<ul>
+  <li><b>Head.</b> "41 zones in 3 views", the split forward and reverse, the record count, the access of the user as a scope chip. Buttons: CLI toggle, "Check all zones" (assistant, quiet), "New zone…" (filled).</li>
+  <li><b>Banner.</b> One warning when a zone has findings from the ONA import. It says what is wrong and who decides. It links to the import page.</li>
+  <li><b>Toolbar.</b> A filter box, chips for kind, view, team and "Needs a look", and a Tree or Flat switch. Each chip has a count.</li>
+  <li><b>Table.</b> Two groups: "Forward zones" and "Reverse zones". Child zones are indented under their parent. Columns: zone, views, records, derived and manual, serial, DNS servers, team, last export, status.</li>
+  <li><b>DNS servers and views.</b> A second card with ns1, ns2 and ns3: role, views, zone count, serial of kestrel.example.org, last pull.</li>
+</ul>
+<h3 id="zones-parts">Parts and why</h3>
+<table>
+<thead><tr><th>Part</th><th>What it shows</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Tree by parent</td><td><code>kestrel.example.org</code> under <code>example.org</code>. Reverse zones show the prefix they come from, for example <code>10.20.0.0/16</code>.</td><td>A DNS editor thinks in the name tree. A reverse zone is computed from a subnet, so the link to the prefix explains it.</td></tr>
+<tr><td>Views chips</td><td><code>internal</code>, <code>external</code>, <code>fabric</code>.</td><td>The same name can be a different zone in each view. The chip says which copies exist.</td></tr>
+<tr><td>Derived and manual bar</td><td>A thin bar and "1 802 derived · 44 manual".</td><td>A zone with many manual records needs more care. A zone with 0 derived records is suspect (lab.example.org).</td></tr>
+<tr><td>Serial</td><td><code>2026110417</code>.</td><td>The user can compare it with the serial on a server, for example with <code>dig SOA</code>. bembel raises it only when the zone body changes (<a href="dns.html#serial">dns.html#serial</a>).</td></tr>
+<tr><td>Last export</td><td>Time and bundle id.</td><td>It answers "is my change on the servers?" without a visit to Exports.</td></tr>
+<tr><td>Status</td><td>A dot and "ok", or a pill: "5 orphans", "RFC 2317".</td><td>Only a state that needs a look gets a pill.</td></tr>
+</tbody>
+</table>
+<h3 id="zones-states">States</h3>
+<ul>
+  <li><b>Empty.</b> A fresh install shows a short text: what a zone is, and a "New zone…" button. The ONA import fills the list.</li>
+  <li><b>Filtered.</b> A filter with no result shows "No zone matches" and a "Clear filter" link. The chip counts stay.</li>
+  <li><b>Denied.</b> The user sees only zones in the scope of the binding. "New zone…" is disabled with the reason in its title: <code>zone:create</code> in scope <code>example.org</code>.</li>
+  <li><b>Offline.</b> The shell banner appears. The list stays, dimmed.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/zones[?q=&amp;kind=&amp;view=&amp;team=&amp;problem=1&amp;layout=tree|flat]</code></dd>
+  <dt>API</dt><dd><code>GET /v1/zones?view=&amp;under=</code>, <code>GET /v1/exports</code> (last export column), <code>POST /v1/zones</code> (New zone…)</dd>
+  <dt>CLI</dt><dd><code>bembel zone ls --under example.org --view internal</code>, <code>bembel zone ls --kind reverse --status problem</code></dd>
+  <dt>Assistant</dt><dd>"Check all zones": advisory <code>check-zones</code>, tools <code>zone.list</code>, <code>zone.check</code>. Read only.</dd>
+</dl>
+
+<h2 id="zone">Zone</h2>
+<figure class="shot"><a href="mockups/ui/zone.html"><img src="img/ui-zone.webp" alt="Zone kestrel.example.org in view internal: SOA facts, tabs, a records table with derived rows with a lock, an inline edit row with a CNAME conflict, bulk bar and a checks card" loading="lazy"></a><figcaption>Zone kestrel.example.org, view internal. The edit row at the bottom shows the error cname.conflict. Two manual rows are selected for a bulk action.</figcaption></figure>
+<p>Purpose: the page shows and changes the facts and the records of one zone in one view. It tells a user where each record comes from and what a change does.</p>
+<h3 id="zone-layout">Layout</h3>
+<ul>
+  <li><b>Head.</b> The breadcrumb <code>Zones / example.org / kestrel.example.org</code>, the name, a chip with the view, a pill "exported", one line of facts. A view switch (internal 1 846, external 3), the CLI toggle, "Check zone" (assistant) and "New record…" (filled).</li>
+  <li><b>Tabs.</b> Records, Delegations, Servers, History. Each tab has a count.</li>
+  <li><b>Zone facts.</b> Three columns: serial, primary, contact; refresh, retry, expire, negative TTL, default TTL; the NS set, parent, source. "Edit…" opens the SOA dialog.</li>
+  <li><b>Records.</b> Filter, type chips with counts, origin switch (All, Derived, Manual), the bulk bar, the table, the footer with paging.</li>
+  <li><b>Side column.</b> "Checks" with the result of <code>named-checkzone</code> and the rules of bembel, and the result card of the assistant.</li>
+</ul>
+<h3 id="zone-records">The records table</h3>
+<table>
+<thead><tr><th>Column</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td>First</td><td>A checkbox for a manual row. A lock for a derived row, and for the NS set.</td></tr>
+<tr><td>Name</td><td>Relative to the zone. <code>@</code> is the apex. A <span class="tag">new</span> tag marks a record younger than the last export (cn-011).</td></tr>
+<tr><td>Type</td><td>A small chip: A and AAAA in the DNS colour, CNAME in blue, SRV, MX and TXT in violet.</td></tr>
+<tr><td>TTL</td><td>Seconds. An empty TTL in the data shows the zone default.</td></tr>
+<tr><td>Data</td><td>By type. SRV shows priority, weight and port in bold and the target as an FQDN. TXT shows the quoted text.</td></tr>
+<tr><td>Origin</td><td>A derived row: <code>address 10.20.4.44</code> as a link. A manual row: <code>manual</code> and the user. The NS set: <code>zone</code>.</td></tr>
+<tr><td>Last</td><td>A ⋯ menu. A derived row offers "Copy as zone file line" and "History". A manual row adds "Edit…" and "Delete…".</td></tr>
+</tbody>
+</table>
+<aside class="callout why"><p class="callout-title">Why the lock</p><p>ONA let a user edit an A record in the DNS table and then did not match the address. In bembel the address is the one source. The lock is a visible refusal, with the way out in the tooltip and in the link of the origin column.</p></aside>
+<h3 id="zone-edit">Inline edit and validation</h3>
+<p>The ⋯ menu of a manual row, or a double click, turns the row into inputs: name, type, TTL, data. The row gets a grey background and a red left edge when it has an error. The error stands under the data field. It has a code, a plain sentence and a link to the cause.</p>
+<figure class="diagram">
+<svg viewBox="0 0 960 230" role="img" aria-labelledby="fig-val-t">
+<title id="fig-val-t">Validation of a manual record: the browser checks the syntax while the user types, the server checks the zone rules when the user saves; an error keeps the row open</title>
+<rect class="box" x="16" y="40" width="190" height="90" rx="10"/>
+<text class="t-title" x="32" y="68">Edit row</text>
+<text class="t-small" x="32" y="90">name ctl01, type CNAME</text>
+<text class="t-small t-muted" x="32" y="108">data ctl01.kestrel…</text>
+<rect class="box" x="260" y="40" width="200" height="90" rx="10"/>
+<text class="t-title" x="276" y="68">Syntax, in the page</text>
+<text class="t-small" x="276" y="90">label length, characters</text>
+<text class="t-small t-muted" x="276" y="108">TTL range, data per type</text>
+<rect class="box-accent" x="514" y="40" width="210" height="90" rx="10"/>
+<text class="t-title t-on" x="530" y="68">Zone rules, in the API</text>
+<text class="t-small t-on" x="530" y="90">CNAME alone at its name</text>
+<text class="t-small t-on" x="530" y="108">no CNAME at the apex</text>
+<rect class="box-ok" x="778" y="24" width="166" height="56" rx="10"/>
+<text class="t-title" x="794" y="50">Saved</text>
+<text class="t-small t-muted" x="794" y="68">201, audit event</text>
+<rect class="box-err" x="778" y="110" width="166" height="76" rx="10"/>
+<text class="t-title" x="794" y="136">409 problem</text>
+<text class="t-small" x="794" y="156">cname.conflict</text>
+<text class="t-small t-muted" x="794" y="174">row stays open</text>
+<path class="edge" d="M206,85 L258,85" marker-end="url(#arrow)"/>
+<path class="edge" d="M460,85 L512,85" marker-end="url(#arrow)"/>
+<path class="edge-ok" d="M724,66 L776,54" marker-end="url(#arrow)"/>
+<path class="edge-err" d="M724,104 L776,134" marker-end="url(#arrow)"/>
+</svg>
+<figcaption>Two levels of checks. The page catches typing errors. The API decides the zone rules, so the CLI and the UI get the same answer.</figcaption>
+</figure>
+<p>The example in the mockup: a user renames the CNAME <code>slurm</code> to <code>ctl01</code>. The name has a derived A record from 10.20.4.5. The API answers <code>409</code> with the problem code <code>cname.conflict</code>. The row shows: "ctl01 already holds an A record, derived from 10.20.4.5. A name with a CNAME cannot hold other records." Save stays disabled until the user changes the name.</p>
+<h3 id="zone-bulk">Bulk actions</h3>
+<p>A selection of manual rows opens a bar over the table: "2 manual records selected", with Set TTL…, Copy to view… and Delete…. The bar does not list derived rows. A bulk change of more than the configured limit becomes a change request (<a href="access.html">access.html</a>). The dialog says so before the user confirms.</p>
+<h3 id="zone-checks">Checks and the assistant</h3>
+<ul>
+  <li><b>Checks card.</b> Five lines with a dot: named-checkzone ok, no CNAME beside other data, PTR coverage, targets outside the zone, and the unsaved row. A warning has a second line with the detail.</li>
+  <li><b>Check zone.</b> The advisory <code>check-zone</code> reads the records and the last export diff. The answer is one sentence of verdict and a numbered list. It cites the known difference <code>kd-1</code> and the new record cn-011. A fold "Tools used" lists the calls. A button opens the diff.</li>
+</ul>
+<h3 id="zone-states2">States</h3>
+<ul>
+  <li><b>External view.</b> The switch shows the 3 records of view external. A record that exists only in one view has a chip with that view.</li>
+  <li><b>Managed zone.</b> A zone with <code>source=openstack:os-prod</code> has locks on all rows and a banner "managed by". Humans cannot edit it.</li>
+  <li><b>Held change.</b> A delete that needs a change request shows the row as "pending" until an approver acts.</li>
+  <li><b>Conflict.</b> A save with an old <code>If-Match</code> shows "Another user changed this record" and offers a reload of the row.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/zones/{zone}[?view=internal&amp;tab=records&amp;type=&amp;origin=manual&amp;q=]</code>, tabs <code>tab=delegations|servers|history</code></dd>
+  <dt>API</dt><dd><code>GET /v1/zones/{id}</code>, <code>GET /v1/zones/{id}/records?type=&amp;derived=</code>, <code>POST /v1/zones/{id}/records</code> with <code>Idempotency-Key</code>, <code>PATCH /v1/records/{id}</code> with <code>If-Match</code>, <code>DELETE /v1/records/{id}</code></dd>
+  <dt>CLI</dt><dd><code>bembel record ls kestrel.example.org --view internal --manual</code>, <code>bembel record add …</code>, <code>bembel zone check kestrel.example.org</code></dd>
+  <dt>Assistant</dt><dd>"Check zone": advisory <code>check-zone</code>, tools <code>record.list</code>, <code>zone.check</code>, <code>export.diff</code>.</dd>
+</dl>
+
+<h2 id="record">Record dialog</h2>
+<figure class="shot"><a href="mockups/ui/record-dialog.html"><img src="img/ui-record-dialog.webp" alt="New record dialog for an SRV record: name with zone suffix, type, TTL, priority weight port target, view checkboxes, a warning about CNAME exclusivity and the zone file preview" loading="lazy"></a><figcaption>The new-record dialog for an SRV record at <code>_slurmctld._tcp</code>. The page behind it is the zone page.</figcaption></figure>
+<p>Purpose: the dialog creates or changes a manual record. It shows the result in the form of the zone file before the user saves.</p>
+<h3 id="record-parts">Parts and why</h3>
+<ul>
+  <li><b>Name with suffix.</b> The input takes the relative name. The zone name stands after it as a fixed suffix <code>.kestrel.example.org.</code>. A user cannot write the wrong zone. <code>@</code> means the apex.</li>
+  <li><b>Type.</b> A, AAAA and PTR are not in the list. The hint says they come from addresses. The list has CNAME, MX, NS, CAA, SRV and TXT.</li>
+  <li><b>TTL.</b> A number of seconds. An empty field takes the zone default, shown in the hint.</li>
+  <li><b>Data fields by type.</b> The group below changes with the type. A short table shows each form.</li>
+  <li><b>Views.</b> One checkbox per view of the zone, with the record count of the view. The default is the view of the zone page.</li>
+  <li><b>Warning.</b> A banner explains the CNAME rule for this name: "A name that holds an SRV cannot hold a CNAME." It names the number of records at the name.</li>
+  <li><b>Preview.</b> A dark block shows the lines of the zone file at this name, with the new line in green, and the serial change. Four checks stand under it.</li>
+  <li><b>Command.</b> The same change as a <code>bembel record add</code> command, with a copy button.</li>
+  <li><b>Footer.</b> The role of the user in the scope, the audit note, and the undo ("delete the record"). Cancel is on the left, "Create record" is filled.</li>
+</ul>
+<table>
+<thead><tr><th>Type</th><th>Fields</th><th>Check</th></tr></thead>
+<tbody>
+<tr><td>CNAME</td><td>target name</td><td>The name holds no other record. The name is not the apex. The target is not a CNAME that loops.</td></tr>
+<tr><td>MX</td><td>preference, mail host</td><td>The host has an address record and is not a CNAME.</td></tr>
+<tr><td>NS</td><td>name server</td><td>Only for a delegation. The zone NS set has its own place.</td></tr>
+<tr><td>SRV</td><td>priority, weight, port, target</td><td>The target has an A or AAAA record in the view. The mockup shows <code>10.20.4.7</code>.</td></tr>
+<tr><td>TXT</td><td>text</td><td>bembel splits the text at 255 bytes and escapes a semicolon and a quote.</td></tr>
+<tr><td>CAA</td><td>flag, tag, value</td><td>The tag is <code>issue</code>, <code>issuewild</code> or <code>iodef</code>.</td></tr>
+</tbody>
+</table>
+<aside class="callout why"><p class="callout-title">Why a preview of the zone file</p><p>The DNS editors of the organisation know the zone file format. A line in that format needs no explanation. It also shows what the next export will contain, so the user finds a wrong dot at the end of a name before the server does.</p></aside>
+<h3 id="record-states">States</h3>
+<ul>
+  <li><b>Error.</b> An invalid field has a red border and a sentence under it. "Create record" stays enabled. The server answer shows on the first field it names.</li>
+  <li><b>Edit.</b> The title is "Edit record in …". The name and type are fixed. The footer shows "Revision 7".</li>
+  <li><b>Held.</b> A change that needs approval has the button "Ask for approval…" and a field for the reason.</li>
+  <li><b>No permission.</b> The page behind the dialog does not offer the dialog. The button is disabled, with the reason in its title.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd>A dialog on <code>/zones/{zone}</code>. A link with <code>?new=SRV&amp;name=_slurmctld._tcp</code> opens it filled.</dd>
+  <dt>API</dt><dd><code>POST /v1/zones/{id}/records</code> (<code>Idempotency-Key</code>), <code>PATCH /v1/records/{id}</code> (<code>If-Match</code>), <code>POST /v1/zones/{id}/records:validate</code> for the preview and the checks.</dd>
+  <dt>CLI</dt><dd><code>bembel record add kestrel.example.org --view internal --name _slurmctld._tcp --type SRV --data "30 0 6817 ctl03.kestrel.example.org."</code></dd>
+</dl>
+
+<h2 id="dhcp">DHCP scope</h2>
+<figure class="shot"><a href="mockups/ui/dhcp.html"><img src="img/ui-dhcp.webp" alt="DHCP scope kestrel-compute 10.20.4.0/22: address map, pool with lease use, reservations with a stale row, IPoIB reservations by client identifier, options with inheritance, leases, failover pair dhcp-a and an assistant result" loading="lazy"></a><figcaption>DHCP scope kestrel-compute. Two reservations are stale. The options table shows where each option is set.</figcaption></figure>
+<p>Purpose: the page shows the DHCP settings of one subnet: the pool, the reservations, the options and the state of the leases. It answers "which clients get which address and which options, and from which server".</p>
+<h3 id="dhcp-layout">Layout</h3>
+<ul>
+  <li><b>Head.</b> The scope name, the prefix, a pill "enabled". The line: VRF, VLAN 204, gateway, team, fabric. Buttons: CLI toggle, "Find stale reservations" (assistant), "New reservation…" (filled).</li>
+  <li><b>Main column.</b> Pools and address map, Reservations, Reservations by client identifier, Options, Leases.</li>
+  <li><b>Side column.</b> Scope facts, Failover pair, the assistant result.</li>
+</ul>
+<h3 id="dhcp-parts">Parts and why</h3>
+<table>
+<thead><tr><th>Part</th><th>What it shows</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Address map</td><td>One bar for the /22 in four parts: infrastructure (<code>10.20.4.0</code>–<code>.31</code>), reservations and static addresses, the DHCP pool <code>10.20.7.0</code>–<code>10.20.7.254</code>, the broadcast address.</td><td>The map explains the ranges at one look. The pool is a range with role <code>dhcp-pool</code>, so the allocation tool never hands out an address inside it.</td></tr>
+<tr><td>Pool row</td><td>255 addresses, 143 used by leases (56 %), 61 expired, 51 free. Split: dhcp1 128, dhcp2 127.</td><td>The use comes from the lease files, not from allocations. It shows whether the pool is big enough.</td></tr>
+<tr><td>Reservations</td><td>MAC, address, host, own options, last lease seen, state. 16 of 641 rows. Stale rows have a yellow background and a pill "stale 106 d".</td><td>A reservation holds an address for a host. A reservation without a lease for 90 days is a candidate for removal.</td></tr>
+<tr><td>IPoIB reservations</td><td>The client identifier <code>ff:00:00:00:00:00:02:00:00:02:c9:00</code> and the 8-byte port GUID in bold.</td><td>An InfiniBand port has no useful MAC for DHCP. The server matches <code>dhcp-client-identifier</code>. The rows belong to scope <code>kestrel-ipoib</code> (10.100.4.0/22), which uses the same pair.</td></tr>
+<tr><td>Options</td><td>Option name and code, the effective value, the chain global › server › scope › host, a note.</td><td>See the next figure.</td></tr>
+<tr><td>Leases</td><td>Address, MAC, client name, state, end, last seen, and a pill when the MAC is unknown or the lease matches a stale reservation.</td><td>The ingestion reads <code>dhcpd.leases</code> from both servers every 5 minutes. bembel never writes a lease.</td></tr>
+<tr><td>Failover pair</td><td>dhcp1 primary and dhcp2 secondary, state normal, split 50, MCLT 3600 s, max response delay 60 s.</td><td>The user sees if the pair is healthy before a change. The restart order is stated: secondary first.</td></tr>
+</tbody>
+</table>
+<figure class="diagram">
+<svg viewBox="0 0 960 220" role="img" aria-labelledby="fig-opt-t">
+<title id="fig-opt-t">Option inheritance: the most specific level wins; the options table shows the level where each option is set and the levels that it overrides</title>
+<rect class="box" x="16" y="30" width="190" height="86" rx="10"/>
+<text class="t-title" x="32" y="58">Global</text>
+<text class="t-small" x="32" y="80">interface-mtu 1500</text>
+<text class="t-small t-muted" x="32" y="98">default-lease-time 86400</text>
+<rect class="box" x="268" y="30" width="190" height="86" rx="10"/>
+<text class="t-title" x="284" y="58">Server or pair</text>
+<text class="t-small" x="284" y="80">ntp-servers 10.20.0.123</text>
+<text class="t-small t-muted" x="284" y="98">set on dhcp-a</text>
+<rect class="box-accent" x="520" y="30" width="190" height="86" rx="10"/>
+<text class="t-title t-on" x="536" y="58">Scope</text>
+<text class="t-small t-on" x="536" y="80">interface-mtu 9000</text>
+<text class="t-small t-on" x="536" y="98">default-lease-time 43200</text>
+<rect class="box" x="772" y="30" width="172" height="86" rx="10"/>
+<text class="t-title" x="788" y="58">Host</text>
+<text class="t-small" x="788" y="80">filename ipxe-gpu.efi</text>
+<text class="t-small t-muted" x="788" y="98">cn-004, cn-005</text>
+<path class="edge" d="M206,73 L266,73" marker-end="url(#arrow)"/>
+<path class="edge" d="M458,73 L518,73" marker-end="url(#arrow)"/>
+<path class="edge" d="M710,73 L770,73" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="480" y="160" text-anchor="middle">more specific, wins</text>
+<path class="edge-muted" d="M110,140 L850,140" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="16" y="196">In the table: a filled chip is the level in effect; a struck chip is set and overridden; a dashed chip is not set.</text>
+</svg>
+<figcaption>Inheritance of options. The export writes each option once, at the level where it takes effect.</figcaption>
+</figure>
+<aside class="callout why"><p class="callout-title">Why the chain, not only the value</p><p>ONA showed the option at one level. A user could not see why a host got MTU 1500 when the scope says 9000. The chain shows the answer, and the note names the overrides ("overridden for 2 hosts").</p></aside>
+<h3 id="dhcp-assistant">Find stale reservations</h3>
+<p>The advisory <code>stale-reservations</code> reads the reservations, the leases and the asset mirror. In the story it finds 4 of 641 reservations with no lease for 90 days. For cn-009 the asset mirror says "removed since 2026-08-02". The card lists the findings and offers "Open draft". The draft deletes nothing until the user applies it (<a href="assistant.html">assistant.html</a>).</p>
+<h3 id="dhcp-states">States</h3>
+<ul>
+  <li><b>Scope off.</b> The pill says "disabled". The pool and reservations stay visible. The export omits the scope.</li>
+  <li><b>Failover degraded.</b> A node with state "communications interrupted" has a red dot and the banner "dhcp2 does not answer". The pool row shows the share of the secondary as "unavailable".</li>
+  <li><b>No lease data.</b> If the ingestion is older than 15 minutes, the Leases card says "Lease data is 42 min old" with a warning dot.</li>
+  <li><b>Pool nearly full.</b> The meter turns yellow at 70 % and red at 90 %.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/dhcp/{scope}[?tab=&amp;q=&amp;stale=1]</code></dd>
+  <dt>API</dt><dd><code>GET /v1/dhcp-scopes?server=&amp;enabled=</code>, <code>PATCH /v1/dhcp-scopes/{id}</code> (<code>If-Match</code>), <code>GET /v1/dhcp-scopes/{id}/reservations</code>, <code>GET /v1/dhcp-scopes/{id}/leases</code>. The last two paths are a proposal for the OpenAPI document.</dd>
+  <dt>CLI</dt><dd><code>bembel dhcp scope show kestrel-compute</code>, <code>bembel dhcp reservation ls --scope kestrel-compute --stale-above 90d</code>, <code>bembel export preview dhcp1</code></dd>
+  <dt>Assistant</dt><dd>"Find stale reservations": advisory <code>stale-reservations</code>, tools <code>reservation.list</code>, <code>lease.list</code>, <code>asset.search</code>.</dd>
+</dl>
+
+<h2 id="exports">Exports</h2>
+<figure class="shot"><a href="mockups/ui/exports.html"><img src="img/ui-exports.webp" alt="Exports page: eight delivery target cards with mode, bundle, checks and last pull, a stale warning for sm-kestrel, and a bundle history table" loading="lazy"></a><figcaption>Exports at 18:02. Seven targets are current. sm-kestrel has not pulled for 26 hours.</figcaption></figure>
+<p>Purpose: the page shows, for each delivery target, which bundle it has, whether the checks passed and when the agent pulled it. It also builds a bundle now and previews files. It is the page for the question "do the servers have my change?".</p>
+<h3 id="exports-layout">Layout</h3>
+<ul>
+  <li><b>Head.</b> "8 delivery targets · 7 current, 1 stale", the last bundle, the parallel-run state. Buttons: CLI toggle, "Why does the export differ?" (assistant), "Preview…", "Build now" (filled).</li>
+  <li><b>Banner.</b> A warning for the stale target, with "Pull log" and "Silence 24 h…".</li>
+  <li><b>Target cards.</b> Two columns. One card per target: ns1, ns2, ns3, dhcp1, dhcp2, sm-kestrel, fw-edge, frr-core.</li>
+  <li><b>Bundle history.</b> A table: bundle, trigger, targets, built, duration, zones changed, lines, files, checks, diff link.</li>
+</ul>
+<figure class="diagram wide">
+<svg viewBox="0 0 960 250" role="img" aria-labelledby="fig-exp-t2">
+<title id="fig-exp-t2">From a change to a pull: the event starts a build, the build runs the checks, the bundle gets an id, and the agent on each target pulls it with an ETag</title>
+<rect class="box" x="16" y="50" width="150" height="86" rx="10"/>
+<text class="t-title" x="32" y="78">Change</text>
+<text class="t-small" x="32" y="98">record, address,</text>
+<text class="t-small" x="32" y="114">reservation</text>
+<rect class="box" x="214" y="50" width="160" height="86" rx="10"/>
+<text class="t-title" x="230" y="78">Build</text>
+<text class="t-small" x="230" y="98">one snapshot</text>
+<text class="t-small" x="230" y="114">files per target</text>
+<rect class="box-accent" x="422" y="50" width="160" height="86" rx="10"/>
+<text class="t-title t-on" x="438" y="78">Checks</text>
+<text class="t-small t-on" x="438" y="98">named-checkconf -z</text>
+<text class="t-small t-on" x="438" y="114">dhcpd -t, lint</text>
+<rect class="box" x="630" y="50" width="130" height="86" rx="10"/>
+<text class="t-title" x="646" y="78">Bundle</text>
+<text class="t-small" x="646" y="98">b-7c41e0</text>
+<text class="t-small t-muted" x="646" y="114">immutable</text>
+<rect class="box-ok" x="808" y="20" width="136" height="64" rx="10"/>
+<text class="t-title" x="824" y="46">ns1, dhcp1</text>
+<text class="t-small t-muted" x="824" y="66">pull, 200 or 304</text>
+<rect class="box-warn" x="808" y="110" width="136" height="64" rx="10"/>
+<text class="t-title" x="824" y="136">sm-kestrel</text>
+<text class="t-small t-muted" x="824" y="156">no pull for 26 h</text>
+<path class="edge" d="M166,93 L212,93" marker-end="url(#arrow)"/>
+<path class="edge" d="M374,93 L420,93" marker-end="url(#arrow)"/>
+<path class="edge" d="M582,93 L628,93" marker-end="url(#arrow)"/>
+<path class="edge-ok" d="M760,80 L806,56" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M760,106 L806,136" marker-end="url(#arrow-muted)"/>
+<path class="edge-err" d="M502,136 L502,200" marker-end="url(#arrow)"/>
+<text class="t-small t-err" x="514" y="196">check fails: no bundle, the target keeps the last good one</text>
+</svg>
+<figcaption>The path of a change to a server. A failed check stops the bundle. A target that does not pull is visible on this page.</figcaption>
+</figure>
+<h3 id="exports-cards">Target cards and why</h3>
+<table>
+<thead><tr><th>Field</th><th>Example</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Name and role</td><td><code>ns1</code> BIND primary; <code>dhcp1</code> ISC dhcpd primary; <code>sm-kestrel</code> OpenSM partitions.conf; <code>fw-edge</code> feed login-nodes; <code>frr-core</code> FRR prefix list.</td><td>One card per place that gets files. The kind of target decides the format.</td></tr>
+<tr><td>Mode</td><td><span class="tag">compat</span> or <span class="tag">native</span></td><td><b>compat</b> writes the ONA format, byte for byte, for the parallel run. <b>native</b> is the clean bembel format. A target moves to native at the cutover (<a href="dns.html#compat">dns.html#compat</a>).</td></tr>
+<tr><td>Content</td><td>"3 views, 41 zones, 1 named.conf fragment".</td><td>The user sees the size of what the server loads.</td></tr>
+<tr><td>Bundle and built</td><td><code>b-7c41e0</code>, today 17:57:41.</td><td>The id is the start of the digest. It is the same on all targets of one build.</td></tr>
+<tr><td>Pulled</td><td>today 17:58:12 by <code>bembel-agent@ns1</code> · 200.</td><td>It shows who pulled, when, and the HTTP code. 304 means "nothing changed".</td></tr>
+<tr><td>ETag</td><td><code>"7c41e0a9…"</code> with a copy button.</td><td>An admin compares it with the header of a pull on the server.</td></tr>
+<tr><td>Checks</td><td>named-checkconf -z ok; named-checkzone 41 of 41 ok; dhcpd -t ok; "applied 17:59:10, restarted after dhcp2".</td><td>The checks run on the bembel side and on the agent. A check line has a green or yellow mark.</td></tr>
+<tr><td>Status pill</td><td><span class="tag">current</span> or <span class="tag">stale</span></td><td>"stale" means the target has not pulled for longer than the alert time (1 h).</td></tr>
+</tbody>
+</table>
+<p>The stale card has a yellow edge. Its note says: "The agent reports no error. The host may be down, or the timer may be stopped." The bundle is not wrong: <code>b-3a90d1</code> is still the newest for sm-kestrel. The risk is a partition table on the subnet manager that is older than bembel knows.</p>
+<h3 id="exports-actions">Actions</h3>
+<ul>
+  <li><b>Build now.</b> It builds all targets whose content changed. The result shows as a toast and a new row in the history. It never pushes: the agents pull.</li>
+  <li><b>Preview.</b> It renders the files of one target in a dialog, with a file list on the left and the text on the right. It writes nothing.</li>
+  <li><b>Pull log.</b> The list of the last pulls of a target, with time, agent, code and ETag.</li>
+  <li><b>Silence.</b> It mutes the stale warning for a time. It needs a reason and writes an audit event.</li>
+</ul>
+<h3 id="exports-states">States</h3>
+<ul>
+  <li><b>Build failed.</b> The history row has a red pill "failed" and a link "log". The targets keep their last good bundle. The head says "1 build failed".</li>
+  <li><b>Nothing changed.</b> A scheduled build with no change creates a row "no change". It makes no new bundle.</li>
+  <li><b>Running.</b> The build button shows a spinner and "Building…". The cards stay.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/exports[?kind=dns|dhcp|other&amp;stale=1]</code>, bundles at <code>/exports#bundles</code></dd>
+  <dt>API</dt><dd><code>GET /v1/exports</code>, <code>POST /v1/exports/{id}:build</code>, <code>GET /v1/exports/{id}/artifact</code> with <code>If-None-Match</code>. Bundle history and pull log are a proposal: <code>GET /v1/export-bundles</code>, <code>GET /v1/exports/{id}/pulls</code>.</dd>
+  <dt>CLI</dt><dd><code>bembel export ls</code>, <code>bembel export build --all</code>, <code>bembel export preview ns1</code>, <code>bembel export bind --server ns1 --out ./ns1</code>, <code>bembel export dhcpd --server dhcp1 --out ./dhcp1</code></dd>
+  <dt>Assistant</dt><dd>"Why does the export differ?": advisory <code>explain-diff</code>.</dd>
+</dl>
+
+<h3 id="export-diff">Export diff</h3>
+<figure class="shot"><a href="mockups/ui/export-diff.html"><img src="img/ui-export-diff.webp" alt="Parallel run diff of ns1 BIND, night 12 of 14: summary with 3 differing lines, a file tree, a unified diff in a dark block with a known-difference badge, and an Explain diff result" loading="lazy"></a><figcaption>Parallel run, night 12 of 14. One line is a known difference, two lines are new data from cn-011.</figcaption></figure>
+<p>Purpose: during the parallel run the page compares the ONA export with the bembel bundle of one target. A user decides each differing line: explained, or to fix. The run ends when the diff is empty or fully explained on the last 3 nights (<a href="migration.html">migration.html</a>).</p>
+<p><b>Parts and why</b></p>
+<ul>
+  <li><b>Summary.</b> Three numbers: 3 differing lines in 2 of 41 files, 1 known difference, 2 unexplained. A bar splits the lines by class. A bar chart shows the unexplained lines for each night; the current night is marked. The cutover rule stands under it. The user sees the trend, not only a count.</li>
+  <li><b>File tree.</b> Files of the bundle with "identical" or "N lines". The filter "Differ" is on. Identical files fold into one line "31 more, all identical". The note says that ONA writes no views, so ONA is compared with view internal.</li>
+  <li><b>Normalised before the diff.</b> A card lists what the diff ignores: the SOA serial and the header date, and the order of record lines (<a href="dns.html#compat">dns.html#compat</a>). A user knows what the "identical" claim covers.</li>
+  <li><b>Diff.</b> One card per file. A dark block with two line-number columns, the sign, and the text. A removed line has a red tint, an added line a green tint, a hunk header a blue band. A badge ends the line: "known kd-1" links to the list below; "unexplained" is yellow.</li>
+  <li><b>Explain diff.</b> The result card of the advisory <code>explain-diff</code>. It explains each class in one sentence, and it checks the claim with a canonical zone dump ("L2 check"). It cannot accept a line. The button "Accept 2 lines as known difference…" opens a dialog that the user confirms.</li>
+  <li><b>Known differences.</b> A table of rules: id, what differs, why it is fine, who accepted it and when, and the lines that match tonight. A rule expires at the cutover.</li>
+</ul>
+<aside class="callout why"><p class="callout-title">Why accept by rule and not by line</p><p>A line number changes every night. A rule matches by zone, type and a pattern, so the same difference is not a new question the next night. A new kind of difference never matches an old rule by accident.</p></aside>
+<p><b>States</b></p>
+<ul>
+  <li><b>Empty diff.</b> The summary says "0 differing lines" with a green mark. The page counts the nights with an empty or explained diff.</li>
+  <li><b>Accept dialog.</b> It asks for a note of 8 characters or more, shows the pattern of the rule, and the CLI command. The audit event names the user.</li>
+  <li><b>No ONA data.</b> If the ONA export of the night is missing, the page says so and shows no diff.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/exports/ns1/diff[?night=12&amp;file=]</code></dd>
+  <dt>API</dt><dd><code>GET /v1/exports/{id}/diff?against=ona&amp;night=12</code>, <code>POST /v1/exports/{id}/known-differences</code>. Both are a proposal for the OpenAPI document.</dd>
+  <dt>CLI</dt><dd><code>bembel export diff ns1 --against ona:/srv/ona/zone_data --normalize</code>, <code>bembel export diff accept ns1 --line db.kestrel.example.org:34 --note "…" --until cutover</code></dd>
+  <dt>Assistant</dt><dd>"Explain diff": advisory <code>explain-diff</code>, tools <code>export.diff</code>, <code>address.get</code>, <code>audit.query</code>.</dd>
+</dl>
+
+<h3 id="routing">Routing and groups</h3>
+<figure class="shot"><a href="mockups/ui/routing.html"><img src="img/ui-routing.webp" alt="Routing and groups, tab Address groups: a groups table with filter chips, members, feeds and consumers, the filter of login-nodes as YAML, the plain text list and a prefix list for FRR" loading="lazy"></a><figcaption>Routing and groups, tab Address groups. The group login-nodes is selected. Its filter, its members and two feeds stand under the table.</figcaption></figure>
+<p>Purpose: the page holds the values that network automation and firewalls read: ASNs, route targets, static routes and address groups. bembel is the source of the values. It does not push device configuration (<a href="routing.html">routing.html</a>). This section describes the tab Address groups.</p>
+<p><b>Parts and why</b></p>
+<ul>
+  <li><b>Tabs.</b> ASNs 3, Route targets 12, Static routes 27, Address groups 7. The mockup shows the last one.</li>
+  <li><b>Groups table.</b> Name and description, filter as chips (<code>host.role</code> login, <code>vrf</code> global, <code>team</code> hpc-ops), member count, feeds (nftables, EDL, firewalld, JSON), consumers with the last pull. The selected row has a tint. A group with no consumer says so.</li>
+  <li><b>Filter card.</b> The definition of <code>login-nodes</code> as YAML in a dark block, the revision, the editor, and a table of the 4 matching hosts with the reason. "6 members" counts hosts and prefixes.</li>
+  <li><b>Feed card.</b> The plain text list that a firewall fetches over HTTPS: a comment line and one entry per line. The URL has a copy button. Two consumers show the last pull, the code and the ETag.</li>
+  <li><b>Prefix list card.</b> A preview of <code>bembel export prefix-list</code> for FRR with a switch for bird, junos and eos. It shows the prefixes with <code>announce=true</code> in VRF <code>global</code> and the target <code>frr-core</code>.</li>
+</ul>
+<aside class="callout why"><p class="callout-title">Why a filter and not a list</p><p>A list of addresses is old after the next allocation. A filter follows the data: a new login node with role login joins the group and all feeds change at the next build. The firewall policy stays in the firewall tool and refers to the group by name.</p></aside>
+<table>
+<thead><tr><th>Feed</th><th>Format</th><th>Reader</th></tr></thead>
+<tbody>
+<tr><td>nftables</td><td>set file for <code>inet filter</code></td><td>nftables on a login firewall host</td></tr>
+<tr><td>firewalld</td><td>ipset XML</td><td>firewalld</td></tr>
+<tr><td>EDL</td><td>plain text, one entry per line</td><td>Palo Alto EDL, OPNsense URL table, FortiGate threat feed</td></tr>
+<tr><td>JSON</td><td>group with members and revision</td><td>automation through the API</td></tr>
+</tbody>
+</table>
+<p><b>States</b></p>
+<ul>
+  <li><b>Empty group.</b> A filter with 0 members says "No member now" and keeps the feed. A feed with 0 entries is valid text with only the comment line. A consumer must not block a firewall for an empty list, so the page shows a warning when a feed changes from more than 0 to 0.</li>
+  <li><b>Consumer late.</b> A consumer that did not pull for 3 intervals gets a yellow dot, as a target on the Exports page.</li>
+  <li><b>Edit.</b> "Edit…" opens the filter as YAML with a live count of members and a diff of the feed. Saving writes a new revision.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/routing?tab=groups[&amp;group=login-nodes]</code>, other tabs <code>tab=asn|rt|routes</code></dd>
+  <dt>API</dt><dd><code>GET /v1/address-groups</code>, <code>GET /v1/address-groups/{id}/members</code>, <code>GET /v1/feeds/{name}.txt</code> (plain text, ETag), <code>GET /v1/prefix-lists?vrf=global&amp;format=frr</code>. The group and feed paths are a proposal for the OpenAPI document.</dd>
+  <dt>CLI</dt><dd><code>bembel group ls</code>, <code>bembel group show login-nodes --members</code>, <code>bembel export group login-nodes --format edl</code>, <code>bembel export prefix-list --vrf global --format frr</code></dd>
+  <dt>Assistant</dt><dd>"Who is in this group?": advisory <code>group-impact</code>, tools <code>group.members</code>, <code>host.list</code>. Read only.</dd>
+</dl>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cn-004 · bembel</title>
+<link rel="stylesheet" href="../assets/bembel.css">
+<link rel="stylesheet" href="../assets/shell.css">
+<link rel="stylesheet" href="../assets/addr.css">
+</head>
+<body data-page="host">
+<a class="skip" href="#main">Skip to content</a>
+<div class="app">
+<!-- SHELL: top bar. Copy it unchanged to each page; change only aria-current in the sidebar and the VRF in the switcher. -->
+<header class="topbar">
+  <a class="icon-btn nav-toggle" href="#nav" aria-controls="nav" aria-expanded="false" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></a>
+  <a class="brand" href="overview.html" aria-label="bembel: overview"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M12.6 7h6.8M13.6 7v2.6C9.9 11 8.4 13.6 8.4 16.8c0 3.2 1.4 5.7 3.1 7.2h9c1.7-1.5 3.1-4 3.1-7.2 0-3.2-1.5-5.8-5.2-7.2V7M19.4 8.3c4.4-.3 6.9 1.4 6.9 4.4 0 2.3-1.1 3.9-2.5 4.8M9.4 15.6h13.2"/></svg></span><span class="brand-name">bembel</span></a>
+  <details class="set-menu vrf-menu">
+    <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+    <div class="set-pop">
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+    </div>
+  </details>
+  <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
+    <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
+  <span class="spacer"></span>
+  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
+  <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
+  <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
+    <div class="more-pop" role="menu">
+      <div class="um-head"><b>Dennis Klein</b><span class="mono">d.klein · id.example.org</span><span class="muted small">groups netops, hpc-ops</span></div>
+      <a href="#" role="menuitem">My access</a><a href="#" role="menuitem">Tokens</a><a href="#" role="menuitem">Sign out</a></div></details>
+  <button class="icon-btn" type="button" data-help aria-label="Help (?)">?</button>
+  <button class="icon-btn" type="button" data-theme-toggle aria-label="Theme: auto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/></svg></button>
+</header>
+<!-- SHELL: sidebar. Groups and icons follow the glossary domains (docs/assets/glossary-data.js). -->
+<nav class="sidebar" id="nav" aria-label="Navigation">
+  <a class="nav-item" href="overview.html" data-key="o"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview<span class="count attn">6</span></a>
+  <div class="nav-label" data-domain="addr"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 1.8h3v3h-3Z M2 11.2h3v3H2Z M11 11.2h3v3h-3Z M8 4.8v3.2 M3.5 11.2V8h9v3.2"/></svg>Addressing</div>
+  <a class="nav-item" data-domain="addr" href="prefixes.html" data-key="p"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v4H4zM4 16h6v4H4zM14 10h6v4h-6z"/><path d="M7 8v8M10 12h4"/></svg>Prefixes</a>
+  <a class="nav-item" data-domain="addr" href="hosts.html" data-key="h" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>Hosts</a>
+  <a class="nav-item" data-domain="addr" href="vlans.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/><path d="M8 3v18"/></svg>VLANs and partitions</a>
+  <a class="nav-item" data-domain="addr" href="fabrics.html" data-key="f"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8M7.5 7.5l9 9"/></svg>Fabrics</a>
+  <a class="nav-item" data-domain="addr" href="routing.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h4a4 4 0 004-4V8"/></svg>Routing and groups</a>
+  <div class="nav-label" data-domain="dns"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 1 0 0 12.4A6.2 6.2 0 0 0 8 1.8Z M1.8 8h12.4 M8 1.8C6 3.8 5.4 5.8 5.4 8S6 12.2 8 14.2 M8 1.8c2 2 2.6 4 2.6 6.2S10 12.2 8 14.2"/></svg>DNS and DHCP</div>
+  <a class="nav-item" data-domain="dns" href="zones.html" data-key="z"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-2.5 2.6-3.5 5.6-3.5 9s1 6.4 3.5 9M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9"/></svg>Zones</a>
+  <a class="nav-item" data-domain="dhcp" href="dhcp.html" data-key="d"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12l4 5-4 5H3z"/><path d="M7 12h5"/></svg>DHCP scopes</a>
+  <a class="nav-item" data-domain="integ" href="exports.html" data-key="e"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Exports<span class="count attn">1 diff</span></a>
+  <div class="nav-label" data-domain="assets"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 1.8h8.8v12.4H3.6Z M3.6 5h8.8 M3.6 8.2h8.8 M3.6 11.4h8.8 M5.6 3.4h1.2 M5.6 6.6h1.2 M5.6 9.8h1.2"/></svg>Assets</div>
+  <a class="nav-item" data-domain="assets" href="floor.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 3v16M15 5v16"/></svg>Floor map</a>
+  <a class="nav-item" data-domain="assets" href="rack.html" data-key="r"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="1.5"/><path d="M5 8h14M5 13.5h14M8 5.3h2M8 10.8h2M8 16.5h2"/></svg>Racks</a>
+  <a class="nav-item" data-domain="assets" href="sync-review.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0114-5.3L20 9M20 12a8 8 0 01-14 5.3L4 15"/><path d="M20 4v5h-5M4 20v-5h5"/></svg>Sync review<span class="count attn">4</span></a>
+  <div class="nav-label" data-domain="access"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 3.6v4.1c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.6Z M5.9 8l1.5 1.5 2.8-3"/></svg>Access</div>
+  <a class="nav-item" data-domain="access" href="bindings.html" data-key="b"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.4c1.8.9 3 2.9 3 5.6"/></svg>Roles and bindings</a>
+  <a class="nav-item" data-domain="access" href="changes.html" data-key="c"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg>Change requests<span class="count attn">2</span></a>
+  <a class="nav-item" data-domain="access" href="audit.html" data-key="a"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Audit log</a>
+  <div class="nav-label" data-domain="integ"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h9 M8.6 2.6 11 5 8.6 7.4 M14 11H5 M7.4 8.6 5 11l2.4 2.4"/></svg>Integrations</div>
+  <a class="nav-item" data-domain="integ" href="integrations.html" data-key="i"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0z"/><path d="M12 16v5"/></svg>Sources and syncs</a>
+  <a class="nav-item" data-domain="integ" href="import.html" data-key="m"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6M9 15l2.5 2.5L16 13"/></svg>ONA migration<span class="count attn">214</span></a>
+  <div class="side-foot">bembel v0.1.0 · api v1</div>
+</nav>
+<!-- /SHELL -->
+
+<main class="main" id="main">
+<div class="banner err offline" role="alert"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M2 8.5a15 15 0 0120 0M5 12a10 10 0 0114 0M8.5 15.5a5 5 0 017 0M12 19h.01M3 3l18 18"/></svg>
+  <div class="grow"><b>Offline.</b> <span data-why>The event stream of bembel stopped. The page shows old data.</span> The page tries again every 5 s.</div>
+  <button class="btn btn-sm" type="button" onclick="location.reload()">Reload</button></div>
+
+
+<div class="page-head">
+  <div><nav class="crumbs" aria-label="Breadcrumb"><a href="hosts.html">Hosts</a><span class="sep">›</span><span class="cur">cn-004.kestrel.example.org</span></nav>
+    <h1><span class="fqdn">cn-004<span class="dom">.kestrel.example.org</span></span></h1>
+    <div class="sub"><span class="pill st-neutral">physical</span><span class="pill st-ok">active</span><span>compute node · team hpc-ops</span><span class="sep">·</span><span class="src">local</span><span class="sep">·</span><span class="muted">3 interfaces, 5 addresses, 3 VRFs</span></div></div>
+  <div class="actions">
+    <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
+      <div class="cli-pop">bembel host show cn-004.kestrel.example.org
+bembel interface add cn-004 --name eno2 --mac …
+bembel address allocate --prefix 10.20.4.0/22 --host cn-004 --interface eno2
+bembel host rm cn-004.kestrel.example.org</div></details>
+    <button class="btn btn-agent" type="button" data-assistant="explain-host" title="Runs the assistant with the advisory explain-host. Tools: read only. It changes nothing.">Explain this host</button>
+    <a class="btn" href="#">Edit</a>
+    <details class="more"><summary class="btn" aria-label="More actions">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Rename…<span class="code-sub">changes 5 DNS names</span></a><a href="#" role="menuitem">Unlink asset…</a><hr><button type="button" role="menuitem">Delete…<span class="code-sub">Frees 5 addresses, 2 reservations</span></button></div></details>
+    <a class="btn btn-primary" href="#">Add interface…</a>
+  </div>
+</div>
+
+<div class="pf">
+<div class="pf-main">
+<section class="card" id="ifaces" aria-labelledby="if-t">
+  <div class="card-head"><h2 id="if-t">Interfaces</h2><span class="right">3 interfaces · an address binds to one interface</span></div>
+  <div class="table-wrap"><table class="table ifc-t">
+    <thead><tr><th>Name</th><th>Hardware address</th><th>Addresses</th><th class="o1">VLAN or partition</th><th class="o2">Port</th></tr></thead>
+    <tbody>
+    <tr><td><span class="ifn">eno1</span><span class="sub">Ethernet · 25G · MTU 9000</span></td>
+      <td><div class="hw"><span class="mac">3c:ec:ef:12:0a:44</span></div></td>
+      <td><div class="al"><span><a class="ip" href="address.html">10.20.4.44</a> <span class="pill st-ok">allocated</span></span><span><span class="ip">2001:db8:4200:204::44</span> <span class="pill st-ok">allocated</span></span><span class="cap">SLAAC fe80::3eec:efff:fe12:a44 observed</span></div></td>
+      <td class="o1"><span class="dchip" data-domain="addr">VLAN <b>204</b></span> <span class="fab eth">ethernet</span></td><td class="o2"><span class="mono-s">sw-mgmt-a01 Gi1/0/14</span></td></tr>
+    <tr><td><span class="ifn">ib0</span><span class="sub">InfiniBand · NDR 400G · IPoIB</span></td>
+      <td><div class="hw"><span class="guid" title="Port GUID, 8 bytes">GUID 0x1070fd0300a1b2c4</span><span class="cap">IPoIB hardware address 00:00:10:49:fe:80:00:00:00:00:00:00:10:70:fd:03:00:a1:b2:c4</span><span class="cap">LID 212 (observed from sm-kestrel)</span></div></td>
+      <td><div class="al"><span><span class="ip">10.100.4.44</span> <span class="pill st-ok">allocated</span> <span class="dchip" data-domain="addr">hpc-fabric</span></span></div></td>
+      <td class="o1"><span class="dchip" data-domain="addr">partition <b>0x8001</b></span> <span class="fab ib">infiniband</span></td><td class="o2"><span class="mono-s">ib-leaf-a01 p17</span></td></tr>
+    <tr><td><span class="ifn">bmc</span><span class="sub">Ethernet · 1G · IPMI</span></td>
+      <td><div class="hw"><span class="mac">3c:ec:ef:12:0a:45</span></div></td>
+      <td><div class="al"><span><span class="ip">172.16.4.44</span> <span class="pill st-ok">allocated</span> <span class="dchip" data-domain="addr">oob</span></span></div></td>
+      <td class="o1"><span class="dchip" data-domain="addr">VLAN <b>10</b></span> <span class="fab eth">ethernet</span></td><td class="o2"><span class="mono-s">sw-mgmt-a01 Gi1/0/38</span></td></tr>
+    </tbody></table></div>
+  <div class="card-foot"><span>The MAC of an Ethernet interface and the GUID of an InfiniBand interface identify it for DHCP. ib0 gets a client identifier made from the GUID.</span></div>
+</section>
+
+<section class="card" id="dns" aria-labelledby="dn-t">
+  <div class="card-head"><h2 id="dn-t">DNS names</h2><span class="right"><span class="cap">derived from the addresses, view internal</span><a href="zones.html">Zone kestrel.example.org</a></span></div>
+  <ul class="dnsl">
+    <li><span class="ty">A</span><span class="nm"><span class="fqdn">cn-004<span class="dom">.kestrel.example.org</span></span></span><span class="mono-s">10.20.4.44</span><span class="s">primary name of the <a class="gl" href="../../glossary.html#host" data-gl="host" data-domain="addr">host</a> · TTL 3600</span></li>
+    <li><span class="ty">AAAA</span><span class="nm"><span class="fqdn">cn-004<span class="dom">.kestrel.example.org</span></span></span><span class="mono-s">2001:db8:4200:204::44</span></li>
+    <li><span class="ty">PTR</span><span class="nm"><span class="fqdn">44.4.20.10.in-addr.arpa</span></span><span class="mono-s">cn-004.kestrel.example.org</span></li>
+    <li><span class="ty">A</span><span class="nm"><span class="fqdn">cn-004-ib<span class="dom">.kestrel.example.org</span></span></span><span class="mono-s">10.100.4.44</span><span class="s"><a class="gl" href="../../glossary.html#zone" data-gl="zone" data-domain="dns">zone</a> kestrel.example.org, <a class="gl" href="../../glossary.html#address" data-gl="address" data-domain="addr">address</a> in <a class="gl" href="../../glossary.html#vrf" data-gl="vrf" data-domain="addr">VRF</a> hpc-fabric</span></li>
+    <li><span class="ty">A</span><span class="nm"><span class="fqdn">cn-004-bmc<span class="dom">.oob.example.org</span></span></span><span class="mono-s">172.16.4.44</span></li>
+    <li><span class="ty">CNAME</span><span class="nm"><span class="fqdn">node44<span class="dom">.kestrel.example.org</span></span></span><span class="mono-s">cn-004.kestrel.example.org</span><span class="s"><a class="gl" href="../../glossary.html#manual-record" data-gl="manual-record" data-domain="dns">manual record</a>, edited by m.huber on 2026-05-12</span></li>
+  </ul>
+</section>
+
+<section class="card" id="dhcp" aria-labelledby="dh-t">
+  <div class="card-head"><h2 id="dh-t">DHCP reservations</h2><span class="right"><a href="dhcp.html">DHCP scopes</a></span></div>
+  <div class="table-wrap"><table class="table ifc-t"><thead><tr><th>Scope</th><th>Interface</th><th>Fixed address</th><th>Identifier</th><th>Server</th></tr></thead><tbody>
+    <tr><td>kestrel-compute <span class="muted">10.20.4.0/22</span></td><td class="mono-s">eno1</td><td><span class="ip">10.20.4.44</span></td><td><span class="mac">3c:ec:ef:12:0a:44</span></td><td>dhcp-a <span class="qs ok">in sync</span></td></tr>
+    <tr><td>kestrel-ipoib <span class="muted">10.100.0.0/16</span></td><td class="mono-s">ib0</td><td><span class="ip">10.100.4.44</span></td><td><span class="mono-s">client-id 00:10:70:fd:03:00:a1:b2:c4</span></td><td>dhcp-a <span class="qs ok">in sync</span></td></tr>
+    <tr><td>kestrel-bmc <span class="muted">172.16.4.0/22</span></td><td class="mono-s">bmc</td><td><span class="ip">172.16.4.44</span></td><td><span class="mac">3c:ec:ef:12:0a:45</span></td><td>dhcp-a <span class="qs ok">in sync</span></td></tr>
+  </tbody></table></div>
+</section>
+</div>
+
+<div class="pf-side">
+<section class="card" id="facts" aria-labelledby="hf-t">
+  <div class="card-head"><h2 id="hf-t">Facts</h2><span class="right"><span class="mono-s">revision 9</span></span></div>
+  <div class="card-body"><dl class="kv">
+    <dt>Primary name</dt><dd><span class="fqdn">cn-004<span class="dom">.kestrel.example.org</span></span></dd>
+    <dt>Kind</dt><dd>physical <span class="muted">· <a class="gl" href="../../glossary.html#role" data-gl="role" data-domain="access">role</a> compute</span></dd>
+    <dt>Team</dt><dd>hpc-ops</dd>
+    <dt>Tags</dt><dd><span class="tag">cluster=kestrel</span><span class="tag">env=prod</span></dd>
+    <dt>Source</dt><dd><span class="src">local</span></dd>
+    <dt>Created</dt><dd>2026-03-02 by a.berger</dd>
+    <dt>Updated</dt><dd>2026-10-21 by <a class="gl" href="../../glossary.html#sync" data-gl="sync" data-domain="integ">sync</a> <span class="src managed">fnt</span></dd>
+  </dl></div>
+</section>
+
+<section class="card" id="asset" aria-labelledby="as-t">
+  <div class="card-head"><h2 id="as-t">Asset</h2><span class="right"><span class="src managed">fnt</span> synced 17:45</span></div>
+  <div class="rkcard">
+    <a href="rack.html" aria-label="Rack A01, device in U10 and U11"><svg class="rk rk-big" width="96" height="195" viewBox="0 0 74 150" role="img" aria-label="Rack A01, 47 U. The device occupies U10 and U11.">
+<rect class="rk-bg" x="1" y="1" width="72" height="148" rx="2"/>
+<rect class="rk-a" x="6" y="3.00" width="62" height="3.06"/><rect class="rk-b" x="6" y="6.06" width="62" height="3.06"/><rect class="rk-a" x="6" y="9.13" width="62" height="3.06"/><rect class="rk-b" x="6" y="12.19" width="62" height="3.06"/><rect class="rk-a" x="6" y="15.26" width="62" height="3.06"/><rect class="rk-b" x="6" y="18.32" width="62" height="3.06"/><rect class="rk-a" x="6" y="21.38" width="62" height="3.06"/><rect class="rk-b" x="6" y="24.45" width="62" height="3.06"/><rect class="rk-a" x="6" y="27.51" width="62" height="3.06"/><rect class="rk-b" x="6" y="30.57" width="62" height="3.06"/><rect class="rk-a" x="6" y="33.64" width="62" height="3.06"/><rect class="rk-b" x="6" y="36.70" width="62" height="3.06"/><rect class="rk-a" x="6" y="39.77" width="62" height="3.06"/><rect class="rk-b" x="6" y="42.83" width="62" height="3.06"/><rect class="rk-a" x="6" y="45.89" width="62" height="3.06"/><rect class="rk-b" x="6" y="48.96" width="62" height="3.06"/><rect class="rk-a" x="6" y="52.02" width="62" height="3.06"/><rect class="rk-b" x="6" y="55.09" width="62" height="3.06"/><rect class="rk-a" x="6" y="58.15" width="62" height="3.06"/><rect class="rk-b" x="6" y="61.21" width="62" height="3.06"/><rect class="rk-a" x="6" y="64.28" width="62" height="3.06"/><rect class="rk-b" x="6" y="67.34" width="62" height="3.06"/><rect class="rk-a" x="6" y="70.40" width="62" height="3.06"/><rect class="rk-b" x="6" y="73.47" width="62" height="3.06"/><rect class="rk-a" x="6" y="76.53" width="62" height="3.06"/><rect class="rk-b" x="6" y="79.60" width="62" height="3.06"/><rect class="rk-a" x="6" y="82.66" width="62" height="3.06"/><rect class="rk-b" x="6" y="85.72" width="62" height="3.06"/><rect class="rk-a" x="6" y="88.79" width="62" height="3.06"/><rect class="rk-b" x="6" y="91.85" width="62" height="3.06"/><rect class="rk-a" x="6" y="94.91" width="62" height="3.06"/><rect class="rk-b" x="6" y="97.98" width="62" height="3.06"/><rect class="rk-a" x="6" y="101.04" width="62" height="3.06"/><rect class="rk-b" x="6" y="104.11" width="62" height="3.06"/><rect class="rk-a" x="6" y="107.17" width="62" height="3.06"/><rect class="rk-b" x="6" y="110.23" width="62" height="3.06"/><rect class="rk-a" x="6" y="113.30" width="62" height="3.06"/><rect class="rk-b" x="6" y="116.36" width="62" height="3.06"/><rect class="rk-a" x="6" y="119.43" width="62" height="3.06"/><rect class="rk-b" x="6" y="122.49" width="62" height="3.06"/><rect class="rk-a" x="6" y="125.55" width="62" height="3.06"/><rect class="rk-b" x="6" y="128.62" width="62" height="3.06"/><rect class="rk-a" x="6" y="131.68" width="62" height="3.06"/><rect class="rk-b" x="6" y="134.74" width="62" height="3.06"/><rect class="rk-a" x="6" y="137.81" width="62" height="3.06"/><rect class="rk-b" x="6" y="140.87" width="62" height="3.06"/><rect class="rk-a" x="6" y="143.94" width="62" height="3.06"/>
+<rect class="rk-hit" x="6" y="113.30" width="62" height="6.13" rx="1"/>
+<text class="rk-lbl" x="37" y="119.36" text-anchor="middle">cn-004</text></svg></a>
+    <div><dl class="kv"><dt>Rack</dt><dd><a href="rack.html">A01</a></dd><dt>Position</dt><dd>U10–11</dd><dt>Height</dt><dd>2U, front</dd><dt>Location</dt><dd>Hall 2, Row A</dd><dt>Device</dt><dd><a href="device.html">2U compute</a></dd><dt>Serial</dt><dd class="mono">SN7K4-0042</dd><dt>Status</dt><dd><span class="qs ok">installed</span></dd><dt>Link</dt><dd>matched by serial</dd></dl>
+      <div class="acts"><a class="btn btn-sm" href="rack.html">Open rack</a><a class="btn btn-sm" href="device.html">Open device</a></div></div>
+  </div>
+</section>
+
+<section class="card" id="hist" aria-labelledby="hi-t">
+  <div class="card-head"><h2 id="hi-t">History</h2><span class="right"><a href="audit.html">Audit log</a></span></div>
+  <div class="card-body"><ol class="hist">
+    <li><span><b>sync</b> <span class="src managed">fnt</span> updated the device link</span><span class="when">2026-10-21 02:15</span></li>
+    <li><span><b>m.huber</b> added CNAME node44</span><span class="when">2026-05-12 09:30 · CLI</span></li>
+    <li><span><b>a.berger</b> added interface ib0 and 10.100.4.44</span><span class="when">2026-03-02 10:50 · web UI</span></li>
+    <li><span><b>a.berger</b> created the host with eno1 and 10.20.4.44</span><span class="when">2026-03-02 10:41 · web UI</span></li>
+  </ol></div>
+</section>
+</div>
+</div>
+
+</main>
+</div>
+
+<dialog id="help" class="dlg" aria-labelledby="help-t">
+  <header><h2 id="help-t">Keyboard shortcuts</h2><span class="step-n">Esc closes</span></header>
+  <div class="body"><table class="keys">
+    <tr><td><kbd>g</kbd> <kbd>o</kbd></td><td>Overview</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>p</kbd></td><td>Prefixes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>h</kbd></td><td>Hosts</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>z</kbd></td><td>Zones</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>d</kbd></td><td>DHCP scopes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>e</kbd></td><td>Exports</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>r</kbd></td><td>Racks</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>c</kbd></td><td>Change requests</td></tr>
+    <tr><td><kbd>/</kbd></td><td>Jump to an IP, prefix, MAC, host, zone or page</td></tr>
+    <tr><td><kbd>Shift</kbd> <kbd>A</kbd></td><td>Open the assistant</td></tr>
+    <tr><td><kbd>?</kbd></td><td>Help for the element under the pointer, else for this page</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Close a dialog, a menu or a pane</td></tr>
+  </table><p class="muted">No key <a class="gl" href="../../glossary.html#allocate" data-gl="allocate" data-domain="addr">allocates</a>, deletes or <a class="gl" href="../../glossary.html#approve" data-gl="approve" data-domain="access">approves</a>.</p></div>
+  <footer><form method="dialog"><button class="btn">Close</button></form></footer>
+</dialog>
+<script src="../assets/shell.js"></script>
+<script src="../../../assets/glossary-data.js"></script>
+<script src="../../../assets/glossary.js"></script>
+</body>
+</html>

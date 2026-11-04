@@ -1,0 +1,39 @@
+/* overview.css: the Overview page. Link after bembel.css and shell.css. Page classes only; tokens only. */
+
+.page-head .sub{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px;color:var(--c-text-2)}
+.page-head .actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.ov{display:grid;gap:var(--gap-card);grid-template-columns:minmax(0,1fr) 360px;align-items:start}
+.ov-main,.ov-side{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--gap-card);min-width:0}
+@container main (max-width:1000px){.ov{grid-template-columns:minmax(0,1fr) 300px}}
+@container main (max-width:840px){.ov{grid-template-columns:minmax(0,1fr)}}
+
+/* Needs you: one numbered list in work order (the pattern of repoctl and brig) */
+.todo-list{list-style:none;margin:0;padding:0}
+.todo-list>li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:4px 14px;align-items:start;padding:14px 16px;border-top:1px solid var(--c-border)}
+.todo-list>li:first-child{border-top:0}
+.todo-list .no{display:grid;place-items:center;width:22px;height:22px;margin-top:1px;border-radius:50%;border:1.5px solid var(--c-border-strong);color:var(--c-text-3);font:600 12px var(--font-sans)}
+.todo-list .t-failed .no{border-color:var(--s-failed);color:var(--s-failed)}
+.todo-list .t-warn .no{border-color:var(--s-warn);color:var(--s-warn)}
+.todo-list .first .no{background:var(--s-failed);border-color:var(--s-failed);color:var(--c-surface)}
+.todo-list .what{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;min-width:0}
+.todo-list .t{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-weight:500;line-height:24px}
+.todo-list .kind{min-width:56px;font-size:12px;font-weight:500;color:var(--c-text-3)}
+.todo-list .s{margin:0;font-size:13px;color:var(--c-text-2)}
+.todo-list .s .code-sub{margin-left:4px;white-space:nowrap}
+.todo-list .t-info .t{font-weight:400;color:var(--c-text-2)}
+.todo-list .acts{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px}
+@container main (max-width:640px){.todo-list>li{grid-template-columns:24px minmax(0,1fr)}.todo-list .acts{grid-column:2;justify-content:flex-start}}
+
+/* address space table */
+.space td{vertical-align:middle}
+.space .meter{width:90px}
+.fab{display:inline-flex;align-items:center;gap:5px;font:12px var(--font-mono);color:var(--c-text-2);white-space:nowrap}
+.fab::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c-text-3)}
+.fab.ib::before{background:var(--d-addr);border-radius:50%}
+.fab.roce::before{background:var(--d-dhcp)}
+
+/* side cards: two-line rows */
+.rows.mini>li{display:grid;gap:2px;padding:10px 16px}
+.rows.mini .t{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13.5px}
+.rows.mini .s{font-size:12.5px;color:var(--c-text-3)}
+.rows.mini .dot{width:8px;height:8px}
