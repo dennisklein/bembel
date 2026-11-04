@@ -13,10 +13,10 @@ The chapters `ui.html`, `ui-addr.html`, `ui-dns.html`, `ui-assets.html` and
 | Part | Path |
 |---|---|
 | Web UI pages | `docs/design/mockups/ui/*.html` |
-| Shared CSS and JS | `docs/design/mockups/assets/` (`bembel.css` tokens and components, `shell.css` frame and sidebar, `shell.js` keys and pop-ups, one CSS per area: `addr.css`, `dns.css`, `assets.css`, `access.css`, `overview.css`; `gsi.css` the GSI theme, imported by `bembel.css`) |
-| Fonts | `docs/design/mockups/assets/fonts/` (IBM Plex, Barlow for the rack views) |
+| Shared CSS and JS | `docs/design/mockups/assets/` (`bembel.css` tokens and components, `shell.css` frame and sidebar, `shell.js` keys and pop-ups, one CSS per area: `addr.css`, `dns.css`, `assets.css`, `access.css`, `overview.css`) |
+| Fonts | `docs/design/mockups/assets/fonts/` (IBM Plex Mono, Barlow for the rack views; the sans font is Helvetica or Arial from the system) |
 | Gallery | `docs/design/mockups/index.html` |
-| Screenshots | `docs/design/img/ui-*.webp`, `ui-*-mobile.webp`, `ui-*-gsi.webp` (GSI theme) |
+| Screenshots | `docs/design/img/ui-*.webp`, `ui-*-mobile.webp` |
 | Screenshot tool | `tools/site/shots.mjs` |
 
 ## Rules
@@ -38,11 +38,11 @@ The chapters `ui.html`, `ui-addr.html`, `ui-dns.html`, `ui-assets.html` and
   `--rk-*`), in light and in both dark blocks. A domain colour marks a
   domain, never a state. A new token goes into all three blocks and into the
   colour table of `docs/design/ui.html`.
-- The GSI theme (`<html data-brand="gsi">`, `gsi.css`) sets the same tokens
-  with GSI values, in light and in both dark blocks. A new colour token also
-  gets a GSI value there. House orange (`--c-brand`) is decoration only; text
-  in orange uses `--c-brand-text`. `docs/assets/site-gsi.css` is the same
-  theme for the design record.
+- The tokens follow the GSI design system (`ui.html#colours`). House orange
+  (`--c-brand`) is decoration only: the top bar line, the brand mark, the
+  active item rule, the primary button with black text. Text in orange uses
+  `--c-brand-text`. All other text, links and small UI use the AA-safe GSI web
+  palette. Helvetica, radii from `--r-sm`, `--r-md`, `--r-lg` only.
 - Show permissions as in `ui.html#permissions`: an allowed button, a
   "Request" button for a change request, a disabled button with a
   `.why-not` text. Show the source and `managed_by` of each object.
@@ -62,7 +62,6 @@ The chapters `ui.html`, `ui-addr.html`, `ui-dns.html`, `ui-assets.html` and
 ```sh
 mise run docs:glossary                          # glossary links and scripts
 node tools/site/shots.mjs <page> ...            # or mise run docs:shots
-node tools/site/shots.mjs overview prefix zone rack assistant-chat --brand gsi --no-mobile
 mise run docs
 ```
 
@@ -72,8 +71,6 @@ mise run docs
   Pillow. It takes each web UI page at 1440x900 CSS px and some at 390x844,
   at device scale 2. Make the shots of each page that you changed, and of all
   pages after a change to the shared CSS, to the sidebar or to the glossary.
-  After a change to shared CSS, also make the GSI shots that `ui.html#gsi-theme`
-  shows (second command above).
 - Look at each new screenshot before you commit it: no hover card open, no
   focus ring that is not part of the design, the same data as the text.
 - Open one page in a browser and check: light and dark mode, the hover card on

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Web UI</title>
-<meta name="description" content="Principles, layout, colours, keys, permission display, page list and mobile rules of the bembel web UI.">
+<meta name="description" content="Principles, layout, colours and type, keys, permission display, page list and mobile rules of the bembel web UI.">
 </head>
 <body>
 <h1>Web UI</h1>
@@ -82,57 +82,45 @@
 <dt>Right panel</dt><dd>The help pane (as in brig) or the assistant panel.</dd>
 </dl>
 
-<h2 id="colours">Colours</h2>
-<p>The UI and the design record share one set of tokens (<code>docs/design/mockups/assets/bembel.css</code>). The primary colour is indigo. Each domain has one colour that the glossary, the sidebar and the chips use.</p>
+<h2 id="colours">Colours and type</h2>
+<p>The UI and the design record follow the GSI design system. They share one set of tokens (<code>docs/design/mockups/assets/bembel.css</code> for the UI, <code>docs/assets/site.css</code> for the record), in light and in dark. Two rules apply:</p>
+<ul>
+<li>The brand colours are decoration. The house orange <code>#FABE5D</code> marks the line under the top bar, the brand mark, the active sidebar item, square bullets and the primary button. The primary button has black text on orange (10.4:1). The house orange is never text on a light surface.</li>
+<li>Everything that a user reads uses the AA-safe GSI web palette: text, links, icons, small badges, focus and form states. Each colour has at least 4.5:1 on white.</li>
+</ul>
 <table>
 <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Use</th></tr></thead>
 <tbody>
-<tr><td><code>--accent</code></td><td><code>#5b46c9</code></td><td><code>#a59bf7</code></td><td>Primary buttons, links, focus ring, the address domain.</td></tr>
-<tr><td><code>--d-addr</code></td><td><code>#5b46c9</code></td><td><code>#a59bf7</code></td><td>Addressing: VRF, prefix, address, VLAN.</td></tr>
-<tr><td><code>--d-dns</code></td><td><code>#0e7c7b</code></td><td><code>#5fd0c8</code></td><td>DNS: zone, record, view.</td></tr>
-<tr><td><code>--d-dhcp</code></td><td><code>#1f6fb2</code></td><td><code>#7ab4ee</code></td><td>DHCP: scope, pool, reservation.</td></tr>
-<tr><td><code>--d-assets</code></td><td><code>#4b5d78</code></td><td><code>#9fb2cf</code></td><td>Assets: rack, device, port.</td></tr>
-<tr><td><code>--d-access</code></td><td><code>#a23a77</code></td><td><code>#e59ac2</code></td><td>Access: binding, role, token.</td></tr>
-<tr><td><code>--d-integ</code></td><td><code>#a0582a</code></td><td><code>#e3a070</code></td><td>Integrations: source, sync, export.</td></tr>
+<tr><td><code>--c-brand</code></td><td><code>#FABE5D</code></td><td><code>#FABE5D</code></td><td>House orange: decoration and the primary button fill.</td></tr>
+<tr><td><code>--c-brand-text</code></td><td><code>#9a6304</code></td><td><code>#FABE5D</code></td><td>Orange text and icons: breadcrumbs, the assistant mark.</td></tr>
+<tr><td><code>--c-primary</code></td><td><code>#005ea8</code></td><td><code>#7fb6e8</code></td><td>Links, focus ring, selection, the address domain.</td></tr>
+<tr><td><code>--d-addr</code></td><td><code>#005ea8</code></td><td><code>#7fb6e8</code></td><td>Addressing: VRF, prefix, address, VLAN. GSI dark blue.</td></tr>
+<tr><td><code>--d-dns</code></td><td><code>#00806a</code></td><td><code>#4fc7ae</code></td><td>DNS: zone, record, view. GSI teal.</td></tr>
+<tr><td><code>--d-dhcp</code></td><td><code>#0d7c9b</code></td><td><code>#5fc4de</code></td><td>DHCP: scope, pool, reservation. GSI light blue.</td></tr>
+<tr><td><code>--d-assets</code></td><td><code>#4d4d4d</code></td><td><code>#c9ccd2</code></td><td>Assets: rack, device, port. Grey.</td></tr>
+<tr><td><code>--d-access</code></td><td><code>#b10057</code></td><td><code>#f07aae</code></td><td>Access: binding, role, token. GSI ruby.</td></tr>
+<tr><td><code>--d-integ</code></td><td><code>#9a6304</code></td><td><code>#FABE5D</code></td><td>Integrations: source, sync, export. GSI orange.</td></tr>
 </tbody>
 </table>
 <p>State colours are separate from domain colours. Each state also has an icon or a word, so colour is never the only signal.</p>
 <table>
-<thead><tr><th>State</th><th>Meaning</th><th>Example</th></tr></thead>
+<thead><tr><th>State</th><th>Light</th><th>Meaning</th><th>Example</th></tr></thead>
 <tbody>
-<tr><td><code>ok</code></td><td>Healthy, in sync, active.</td><td>Export ns1: applied 18:02.</td></tr>
-<tr><td><code>warn</code></td><td>Needs attention soon.</td><td>Subnet 92 % full. Claim expires in 10 minutes.</td></tr>
-<tr><td><code>failed</code></td><td>Broken, blocked, rejected.</td><td>Export dhcp2: <code>dhcpd -t</code> failed.</td></tr>
-<tr><td><code>info</code></td><td>A neutral fact with weight.</td><td>Observed address (SLAAC).</td></tr>
-<tr><td><code>pending</code></td><td>Waits for a person or a job.</td><td>Change request waits for approval.</td></tr>
-<tr><td><code>neutral</code></td><td>No state.</td><td>Planned prefix.</td></tr>
+<tr><td><code>ok</code></td><td><code>#3f7e28</code></td><td>Healthy, in sync, active.</td><td>Export ns1: applied 18:02.</td></tr>
+<tr><td><code>warn</code></td><td><code>#9a6304</code></td><td>Needs attention soon.</td><td>Subnet 92 % full. Claim expires in 10 minutes.</td></tr>
+<tr><td><code>failed</code></td><td><code>#c92a1b</code></td><td>Broken, blocked, rejected.</td><td>Export dhcp2: <code>dhcpd -t</code> failed.</td></tr>
+<tr><td><code>info</code></td><td><code>#005ea8</code></td><td>A neutral fact with weight.</td><td>Observed address (SLAAC).</td></tr>
+<tr><td><code>pending</code></td><td><code>#0d7c9b</code></td><td>Waits for a person or a job.</td><td>Change request waits for approval.</td></tr>
+<tr><td><code>neutral</code></td><td><code>#6e6e6e</code></td><td>No state.</td><td>Planned prefix.</td></tr>
 </tbody>
 </table>
-<p>The utilisation meter uses <code>ok</code> up to 80 %, <code>warn</code> from 80 % and <code>failed</code> from 95 %. The thresholds are settings per prefix pool. The rack views use their own tokens (<code>--rk-*</code>) and the condensed Barlow font, in the style of rackplanner.</p>
-
-<h3 id="gsi-theme">The GSI theme (try-out)</h3>
-<p>A second theme applies the GSI design system to the same pages. Indigo stays the default. The theme changes only tokens and a small set of shapes, so each page, state and domain keeps its meaning. The files are <code>docs/design/mockups/assets/gsi.css</code> for the UI and <code>docs/assets/site-gsi.css</code> for the design record.</p>
-<p>To see it, select <b>GSI</b> in the top bar of the design record or of a mockup, or add <code>?brand=gsi</code> to the address. The choice stays in the browser (<code>localStorage</code> key <code>bembel-brand</code>), and the design record and the mockups share it. <code>?brand=bembel</code> goes back to indigo.</p>
-<table>
-<thead><tr><th>Part</th><th>Indigo (default)</th><th>GSI</th></tr></thead>
-<tbody>
-<tr><td>Brand colour</td><td>Indigo <code>#5b46c9</code> for buttons, links and the brand mark.</td><td>House orange <code>#FABE5D</code> for decoration only: the line under the top bar, the brand mark, the primary button fill (with black text, 10.4:1), the active item rule, square bullets.</td></tr>
-<tr><td>Links, focus, selection</td><td>Indigo.</td><td>Dark blue <code>#005ea8</code> (6.6:1). On dark surfaces <code>#7fb6e8</code>.</td></tr>
-<tr><td>Orange text</td><td>Not used.</td><td><code>#9a6304</code> (5.1:1), never the house orange on a light surface.</td></tr>
-<tr><td>Domains</td><td>Indigo, teal, blue, slate, plum, copper.</td><td>The GSI harmonizing colours at AA values: dark blue <code>#005ea8</code>, teal <code>#00806a</code>, light blue <code>#0d7c9b</code>, grey <code>#4d4d4d</code>, ruby <code>#b10057</code>, orange <code>#9a6304</code>.</td></tr>
-<tr><td>States</td><td>Green, amber, red, blue, grey, indigo.</td><td>Green <code>#3f7e28</code>, orange <code>#9a6304</code>, red <code>#c92a1b</code>, blue <code>#005ea8</code>, grey <code>#6e6e6e</code>; <code>pending</code> is light blue <code>#0d7c9b</code>.</td></tr>
-<tr><td>Surfaces</td><td>Cool lavender grey.</td><td>White and neutral greys (<code>#f6f6f6</code>, <code>#ededed</code>). Dark theme: the navy of the GSI master (<code>#131519</code>, <code>#20242b</code>, <code>#292d35</code>).</td></tr>
-<tr><td>Type</td><td>IBM Plex Sans in the UI, Inter and Source Serif 4 in the record.</td><td>Helvetica, then Arial. Bold headings. Monospace stays for addresses and code, because GSI has no monospaced font.</td></tr>
-<tr><td>Shape</td><td>Radii 4, 6 and 10 px in the UI, up to 18 px in the record.</td><td>Radii 2, 4 and 6 px, 1 px hairlines, flat cards, no gradients. Page heads use the GSI pattern: eyebrow, orange line, heading.</td></tr>
-</tbody>
-</table>
-<p>The rack views keep the <code>--rk-*</code> tokens and the Barlow font. Only the tape labels change to the house orange. The team colours of the device faces do not change, because they come from the data.</p>
-<figure class="shot"><a href="mockups/ui/overview.html?brand=gsi"><img src="img/ui-overview-gsi.webp" alt="The overview page in the GSI theme: white top bar with an orange line, Helvetica, orange primary buttons with black text, dark blue links" loading="lazy"></a><figcaption>The overview in the GSI theme. Compare with the <a href="mockups/ui/overview.html?brand=bembel">indigo overview</a> at the top of this chapter.</figcaption></figure>
-<figure class="shot"><a href="mockups/ui/prefix.html?brand=gsi"><img src="img/ui-prefix-gsi.webp" alt="The prefix page of 10.20.4.0/22 in the GSI theme with the address map in the state colours" loading="lazy"></a><figcaption>Prefix kestrel-compute. The state colours of the address map come from the GSI web palette.</figcaption></figure>
-<figure class="shot"><a href="mockups/ui/zone.html?brand=gsi"><img src="img/ui-zone-gsi.webp" alt="The zone page of kestrel.example.org in the GSI theme" loading="lazy"></a><figcaption>Zone kestrel.example.org. The DNS domain colour is the GSI teal.</figcaption></figure>
-<figure class="shot"><a href="mockups/ui/rack.html?brand=gsi"><img src="img/ui-rack-gsi.webp" alt="The rack elevation of Row A in the GSI theme with orange tape labels" loading="lazy"></a><figcaption>Row A. The drawing sheet keeps its own tokens. The tape labels use the house orange.</figcaption></figure>
-<figure class="shot"><a href="mockups/ui/assistant-chat.html?brand=gsi"><img src="img/ui-assistant-chat-gsi.webp" alt="The assistant chat in the GSI theme with a draft card and an orange Open draft button" loading="lazy"></a><figcaption>The assistant pane. The user message uses the dark blue, the draft action uses the orange button.</figcaption></figure>
-<div class="callout note"><p>The GSI theme is a try-out for review. If it is accepted, it can become the default, and the indigo theme can stay as the option or go away. The tokens are the only contract, so the change is one file.</p></div>
+<p>The utilisation meter uses <code>ok</code> up to 80 %, <code>warn</code> from 80 % and <code>failed</code> from 95 %. The thresholds are settings per prefix pool.</p>
+<dl>
+<dt>Surfaces</dt><dd>White and neutral greys (<code>#f6f6f6</code>, <code>#ededed</code>, <code>#dddddd</code> hairlines). The dark theme uses the navy of the GSI master (<code>#131519</code>, <code>#20242b</code>, <code>#292d35</code>). The footer of the design record is the navy bar.</dd>
+<dt>Type</dt><dd>Helvetica, then Arial. Headings are bold. Addresses, ids and code use a monospaced font (IBM Plex Mono in the UI, JetBrains Mono in the record), because GSI has no monospaced font.</dd>
+<dt>Shape</dt><dd>Radii of 2, 4 and 6 px, 1 px hairlines, flat cards, no gradients. A page head uses the GSI pattern: eyebrow (the breadcrumbs), a short orange line, the heading.</dd>
+<dt>Racks</dt><dd>The rack views use their own tokens (<code>--rk-*</code>) and the condensed Barlow font, in the style of rackplanner. The tape labels use the house orange. The team colours of the device faces come from the data.</dd>
+</dl>
 
 <h2 id="keys">Keys</h2>
 <table>
