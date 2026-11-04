@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Decision</title>
+<meta name="description" content="Why the organisation replaces OpenNetAdmin, which options it examined, why it builds bembel, the name and the license.">
+</head>
+<body>
+<h1>Decision</h1>
+<p class="lede">The organisation uses OpenNetAdmin (ONA) for addresses, DNS and DHCP. ONA works, but its model and its interface stop the next steps: IPv6, VRFs, InfiniBand, self-service for teams and automation from OpenStack and Kubernetes. This chapter records the problems, the requirements, the options and the decision to build bembel.</p>
+<ul class="keypoints">
+<li>ONA keeps its data integrity in PHP code. The database has no foreign keys, IPv6 is stored as a decimal number and permissions are global verbs without scope.</li>
+<li>The requirements are API first, OIDC access control with scopes, IPv4 and IPv6 as equals, InfiniBand and RoCEv2 fabrics, BIND and ISC dhcpd exports, assets from FNT Command, and a safe migration from ONA.</li>
+<li>Five options were scored: NetBox, Nautobot, phpIPAM, a commercial DDI suite and a new tool. NetBox is the strongest product, but its DNS and DHCP story, its access model and its migration path fit worse than a focused new tool.</li>
+<li>The decision is a new tool, bembel: Go, PostgreSQL 18, SvelteKit, one binary, Apache-2.0.</li>
+<li>The name comes from the Hessian stoneware jug that holds the apple wine and pours it out, as an IPAM holds addresses and gives them out.</li>
+</ul>
+
+<h2 id="today">ONA today</h2>
+<p>The organisation runs ONA 19.0.x on MariaDB. ONA holds about 41 000 hosts, 1 900 subnets and 62 000 DNS records. The network team edits data in the ONA web UI and with <code>dcm.pl</code>. Two plugins write the BIND zone files and <code>dhcpd.conf</code> each night. Shell scripts copy the files to the name servers and the DHCP servers.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 1040 300" role="img" aria-labelledby="today-t">
+<title id="today-t">The ONA setup today: web UI and dcm.pl write to MariaDB, nightly plugins build BIND and dhcpd files, scripts copy them</title>
+<rect class="box" x="16" y="40" width="150" height="50" rx="8"/><text class="t-title" x="91" y="70" text-anchor="middle">ONA web UI</text>
+<rect class="box" x="16" y="120" width="150" height="50" rx="8"/><text class="t-title" x="91" y="150" text-anchor="middle">dcm.pl</text>
+<rect class="box-soft" x="16" y="200" width="150" height="50" rx="8"/><text class="t-small" x="91" y="222" text-anchor="middle">direct SQL</text><text class="t-small t-muted" x="91" y="238" text-anchor="middle">scripts, ona_sql</text>
+<rect class="zone" x="210" y="20" width="250" height="260" rx="12"/>
+<text class="t-title" x="226" y="44">ONA 19.0 (PHP, xajax)</text>
+<rect class="box" x="226" y="60" width="218" height="44" rx="8"/><text class="t-small" x="238" y="87">modules: host_add, subnet_add …</text>
+<rect class="box-err" x="226" y="120" width="218" height="60" rx="8"/><text class="t-small" x="238" y="143">integrity only in PHP code</text><text class="t-small" x="238" y="163">no FKs, non-atomic sequences</text>
+<rect class="box" x="226" y="196" width="218" height="64" rx="8"/><text class="t-title" x="238" y="222">MariaDB</text><text class="t-small t-muted" x="238" y="242">41 000 hosts · 62 000 records</text>
+<rect class="box-soft" x="500" y="60" width="200" height="50" rx="8"/><text class="t-small" x="512" y="82">build_bind (cron)</text><text class="t-small t-muted" x="512" y="98">ignores DNS views</text>
+<rect class="box-soft" x="500" y="150" width="200" height="50" rx="8"/><text class="t-small" x="512" y="172">build_isc_dhcp (cron)</text><text class="t-small t-muted" x="512" y="188">IPv4 pools only</text>
+<rect class="box" x="760" y="40" width="130" height="40" rx="8"/><text class="t-small" x="825" y="65" text-anchor="middle">ns1 (BIND)</text>
+<rect class="box" x="760" y="90" width="130" height="40" rx="8"/><text class="t-small" x="825" y="115" text-anchor="middle">ns2, ns3</text>
+<rect class="box" x="760" y="150" width="130" height="40" rx="8"/><text class="t-small" x="825" y="175" text-anchor="middle">dhcp1</text>
+<rect class="box" x="760" y="200" width="130" height="40" rx="8"/><text class="t-small" x="825" y="225" text-anchor="middle">dhcp2</text>
+<rect class="box-muted" x="910" y="100" width="114" height="100" rx="8"/><text class="t-small" x="967" y="130" text-anchor="middle">FNT Command</text><text class="t-small t-muted" x="967" y="150" text-anchor="middle">racks, devices</text><text class="t-small t-muted" x="967" y="170" text-anchor="middle">no link to ONA</text>
+<path class="edge" d="M166,65 L222,80" marker-end="url(#arrow)"/>
+<path class="edge" d="M166,145 L222,90" marker-end="url(#arrow)"/>
+<path class="edge-err" d="M166,225 L222,228" marker-end="url(#arrow)"/>
+<path class="edge" d="M444,228 L470,228 L470,85 L496,85" marker-end="url(#arrow)"/>
+<path class="edge" d="M470,175 L496,175" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M700,85 L756,60" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M700,85 L756,110" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M700,175 L756,170" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M700,175 L756,220" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="728" y="276" text-anchor="middle">scp + rndc reload, scp + restart</text>
+</svg>
+<figcaption>ONA today. Each writer path bypasses checks in a different way. FNT Command has the racks, but no link to the hosts in ONA.</figcaption>
+</figure>
+<p>Other systems hold parts of the same truth. FNT Command holds the racks, devices and cables. OpenStack Neutron allocates addresses in its provider networks without ONA. Kubernetes clusters take load balancer addresses from ranges in spreadsheets. The InfiniBand partitions are in a hand-edited <code>partitions.conf</code> on the subnet manager.</p>
+
+<h2 id="problems">Problems</h2>
+<p>The research for this record read the ONA schema, the module code and the issue tracker (<a href="map-ona.html">map-ona.html</a>). The problems fall into five groups.</p>
+<table>
+<thead><tr><th>Group</th><th>Problem</th><th>Evidence</th><th>Effect for the organisation</th></tr></thead>
+<tbody>
+<tr><td>Integrity</td><td>No foreign keys, almost no indexes. Ids come from a <code>sequences</code> table with a non-atomic read and update.</td><td><code>docs/ona-schema.dbml</code>: "much of the data integrity and consistency is in the code"</td><td>Orphan DNS records and interfaces after failed changes. The import finds 214 findings.</td></tr>
+<tr><td>Model</td><td>No VRF, no prefix tree, no status. Blocks are free ranges without relation to subnets. One interface row is one IP address.</td><td>tables <code>subnets</code>, <code>blocks</code>, <code>interfaces</code></td><td>The OOB and fabric networks cannot reuse addresses. Utilisation and free space are not visible.</td></tr>
+<tr><td>IPv6</td><td>Addresses and masks are <code>DECIMAL(39,0)</code>. The family comes from the size of the number. DHCP pools are 32-bit integers. AAAA is an A record that is printed as AAAA.</td><td>migration <code>10-to-11.xml</code>, issue #166</td><td>IPv6 works for few cases only. Dual stack is two unrelated subnets.</td></tr>
+<tr><td>DNS and DHCP</td><td>Views are a label that <code>build_bind</code> ignores. CNAME and MX targets must be A records in ONA. <code>dhcpd.conf</code> has a subnet only if a router option is set.</td><td>issues #169, #178, #168; <code>build_isc_dhcp.inc.php</code></td><td>Split horizon and external targets need manual zone parts.</td></tr>
+<tr><td>Access and API</td><td>Permissions are global verbs (<code>host_add</code>). Any logged-in user reads everything. Passwords are unsalted MD5. <code>dcm.php</code> is a text RPC without lists or pagination. A 2026 issue reports a pre-auth remote code execution in <code>tag_add</code>.</td><td><code>functions_auth.inc.php</code>, issue #210</td><td>No self-service for teams. No safe automation. A security risk on the network.</td></tr>
+</tbody>
+</table>
+<aside class="callout warn">
+<p class="callout-title">Security</p>
+<p>Issue #210 reports an <code>eval()</code> on user input in the <code>tag_add</code> module, reachable before login, and an SQL injection in the search. The research confirmed the <code>eval()</code> in the cloned source. Until the migration ends, the ONA web server must be reachable only from the admin network.</p>
+</aside>
+
+<h2 id="requirements">Requirements</h2>
+<p>The requirements come from the requester and from the problems above. "Must" items are the scoring criteria in <a href="#scores">scores</a>.</p>
+<table>
+<thead><tr><th>Id</th><th>Requirement</th><th>Level</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>R1</td><td>API first: an OpenAPI document is the contract. The web UI, the CLI and all integrations use only the public API.</td><td>must</td><td><a href="api.html">API</a></td></tr>
+<tr><td>R2</td><td>OIDC login. Access control with roles and scopes: VRF, prefix subtree, zone subtree, site, team, tag. Tokens for services.</td><td>must</td><td><a href="access.html">Access control</a></td></tr>
+<tr><td>R3</td><td>IPv4 and IPv6 as equals, VRFs, a prefix tree, utilisation and safe allocation.</td><td>must</td><td><a href="allocation.html">Allocation</a></td></tr>
+<tr><td>R4</td><td>Ethernet, Ethernet with RoCEv2 and InfiniBand fabrics: VLANs, IB partitions, port GUIDs, QoS profiles.</td><td>must</td><td><a href="fabrics.html">Fabrics</a></td></tr>
+<tr><td>R5</td><td>DNS with views and derived records. BIND export.</td><td>must</td><td><a href="dns.html">DNS</a></td></tr>
+<tr><td>R6</td><td>DHCP with pools, reservations, options, failover. ISC dhcpd export.</td><td>must</td><td><a href="dhcp.html">DHCP</a></td></tr>
+<tr><td>R7</td><td>Migration from ONA with a parallel run and byte-level export comparison.</td><td>must</td><td><a href="migration.html">Migration</a></td></tr>
+<tr><td>R8</td><td>Asset views synced from FNT Command, in the visual style of rackplanner.</td><td>must</td><td><a href="assets.html">Assets</a></td></tr>
+<tr><td>R9</td><td>OpenStack and Kubernetes integration. VMs on Debian libvirt hypervisors.</td><td>must</td><td><a href="openstack.html">OpenStack</a>, <a href="kubernetes.html">Kubernetes</a>, <a href="vms.html">VMs</a></td></tr>
+<tr><td>R10</td><td>Routing values (ASN, route targets, static routes, prefix lists) and firewall address groups as feeds.</td><td>should</td><td><a href="routing.html">Routing and firewall</a></td></tr>
+<tr><td>R11</td><td>Assistant on a local LLM: advisory buttons, free chat, search with embeddings. Help system as in brig.</td><td>should</td><td><a href="assistant.html">Assistant</a></td></tr>
+<tr><td>R12</td><td>HA in Kubernetes. Prometheus metrics and Loki-compatible logs.</td><td>must</td><td><a href="operations.html">Operations</a></td></tr>
+<tr><td>R13</td><td>An open source license. Low cost to run for a small team.</td><td>must</td><td><a href="#license">license</a></td></tr>
+</tbody>
+</table>
+
+<h2 id="options">Options</h2>
+<p>The research examined five options. Each option is described with what it gives and what it does not give for the requirements.</p>
+<dl class="facts">
+<dt>NetBox 4.7 (Apache-2.0)</dt>
+<dd>The reference product for IPAM and DCIM. Rich model: VRF, prefix, IP range, IP address, VLAN groups, racks, devices, cables, VMs. REST and read-only GraphQL. Object permissions with ORM filter constraints. OIDC through python-social-auth. DNS and DHCP are not in core: plugins such as netbox-dns exist, and DHCP is an export template. Its own DCIM overlaps with FNT Command. A migration from ONA needs a custom script.</dd>
+<dt>Nautobot (Apache-2.0)</dt>
+<dd>A NetBox fork with jobs, a GraphQL API and apps. It shares the model and the permission design of NetBox. It adds a larger platform to run (Celery, Redis) and a second plugin ecosystem.</dd>
+<dt>phpIPAM (GPL-3.0)</dt>
+<dd>A PHP IPAM with sections, subnets and a simple API. It has a light DNS (PowerDNS) link. It has no fabric model, a weak API and the same PHP risk class as ONA.</dd>
+<dt>Commercial DDI (for example Infoblox, EfficientIP, BlueCat)</dt>
+<dd>Complete DNS, DHCP and IPAM with appliances and support. High license cost per object or per appliance. It replaces BIND and ISC dhcpd, which the organisation does not want to replace now. InfiniBand is not in its model.</dd>
+<dt>New tool (bembel)</dt>
+<dd>A focused IPAM, DNS and DHCP source of truth with exports to the existing servers. It mirrors assets from FNT Command and does not repeat DCIM. Its model, access control and migration are designed for this organisation. Cost: the development and the maintenance by the team.</dd>
+</dl>
+
+<h2 id="scores">Scores</h2>
+<p>Each option has a score from 0 (no) to 3 (complete) per requirement. A plugin or a script that the organisation must write counts as 1.</p>
+<table>
+<thead><tr><th>Requirement</th><th>NetBox</th><th>Nautobot</th><th>phpIPAM</th><th>DDI</th><th>bembel</th></tr></thead>
+<tbody>
+<tr><td>R1 API first</td><td>3</td><td>3</td><td>1</td><td>2</td><td>3</td></tr>
+<tr><td>R2 OIDC and scoped access</td><td>2</td><td>2</td><td>1</td><td>2</td><td>3</td></tr>
+<tr><td>R3 IPv4, IPv6, VRF, tree</td><td>3</td><td>3</td><td>2</td><td>3</td><td>3</td></tr>
+<tr><td>R4 IB and RoCEv2 fabrics</td><td>1</td><td>1</td><td>0</td><td>0</td><td>3</td></tr>
+<tr><td>R5 DNS and BIND export</td><td>1</td><td>1</td><td>1</td><td>3</td><td>3</td></tr>
+<tr><td>R6 DHCP and dhcpd export</td><td>1</td><td>1</td><td>0</td><td>3</td><td>3</td></tr>
+<tr><td>R7 ONA migration</td><td>1</td><td>1</td><td>1</td><td>1</td><td>3</td></tr>
+<tr><td>R8 FNT asset views</td><td>1</td><td>1</td><td>0</td><td>0</td><td>3</td></tr>
+<tr><td>R9 OpenStack, Kubernetes, libvirt</td><td>2</td><td>2</td><td>0</td><td>2</td><td>3</td></tr>
+<tr><td>R12 HA, metrics, logs</td><td>2</td><td>2</td><td>1</td><td>3</td><td>3</td></tr>
+<tr><td>R13 open source, low cost</td><td>3</td><td>3</td><td>3</td><td>0</td><td>2</td></tr>
+<tr><td><strong>Sum (max 33)</strong></td><td><strong>20</strong></td><td><strong>20</strong></td><td><strong>10</strong></td><td><strong>19</strong></td><td><strong>32</strong></td></tr>
+</tbody>
+</table>
+<p>bembel gets the full score by design, so the sum alone is not a fair argument. The table shows a more useful fact: NetBox is strong on the generic parts (R1, R3) and weak exactly where this organisation is special (R4 to R8). These weak parts are the core of the daily work of the network team.</p>
+<figure class="diagram">
+<svg viewBox="0 0 760 260" role="img" aria-labelledby="sc-t">
+<title id="sc-t">Score per option: bembel 32, NetBox 20, Nautobot 20, DDI 19, phpIPAM 10 of 33</title>
+<text class="t-small t-muted" x="16" y="24">score of 33 (bars to scale)</text>
+<text class="t-title" x="16" y="62">bembel</text><rect class="box-accent" x="130" y="46" width="582" height="24" rx="6"/><text class="t-title t-on" x="700" y="63" text-anchor="end">32</text>
+<text class="t-title" x="16" y="102">NetBox</text><rect class="box" x="130" y="86" width="364" height="24" rx="6"/><text class="t-title" x="504" y="103">20</text>
+<text class="t-title" x="16" y="142">Nautobot</text><rect class="box" x="130" y="126" width="364" height="24" rx="6"/><text class="t-title" x="504" y="143">20</text>
+<text class="t-title" x="16" y="182">DDI</text><rect class="box-soft" x="130" y="166" width="345" height="24" rx="6"/><text class="t-title" x="485" y="183">19</text>
+<text class="t-title" x="16" y="222">phpIPAM</text><rect class="box-muted" x="130" y="206" width="182" height="24" rx="6"/><text class="t-title" x="322" y="223">10</text>
+</svg>
+<figcaption>The scores. The gap between NetBox and bembel is in fabrics, DNS, DHCP, migration and assets.</figcaption>
+</figure>
+
+<h2 id="choice">Choice</h2>
+<p>The organisation builds bembel. The decision has three reasons and one condition.</p>
+<ol>
+<li><strong>The special parts are the daily work.</strong> InfiniBand partitions, RoCEv2 rails, BIND views and dhcpd failover are not edge cases here. In NetBox they are plugins or custom fields that the database does not check.</li>
+<li><strong>FNT Command stays the DCIM.</strong> NetBox would be a second DCIM next to FNT Command, with two sources for racks and devices. bembel only mirrors the assets and links hosts to devices.</li>
+<li><strong>The migration is the risk.</strong> A tool that knows the ONA model can import it, compare the exports byte by byte and switch over without a flag day (<a href="migration.html#parallel-run">migration.html#parallel-run</a>).</li>
+</ol>
+<aside class="callout rule">
+<p class="callout-title">Condition: stay small</p>
+<p>bembel is an IPAM, DNS and DHCP source of truth. It is not a DCIM, not a DNS server, not a DHCP server, not a firewall manager and not a config generator for routers. Each feature request outside this scope needs a decision record. The NetBox mapping (<a href="map-netbox.html">map-netbox.html</a>) keeps a way open: if bembel fails, its data exports to NetBox.</p>
+</aside>
+<p>The stack is decided in <a href="architecture.html#backend">architecture.html#backend</a>: Go instead of Rust, PostgreSQL 18, SvelteKit, mise. The requester proposed Rust. Go wins because the server, the CLI, the Kubernetes controllers, the Cluster API provider and the external-dns webhook share one language and one module, and because the other tools of the author (brig, sind, repoctl, radar) are Go.</p>
+
+<h2 id="name">Name</h2>
+<p>The requester asked for a name that plays with "IP" and with something funny from Hesse. The organisation is near Frankfurt. The shortlist:</p>
+<table>
+<thead><tr><th>Name</th><th>CLI</th><th>Idea</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td><strong>bembel</strong></td><td><code>bembel</code></td><td>The grey-blue stoneware jug for Ebbelwoi (apple wine). It holds the wine and pours it out into each glass, as an IPAM holds the address space and gives out addresses.</td><td><strong>chosen</strong></td></tr>
+<tr><td>dippegucker</td><td><code>dippe</code></td><td>A "Dippegucker" looks into the pots of other people. The pot (Dippe) is the address pool.</td><td>long to type</td></tr>
+<tr><td>ippelwoi</td><td><code>ippel</code></td><td>Ebbelwoi with "IP" in it.</td><td>hard to spell for non-Hessians</td></tr>
+<tr><td>rippche</td><td><code>rippche</code></td><td>Frankfurter Rippche. "RIP" for released addresses.</td><td>a joke on released addresses only</td></tr>
+<tr><td>torrens</td><td><code>torrens</code></td><td>The Torrens title: a land register where the entry is the title. A good source-of-truth picture, but not Hessian.</td><td>first working name</td></tr>
+</tbody>
+</table>
+<p>The names were free on crates.io, npm and PyPI on 2026-11-04. A trademark search and a Go module path check must follow before the first release. Writing rules: "bembel" in lower case in prose and in commands; "Bembel" only at the start of a sentence. Token prefix <code>bem_pat_</code>. Helm chart, container image and Debian package: <code>bembel</code>. The repository is <code>dennisklein/bembel</code>, and the design record is at <code>https://dennisklein.github.io/bembel/</code>.</p>
+<figure class="diagram">
+<svg viewBox="0 0 760 220" role="img" aria-labelledby="nm-t">
+<title id="nm-t">The bembel picture: one jug, many glasses; one address space, many consumers</title>
+<rect class="box-accent" x="40" y="50" width="160" height="120" rx="20"/>
+<text class="t-title t-on" x="120" y="96" text-anchor="middle">bembel</text>
+<text class="t-small t-on" x="120" y="120" text-anchor="middle">address space</text>
+<text class="t-small t-on" x="120" y="140" text-anchor="middle">10.0.0.0/8</text><text class="t-small t-on" x="120" y="156" text-anchor="middle">2001:db8:4200::/48</text>
+<rect class="box" x="330" y="20" width="170" height="34" rx="8"/><text class="t-small" x="415" y="42" text-anchor="middle">users (web UI, CLI)</text>
+<rect class="box" x="330" y="66" width="170" height="34" rx="8"/><text class="t-small" x="415" y="88" text-anchor="middle">BIND and dhcpd</text>
+<rect class="box" x="330" y="112" width="170" height="34" rx="8"/><text class="t-small" x="415" y="134" text-anchor="middle">OpenStack Neutron</text>
+<rect class="box" x="330" y="158" width="170" height="34" rx="8"/><text class="t-small" x="415" y="180" text-anchor="middle">Kubernetes, libvirt</text>
+<path class="edge-accent" d="M200,90 C 260,60 280,40 326,37" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M200,100 C 260,90 290,84 326,83" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M200,120 C 260,124 290,128 326,129" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M200,130 C 260,160 280,174 326,175" marker-end="url(#arrow-accent)"/>
+<text class="t-small t-muted" x="540" y="90">"Noch en Schobbe?"</text>
+<text class="t-small t-muted" x="540" y="110">bembel allocate --in 10.20.4.0/22</text>
+</svg>
+<figcaption>One jug, many glasses. Each consumer gets its share from one source.</figcaption>
+</figure>
+
+<h2 id="license">License</h2>
+<p>bembel uses the <strong>Apache License 2.0</strong>. The file <code>LICENSE</code> is in the root of the repository.</p>
+<table>
+<thead><tr><th>License</th><th>For</th><th>Against</th></tr></thead>
+<tbody>
+<tr><td><strong>Apache-2.0</strong></td><td>Permissive, with an explicit patent grant. Same license as NetBox, Kubernetes, OpenStack and most Go libraries that bembel uses. Other research centres can use and extend it without legal review.</td><td>A company can make a closed fork.</td></tr>
+<tr><td>MIT</td><td>Short and permissive.</td><td>No patent grant.</td></tr>
+<tr><td>GPL-3.0 or AGPL-3.0</td><td>Forks must stay open. AGPL also covers use over the network.</td><td>Institutions and vendors avoid AGPL. The Neutron driver and the Kubernetes parts live in Apache-2.0 ecosystems.</td></tr>
+<tr><td>MPL-2.0</td><td>File-level copyleft.</td><td>Less common in the Go and Kubernetes ecosystem.</td></tr>
+</tbody>
+</table>
+<p>Third-party parts keep their licenses: the IBM Plex fonts and the Barlow fonts in the mockups use the SIL Open Font License 1.1, with their license files next to the fonts.</p>
+
+<h2 id="sources">Sources</h2>
+<ul>
+<li>OpenNetAdmin, v19.0.3: <code>install/ona-table_schema.xml</code>, <code>docs/ona-schema.dbml</code>, modules under <code>www/modules</code>, issues #166, #168, #169, #178, #183, #189, #198, #210.</li>
+<li>OpenNetAdmin plugins <code>build_bind</code> and <code>build_isc_dhcp</code>, and the CLI <code>dcm</code>.</li>
+<li>NetBox v4.7.4: models under <code>netbox/ipam</code>, <code>netbox/dcim</code>, <code>netbox/users</code>; release notes 4.2 to 4.7.</li>
+<li>FNT Command Business Gateway REST API under <code>/axis/api/rest</code>, and the client <code>dennisklein/fntcommand-restclient</code>. Not verified against the current FNT documentation.</li>
+<li>Kea and ISC DHCP status: ISC ended the maintenance of ISC DHCP in 2022. bembel exports <code>dhcpd.conf</code> now and Kea later (<a href="roadmap.html">roadmap.html</a>).</li>
+<li>Go 1.27, PostgreSQL 18, SvelteKit 3 and mise release pages, read on 2026-11-04.</li>
+</ul>
+</body>
+</html>

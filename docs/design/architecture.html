@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Architecture and stack</title>
+<meta name="description" content="The components of bembel, the API-first contract, the Go backend, PostgreSQL 18, the SvelteKit web UI, the mise toolchain, the deployment and the repository layout.">
+</head>
+<body>
+<h1>Architecture and stack</h1>
+<p class="lede">bembel is one Go binary with an embedded web UI, and one PostgreSQL 18 database. Agents on the DNS, DHCP and InfiniBand servers pull signed export bundles. Integrations use the same public API as the web UI. This chapter describes the parts and gives the reasons for each technology choice.</p>
+<ul class="keypoints">
+<li>The OpenAPI 3.1 document <code>api/openapi.yaml</code> is the contract. The server stubs and all clients are generated from it.</li>
+<li>Go, not Rust: one language for the server, the CLI, the Kubernetes controllers, the Cluster API provider and the external-dns webhook. PostgreSQL does the heavy IP work, so the speed of Rust buys little.</li>
+<li>PostgreSQL 18 enforces the model: <code>inet</code> and <code>cidr</code>, GiST exclusion against overlaps, <code>ltree</code>, <code>uuidv7()</code>, pgvector.</li>
+<li>SvelteKit with Svelte 5, built to static files and embedded in the binary. No Node.js at run time.</li>
+<li>The server is stateless. Three or more replicas run behind one service. Workers coordinate through PostgreSQL locks.</li>
+<li>mise pins all tools. <code>mise run</code> is the only entry point for builds, tests and docs.</li>
+</ul>
+
+<h2 id="overview">Overview</h2>
+<figure class="diagram wide">
+<svg viewBox="0 0 1040 470" role="img" aria-labelledby="arch-t">
+<title id="arch-t">bembel components: clients, the bembel server with API, workers and embedded UI, PostgreSQL, agents and external systems</title>
+<rect class="zone" x="16" y="16" width="200" height="438" rx="12"/>
+<text class="t-title" x="32" y="40">Clients</text>
+<rect class="box" x="32" y="56" width="168" height="40" rx="8"/><text class="t-small" x="44" y="81">web UI (browser)</text>
+<rect class="box" x="32" y="106" width="168" height="40" rx="8"/><text class="t-small" x="44" y="131">bembel CLI</text>
+<rect class="box" x="32" y="156" width="168" height="40" rx="8"/><text class="t-small" x="44" y="181">Neutron IPAM driver</text>
+<rect class="box" x="32" y="206" width="168" height="40" rx="8"/><text class="t-small" x="44" y="231">CAPI provider, webhook</text>
+<rect class="box" x="32" y="256" width="168" height="40" rx="8"/><text class="t-small" x="44" y="281">scripts, Ansible</text>
+<rect class="box" x="32" y="306" width="168" height="40" rx="8"/><text class="t-small" x="44" y="331">MCP clients (agents)</text>
+<rect class="box-soft" x="32" y="370" width="168" height="66" rx="8"/><text class="t-small" x="44" y="392">all use the public</text><text class="t-small" x="44" y="410">REST API with OIDC</text><text class="t-small" x="44" y="428">or a token</text>
+
+<rect class="zone" x="260" y="16" width="460" height="438" rx="12"/>
+<text class="t-title" x="276" y="40">bembel serve (3 replicas, stateless)</text>
+<rect class="box-accent" x="276" y="56" width="428" height="44" rx="8"/><text class="t-title t-on" x="290" y="83">HTTP: /v1 (API, auth, events) · / (embedded UI)</text>
+<rect class="box" x="276" y="112" width="134" height="56" rx="8"/><text class="t-small" x="288" y="134">authn</text><text class="t-small t-muted" x="288" y="152">OIDC, tokens</text>
+<rect class="box" x="423" y="112" width="134" height="56" rx="8"/><text class="t-small" x="435" y="134">authz</text><text class="t-small t-muted" x="435" y="152">bindings, scopes</text>
+<rect class="box" x="570" y="112" width="134" height="56" rx="8"/><text class="t-small" x="582" y="134">domain services</text><text class="t-small t-muted" x="582" y="152">allocate, derive</text>
+<rect class="box" x="276" y="180" width="428" height="40" rx="8"/><text class="t-small" x="290" y="205">store: pgx + sqlc · one transaction per request · outbox</text>
+<rect class="box-soft" x="276" y="236" width="134" height="56" rx="8"/><text class="t-small" x="288" y="258">outbox worker</text><text class="t-small t-muted" x="288" y="276">webhooks, SSE</text>
+<rect class="box-soft" x="423" y="236" width="134" height="56" rx="8"/><text class="t-small" x="435" y="258">export builder</text><text class="t-small t-muted" x="435" y="276">BIND, dhcpd, OpenSM</text>
+<rect class="box-soft" x="570" y="236" width="134" height="56" rx="8"/><text class="t-small" x="582" y="258">sync workers</text><text class="t-small t-muted" x="582" y="276">FNT, OpenStack</text>
+<rect class="box-soft" x="276" y="304" width="134" height="56" rx="8"/><text class="t-small" x="288" y="326">reaper</text><text class="t-small t-muted" x="288" y="344">claims, grace</text>
+<rect class="box-soft" x="423" y="304" width="134" height="56" rx="8"/><text class="t-small" x="435" y="326">indexer</text><text class="t-small t-muted" x="435" y="344">embeddings</text>
+<rect class="box-soft" x="570" y="304" width="134" height="56" rx="8"/><text class="t-small" x="582" y="326">assistant</text><text class="t-small t-muted" x="582" y="344">tools, drafts</text>
+<rect class="box-muted" x="276" y="376" width="428" height="60" rx="8"/><text class="t-small" x="290" y="400">/metrics (Prometheus) · JSON logs on stdout (Loki)</text><text class="t-small" x="290" y="420">OTLP traces · /livez · /readyz</text>
+
+<rect class="box-accent" x="760" y="160" width="264" height="70" rx="10"/><text class="t-title t-on" x="776" y="188">PostgreSQL 18</text><text class="t-small t-on" x="776" y="210">btree_gist · ltree · pgvector</text>
+<rect class="box" x="760" y="30" width="264" height="54" rx="8"/><text class="t-small" x="776" y="52">bembel-agent on ns1–3, dhcp1–2, SM</text><text class="t-small t-muted" x="776" y="70">pulls signed bundles (ETag)</text>
+<rect class="box-muted" x="760" y="268" width="264" height="40" rx="8"/><text class="t-small" x="776" y="293">Keycloak (OIDC)</text>
+<rect class="box-muted" x="760" y="318" width="264" height="40" rx="8"/><text class="t-small" x="776" y="343">FNT Command · OpenStack APIs</text>
+<rect class="box-muted" x="760" y="368" width="264" height="40" rx="8"/><text class="t-small" x="776" y="393">local LLM (chat + embeddings)</text>
+<rect class="box-muted" x="760" y="418" width="264" height="36" rx="8"/><text class="t-small" x="776" y="441">ONA MariaDB (import, read-only)</text>
+<path class="edge-accent" d="M200,200 L272,80" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M704,200 L756,195" marker-end="url(#arrow)"/>
+<path class="edge" d="M756,57 L708,78" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M720,288 L756,288" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M704,264 L756,338" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M704,332 L756,388" marker-end="url(#arrow-muted)"/>
+</svg>
+<figcaption>All clients use the public API. The server holds no state of its own. PostgreSQL is the only store.</figcaption>
+</figure>
+
+<h2 id="components">Components</h2>
+<table>
+<thead><tr><th>Component</th><th>Form</th><th>Task</th></tr></thead>
+<tbody>
+<tr><td><code>bembel serve</code></td><td>Go binary, container image, .deb, .rpm</td><td>REST API, OIDC login (BFF), embedded web UI, event stream, workers.</td></tr>
+<tr><td><code>bembel</code> CLI</td><td>same binary</td><td>Client commands (<code>bembel prefix list</code>, <code>bembel allocate</code>), <code>bembel migrate</code>, <code>bembel import ona</code>, <code>bembel help</code>.</td></tr>
+<tr><td><code>bembel-agent</code></td><td>small Go binary, systemd unit</td><td>Pulls export bundles, checks the signature, runs <code>named-checkconf</code> or <code>dhcpd -t</code>, installs, reloads, reports. On a libvirt hypervisor it also reports VMs (<a href="vms.html#agent">vms.html#agent</a>).</td></tr>
+<tr><td><code>networking-bembel</code></td><td>Python package</td><td>Neutron IPAM driver. Neutron loads Python entry points, so this part is Python. It calls only the REST API (<a href="openstack.html#driver">openstack.html#driver</a>).</td></tr>
+<tr><td><code>bembel-k8s</code></td><td>Go, controller-runtime</td><td>Cluster API IPAM provider, LB pool sync, external-dns webhook (<a href="kubernetes.html">kubernetes.html</a>).</td></tr>
+<tr><td><code>bembel mcp</code></td><td>same binary</td><td>An MCP server with the read tools of the assistant, for external agents with a token (<a href="assistant.html#mcp">assistant.html#mcp</a>).</td></tr>
+</tbody>
+</table>
+
+<h2 id="api-first">API first</h2>
+<p>The OpenAPI document is written by hand and reviewed like code. Generators make the rest:</p>
+<figure class="diagram">
+<svg viewBox="0 0 760 250" role="img" aria-labelledby="gen-t">
+<title id="gen-t">From api/openapi.yaml, ogen makes the Go server and client, openapi-typescript makes the web UI types, and a Python client is made for the Neutron driver</title>
+<rect class="box-accent" x="16" y="100" width="190" height="56" rx="10"/><text class="t-title t-on" x="111" y="125" text-anchor="middle">api/openapi.yaml</text><text class="t-small t-on" x="111" y="143" text-anchor="middle">OpenAPI 3.1, reviewed</text>
+<rect class="box" x="300" y="20" width="200" height="44" rx="8"/><text class="t-small" x="312" y="47">ogen → Go server stubs</text>
+<rect class="box" x="300" y="78" width="200" height="44" rx="8"/><text class="t-small" x="312" y="105">ogen → Go client (CLI, K8s)</text>
+<rect class="box" x="300" y="136" width="200" height="44" rx="8"/><text class="t-small" x="312" y="163">openapi-typescript → UI</text>
+<rect class="box" x="300" y="194" width="200" height="44" rx="8"/><text class="t-small" x="312" y="221">Python client → Neutron</text>
+<rect class="box-soft" x="560" y="78" width="184" height="102" rx="8"/><text class="t-small" x="572" y="102">CI checks:</text><text class="t-small" x="572" y="122">spec lint (Spectral)</text><text class="t-small" x="572" y="140">generated code is current</text><text class="t-small" x="572" y="158">breaking change diff</text>
+<path class="edge-accent" d="M206,118 L296,42" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M206,124 L296,100" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M206,134 L296,158" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M206,142 L296,216" marker-end="url(#arrow-accent)"/>
+<path class="edge-muted" d="M500,129 L556,129" marker-end="url(#arrow-muted)"/>
+</svg>
+<figcaption>One contract, four generated clients. CI fails if the generated code differs from the spec.</figcaption>
+</figure>
+<aside class="callout why">
+<p class="callout-title">Why spec first and not code first</p>
+<p>The API is the product for the integrations. A code-first framework (huma) makes the spec a side effect of Go types, and a refactor can change the contract without a review. With the spec first, each change to the contract is a diff in <code>api/openapi.yaml</code>. ogen makes typed handlers, so the server cannot return a shape that the spec does not allow. If ogen does not support a needed OpenAPI 3.1 feature, oapi-codegen with the strict server is the fallback.</p>
+</aside>
+
+<h2 id="backend">Backend: Go</h2>
+<p>The requester proposed Rust with PostgreSQL. The research compared Go and Rust for each part of bembel.</p>
+<table>
+<thead><tr><th>Concern</th><th>Go</th><th>Rust</th><th>Weight</th></tr></thead>
+<tbody>
+<tr><td>Kubernetes controllers, CAPI provider, external-dns webhook</td><td>controller-runtime and kubebuilder are the standard</td><td>kube-rs is good, but smaller; the CAPI contract tools are Go</td><td>high</td></tr>
+<tr><td>Same language as the other tools of the author</td><td>brig, sind, repoctl, radar are Go</td><td>none</td><td>high</td></tr>
+<tr><td>IP math</td><td><code>net/netip</code> in the standard library, <code>go4.org/netipx</code> for sets</td><td><code>ipnet</code>, good</td><td>equal</td></tr>
+<tr><td>SQL checked at build time</td><td>sqlc generates typed Go from SQL files</td><td>sqlx <code>query!</code> macros</td><td>equal</td></tr>
+<tr><td>API first</td><td>ogen, oapi-codegen, huma</td><td>utoipa (code first), progenitor (client)</td><td>Go better</td></tr>
+<tr><td>Build time and static binaries</td><td>seconds, <code>CGO_ENABLED=0</code></td><td>minutes, musl for static</td><td>medium</td></tr>
+<tr><td>Run-time speed</td><td>enough: the database does the work</td><td>faster, not needed</td><td>low</td></tr>
+<tr><td>Contributors in HPC IT</td><td>many know Go and Python</td><td>fewer</td><td>medium</td></tr>
+</tbody>
+</table>
+<p>The decision is Go 1.27. Rust is a good choice too, and nothing blocks it. The main libraries:</p>
+<dl class="facts">
+<dt>HTTP and API</dt><dd><code>net/http</code> ServeMux, ogen handlers, RFC 9457 problem details for errors.</dd>
+<dt>Database</dt><dd>pgx v5 (pool, <code>LISTEN</code>), sqlc for queries, goose for migrations (embedded in the binary).</dd>
+<dt>Identity</dt><dd><code>coreos/go-oidc</code> v3 and <code>golang.org/x/oauth2</code>.</dd>
+<dt>IP</dt><dd><code>net/netip</code>, <code>go4.org/netipx</code>.</dd>
+<dt>Logs, metrics, traces</dt><dd><code>log/slog</code> JSON, <code>prometheus/client_golang</code>, OpenTelemetry SDK.</dd>
+<dt>Kubernetes</dt><dd><code>controller-runtime</code>, <code>sigs.k8s.io/cluster-api</code> IPAM contract types.</dd>
+<dt>CLI</dt><dd>go-clikit (the CLI kit of repoctl) for commands, completion and output formats.</dd>
+</dl>
+
+<h2 id="database">Database: PostgreSQL 18</h2>
+<p>PostgreSQL is the only store. It enforces the rules of the model (<a href="model.html#schema">model.html#schema</a>), so a bug in the server cannot make overlapping prefixes or duplicate addresses.</p>
+<table>
+<thead><tr><th>Feature</th><th>Use in bembel</th></tr></thead>
+<tbody>
+<tr><td><code>inet</code>, <code>cidr</code>, operators <code>&lt;&lt;</code>, <code>&gt;&gt;=</code>, <code>&amp;&amp;</code></td><td>Containment, overlap, the prefix tree, reverse zones.</td></tr>
+<tr><td>GiST with <code>inet_ops</code>, <code>btree_gist</code></td><td>Exclusion constraint: siblings in a VRF do not overlap. Fast containment queries.</td></tr>
+<tr><td><code>uuidv7()</code> (new in 18)</td><td>Ids that sort by time and keep B-tree locality.</td></tr>
+<tr><td><code>ltree</code></td><td>DNS names (labels reversed) and location paths for subtree scopes.</td></tr>
+<tr><td><code>tstzrange</code>, <code>WITHOUT OVERLAPS</code> (new in 18)</td><td>History tables with valid ranges.</td></tr>
+<tr><td><code>FOR UPDATE SKIP LOCKED</code>, advisory locks</td><td>Work queues for the workers, one worker per job across replicas.</td></tr>
+<tr><td><code>LISTEN</code> / <code>NOTIFY</code></td><td>A wake-up signal for the outbox worker. The outbox table holds the data.</td></tr>
+<tr><td><code>tsvector</code>, <code>pg_trgm</code></td><td>Full-text and fuzzy name search.</td></tr>
+<tr><td>pgvector</td><td>Embeddings for the hybrid search and the assistant (<a href="assistant.html#embeddings">assistant.html#embeddings</a>).</td></tr>
+</tbody>
+</table>
+<aside class="callout note">
+<p class="callout-title">PostgreSQL 19</p>
+<p>PostgreSQL 19 is a release candidate (GA planned for 2026-11-19). bembel targets 18 and tests 19 in CI as soon as it is out. bembel uses no extension that managed PostgreSQL services do not offer, except pgvector, which most of them offer.</p>
+</aside>
+
+<h2 id="frontend">Frontend: SvelteKit</h2>
+<p>The web UI is SvelteKit 3 with Svelte 5 runes, TypeScript and <code>adapter-static</code>. The build output goes into the Go binary with <code>go:embed</code>. The server serves the files and the API on one origin, so the browser needs no CORS and the session cookie is <code>SameSite=Strict</code>.</p>
+<ul>
+<li>API calls: <code>openapi-fetch</code> with types from <code>openapi-typescript</code>.</li>
+<li>Tables: TanStack Table (sort, filter, virtual rows for 40 000 hosts).</li>
+<li>Live updates: the event stream (<code>/v1/events</code>, server-sent events) refreshes open lists.</li>
+<li>Help texts: the same embedded files as <code>bembel help</code> (<a href="assistant.html#help">assistant.html#help</a>).</li>
+<li>Tests: Vitest for logic, Playwright for end-to-end flows and screenshots.</li>
+</ul>
+<aside class="callout why">
+<p class="callout-title">Why not server-rendered HTML with htmx</p>
+<p>repoctl and brig render HTML on the server. bembel has dense, editable tables, a rack view, a prefix tree with drag selection and an assistant panel with streaming. These parts need client-side state. A static SvelteKit build keeps the deployment simple (no Node.js on the server) and uses only the public API, which proves that the API is complete.</p>
+</aside>
+
+<h2 id="toolchain">Toolchain: mise</h2>
+<p><code>mise.toml</code> pins every tool. With the first code commit, <code>mise.lock</code> also pins the checksums. A new contributor runs <code>mise install</code> and has the same versions as CI. Today the repository holds only the design record, so <code>mise.toml</code> pins only Python and Node and has the <code>docs</code> tasks. The first code commit extends it as follows. Tools that mise fetches from GitHub releases get the <code>http:</code> backend with a checksum per platform, as in brig.</p>
+<pre><code class="language-toml">[tools]
+go = "1.27.3"
+node = "26"
+pnpm = "12.16.1"
+python = "3.13"
+"aqua:sqlc-dev/sqlc" = "1.31.1"
+"aqua:pressly/goose" = "3.29.0"
+"go:github.com/ogen-go/ogen/cmd/ogen" = "1.24.0"
+"aqua:golangci/golangci-lint" = "2.14.0"
+
+[tasks.docs]
+description = "Build the design record into _site"
+run = "python3 tools/site/build.py --strict --out _site"
+
+[tasks."docs:shots"]
+description = "Make the mockup screenshots"
+run = "node tools/site/shots.mjs"</code></pre>
+<p>The repository has tasks for the code from the first commit of code: <code>gen</code> (ogen, sqlc, openapi-typescript), <code>lint</code>, <code>test</code>, <code>build</code>, <code>dev</code> (server with a local PostgreSQL in a container and the Vite dev server).</p>
+
+<h2 id="deployment">Deployment</h2>
+<p>bembel runs in Kubernetes with a Helm chart, or on a VM with the .deb or .rpm package and a systemd unit. The chapter <a href="operations.html">Operations</a> gives the details.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 1040 300" role="img" aria-labelledby="dep-t">
+<title id="dep-t">HA deployment in Kubernetes: three bembel pods, CloudNativePG with three instances, Prometheus and Loki</title>
+<rect class="zone" x="16" y="16" width="1008" height="268" rx="12"/>
+<text class="t-title" x="32" y="40">Kubernetes namespace bembel</text>
+<rect class="box" x="32" y="60" width="160" height="40" rx="8"/><text class="t-small" x="44" y="85">Ingress (TLS)</text>
+<rect class="box-accent" x="240" y="56" width="150" height="48" rx="8"/><text class="t-small t-on" x="252" y="78">bembel pod 1</text><text class="t-small t-on" x="252" y="94">zone a</text>
+<rect class="box-accent" x="240" y="116" width="150" height="48" rx="8"/><text class="t-small t-on" x="252" y="138">bembel pod 2</text><text class="t-small t-on" x="252" y="154">zone b</text>
+<rect class="box-accent" x="240" y="176" width="150" height="48" rx="8"/><text class="t-small t-on" x="252" y="198">bembel pod 3</text><text class="t-small t-on" x="252" y="214">zone c</text>
+<rect class="box-soft" x="240" y="236" width="150" height="34" rx="8"/><text class="t-small" x="252" y="258">migrate Job (pre-upgrade)</text>
+<rect class="box" x="450" y="56" width="200" height="48" rx="8"/><text class="t-small" x="462" y="78">CloudNativePG primary</text><text class="t-small t-muted" x="462" y="94">PostgreSQL 18 + pgvector</text>
+<rect class="box" x="450" y="116" width="200" height="48" rx="8"/><text class="t-small" x="462" y="138">sync replica</text><text class="t-small t-muted" x="462" y="154">quorum commit</text>
+<rect class="box" x="450" y="176" width="200" height="48" rx="8"/><text class="t-small" x="462" y="198">async replica</text><text class="t-small t-muted" x="462" y="214">read pool</text>
+<rect class="box-muted" x="450" y="236" width="200" height="34" rx="8"/><text class="t-small" x="462" y="258">barman-cloud → S3 (PITR)</text>
+<rect class="box-soft" x="710" y="56" width="140" height="40" rx="8"/><text class="t-small" x="722" y="81">ServiceMonitor</text>
+<rect class="box-soft" x="710" y="106" width="140" height="40" rx="8"/><text class="t-small" x="722" y="131">PrometheusRule</text>
+<rect class="box-soft" x="710" y="156" width="140" height="40" rx="8"/><text class="t-small" x="722" y="181">PDB, spread</text>
+<rect class="box-muted" x="880" y="56" width="128" height="40" rx="8"/><text class="t-small" x="892" y="81">Prometheus</text>
+<rect class="box-muted" x="880" y="106" width="128" height="40" rx="8"/><text class="t-small" x="892" y="131">Loki (Alloy)</text>
+<rect class="box-muted" x="880" y="156" width="128" height="40" rx="8"/><text class="t-small" x="892" y="181">Grafana</text>
+<path class="edge" d="M192,80 L236,80" marker-end="url(#arrow)"/>
+<path class="edge" d="M192,86 L236,138" marker-end="url(#arrow)"/>
+<path class="edge" d="M192,92 L236,198" marker-end="url(#arrow)"/>
+<path class="edge" d="M390,80 L446,80" marker-end="url(#arrow)"/>
+<path class="edge" d="M390,140 L446,86" marker-end="url(#arrow)"/>
+<path class="edge" d="M390,200 L446,92" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M550,104 L550,112" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M850,76 L876,76" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M850,126 L876,126" marker-end="url(#arrow-muted)"/>
+</svg>
+<figcaption>Three stateless pods in three zones, PostgreSQL with a synchronous replica, monitoring through the chart's ServiceMonitor and PrometheusRule.</figcaption>
+</figure>
+
+<h2 id="scale">Scale</h2>
+<p>The size of the organisation is small for PostgreSQL. The design target is ten times the ONA data, with room for IPv6 observed addresses.</p>
+<table>
+<thead><tr><th>Quantity</th><th>ONA today</th><th>Design target</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>Hosts</td><td>41 000</td><td>400 000</td><td>Lists use cursor pagination and virtual rows.</td></tr>
+<tr><td>Prefixes</td><td>1 900</td><td>50 000</td><td>The tree loads per level.</td></tr>
+<tr><td>Addresses</td><td>about 55 000</td><td>1 000 000</td><td>GiST and B-tree indexes per VRF.</td></tr>
+<tr><td>DNS records</td><td>62 000</td><td>1 000 000</td><td>Export bundles build incrementally per zone.</td></tr>
+<tr><td>API writes</td><td>a few per minute</td><td>50 per second (CI, Neutron)</td><td>One lock per parent prefix; no global lock.</td></tr>
+<tr><td>Allocation latency</td><td>n/a</td><td>p99 &lt; 50 ms</td><td>Metric <code>bembel_allocate_duration_seconds</code>.</td></tr>
+</tbody>
+</table>
+
+<h2 id="repo">Repository layout</h2>
+<p>One repository holds the server, the agent, the web UI, the Kubernetes parts, the Neutron driver and the design record.</p>
+<pre><code class="language-text">bembel/
+├── api/openapi.yaml          the contract
+├── cmd/bembel/               server and CLI
+├── cmd/bembel-agent/         export agent and libvirt reporter
+├── internal/                 domain, store (sqlc), authz, export, sync, assistant
+├── internal/help/            concepts/*.md, tasks/*.md, pages.yaml, actions.yaml
+├── migrations/               goose SQL files (embedded)
+├── web/                      SvelteKit app (built into internal/ui/dist)
+├── k8s/                      CAPI provider, LB sync, external-dns webhook
+├── contrib/networking-bembel Neutron IPAM driver (Python)
+├── deploy/helm/bembel/       Helm chart
+├── docs/                     this design record (GitHub Pages)
+├── tools/site/               docs generator, glossary linker, screenshots
+├── .claude/skills/           doc steward skills
+├── mise.toml, mise.lock
+└── LICENSE                   Apache-2.0</code></pre>
+</body>
+</html>

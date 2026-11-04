@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Core model</title>
+<meta name="description" content="All object kinds of bembel and their relations: addressing, fabrics, hosts, VMs, DNS, DHCP, assets, routing, firewall groups, access and history.">
+</head>
+<body>
+<h1>Core model</h1>
+<p class="lede">This chapter defines the objects of bembel and their relations. All other chapters, the API, the CLI and the web UI use these words with one meaning. Read it before the mapping chapters.</p>
+<ul class="keypoints">
+<li>bembel is the source of truth for addresses, names and networks. The database enforces the rules: a prefix is unique in its VRF, an address is unique in its VRF, sibling prefixes do not overlap.</li>
+<li>Prefixes make one tree per VRF. bembel computes the tree from containment. Nobody edits a parent link by hand.</li>
+<li>bembel derives what it can: A, AAAA and PTR records come from addresses, reverse zones come from subnets, DHCP reservations come from interfaces. A derived value is never stored twice.</li>
+<li>Each object has an owner team, a source and, for an integration, a <code>managed_by</code> value. Thus each object has one writer.</li>
+<li>IPv4 and IPv6 are equal. A dual stack network is a pair of subnets on one VLAN or IB partition.</li>
+<li>Each change is a row in a history table, an audit event and an event for webhooks. The API is the only way to change data.</li>
+</ul>
+
+<h2 id="principles">Principles</h2>
+<p>The model follows six rules. Each rule removes a problem of OpenNetAdmin or of other IPAM tools (<a href="decision.html#problems">decision.html#problems</a>).</p>
+<table>
+<thead><tr><th>Rule</th><th>What it means</th><th>Problem that it removes</th></tr></thead>
+<tbody>
+<tr><td>Constraints in the database</td><td>PostgreSQL checks uniqueness, overlap and references. The application checks only what SQL cannot express.</td><td>ONA has no foreign keys. NetBox checks uniqueness only in <code>clean()</code>. Both allow inconsistent data after a bug or a direct write.</td></tr>
+<tr><td>One tree per VRF</td><td>The parent of a prefix is the smallest prefix that contains it in the same VRF. A trigger keeps <code>parent_id</code> correct.</td><td>ONA has no prefix hierarchy. Its blocks are free ranges without relation to subnets.</td></tr>
+<tr><td>Derive, do not copy</td><td>A record, a reverse zone or a reservation that follows from other data is computed. Its source is the only place to change it.</td><td>ONA keeps A and PTR rows that can point to deleted interfaces.</td></tr>
+<tr><td>One writer per object</td><td>An object has a source. An integration that manages an object is its only writer.</td><td>A sync and a user overwrite each other.</td></tr>
+<tr><td>Typed links, no generic links</td><td>Each relation is a foreign key to one table. bembel uses no "any object" link.</td><td>NetBox uses generic foreign keys for assignments and scopes. The database cannot check them.</td></tr>
+<tr><td>The API is the model</td><td>Each object kind is one REST resource with the same fields. The UI and the CLI use only the API.</td><td>ONA mixes UI forms, <code>dcm.pl</code> modules and direct SQL.</td></tr>
+</tbody>
+</table>
+
+<h2 id="overview">Overview</h2>
+<p>The diagram shows the object kinds in their six domains. The colours of the web UI and of the glossary follow the same domains. An arrow points from an object to the object that it refers to.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 1040 560" role="img" aria-labelledby="ov-t">
+<title id="ov-t">Object kinds of bembel in six domains, with their main references</title>
+<rect class="zone" x="16" y="16" width="400" height="300" rx="12"/>
+<text class="t-title" x="32" y="40">Addressing</text>
+<rect class="box-accent" x="32" y="56" width="110" height="40" rx="8"/><text class="t-title t-on" x="87" y="81" text-anchor="middle">VRF</text>
+<rect class="box" x="160" y="56" width="110" height="40" rx="8"/><text class="t-title" x="215" y="81" text-anchor="middle">prefix</text>
+<rect class="box" x="290" y="56" width="110" height="40" rx="8"/><text class="t-title" x="345" y="81" text-anchor="middle">range</text>
+<rect class="box" x="160" y="132" width="110" height="40" rx="8"/><text class="t-title" x="215" y="157" text-anchor="middle">address</text>
+<rect class="box-soft" x="290" y="132" width="110" height="40" rx="8"/><text class="t-title" x="345" y="157" text-anchor="middle">claim</text>
+<rect class="box" x="32" y="132" width="110" height="40" rx="8"/><text class="t-title" x="87" y="157" text-anchor="middle">VLAN</text>
+<rect class="box-soft" x="32" y="204" width="110" height="40" rx="8"/><text class="t-small" x="87" y="229" text-anchor="middle">VLAN domain</text>
+<rect class="box" x="160" y="204" width="110" height="40" rx="8"/><text class="t-title" x="215" y="229" text-anchor="middle">fabric</text>
+<rect class="box-soft" x="290" y="204" width="110" height="40" rx="8"/><text class="t-small" x="345" y="229" text-anchor="middle">IB partition</text>
+<rect class="box-soft" x="32" y="262" width="110" height="36" rx="8"/><text class="t-small" x="87" y="285" text-anchor="middle">ASN, route target</text>
+<rect class="box-soft" x="160" y="262" width="110" height="36" rx="8"/><text class="t-small" x="215" y="285" text-anchor="middle">static route</text>
+<rect class="box-soft" x="290" y="262" width="110" height="36" rx="8"/><text class="t-small" x="345" y="285" text-anchor="middle">address group</text>
+<path class="edge" d="M160,76 L146,76" marker-end="url(#arrow)"/>
+<path class="edge" d="M290,76 L274,76" marker-end="url(#arrow)"/>
+<path class="edge" d="M215,132 L215,100" marker-end="url(#arrow)"/>
+<path class="edge" d="M290,152 L274,152" marker-end="url(#arrow)"/>
+<path class="edge" d="M87,172 L87,200" marker-end="url(#arrow)"/>
+
+<rect class="zone" x="432" y="16" width="290" height="300" rx="12"/>
+<text class="t-title" x="448" y="40">Hosts and VMs</text>
+<rect class="box" x="448" y="56" width="120" height="40" rx="8"/><text class="t-title" x="508" y="81" text-anchor="middle">host</text>
+<rect class="box" x="448" y="132" width="120" height="40" rx="8"/><text class="t-title" x="508" y="157" text-anchor="middle">interface</text>
+<rect class="box-soft" x="590" y="56" width="116" height="40" rx="8"/><text class="t-small" x="648" y="74" text-anchor="middle">host kind vm</text><text class="t-small t-muted" x="648" y="89" text-anchor="middle">runs on hypervisor</text>
+<rect class="box-soft" x="590" y="132" width="116" height="40" rx="8"/><text class="t-small" x="648" y="157" text-anchor="middle">MAC or port GUID</text>
+<path class="edge" d="M508,132 L508,100" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M590,76 L572,76" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M590,152 L572,152" marker-end="url(#arrow-muted)"/>
+<path class="edge" d="M274,160 L444,160" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="448" y="208">address → interface</text>
+<text class="t-small t-muted" x="448" y="226">host → asset link → device</text>
+<text class="t-small t-muted" x="448" y="244">interface → asset link → port</text>
+<text class="t-small t-muted" x="448" y="262">interface → VLAN or IB partition</text>
+
+<rect class="zone" x="738" y="16" width="286" height="140" rx="12"/>
+<text class="t-title" x="754" y="40">DNS</text>
+<rect class="box" x="754" y="56" width="80" height="36" rx="8"/><text class="t-title" x="794" y="79" text-anchor="middle">view</text>
+<rect class="box" x="844" y="56" width="80" height="36" rx="8"/><text class="t-title" x="884" y="79" text-anchor="middle">zone</text>
+<rect class="box" x="934" y="56" width="76" height="36" rx="8"/><text class="t-title" x="972" y="79" text-anchor="middle">record</text>
+<rect class="box-soft" x="754" y="104" width="256" height="36" rx="8"/><text class="t-small" x="882" y="127" text-anchor="middle">DNS server (BIND export target)</text>
+<path class="edge" d="M934,74 L928,74" marker-end="url(#arrow)"/>
+<path class="edge" d="M844,74 L838,74" marker-end="url(#arrow)"/>
+
+<rect class="zone" x="738" y="176" width="286" height="140" rx="12"/>
+<text class="t-title" x="754" y="200">DHCP</text>
+<rect class="box" x="754" y="216" width="122" height="36" rx="8"/><text class="t-small" x="815" y="239" text-anchor="middle">DHCP scope</text>
+<rect class="box" x="888" y="216" width="122" height="36" rx="8"/><text class="t-small" x="949" y="239" text-anchor="middle">reservation</text>
+<rect class="box-soft" x="754" y="264" width="122" height="36" rx="8"/><text class="t-small" x="815" y="287" text-anchor="middle">DHCP option</text>
+<rect class="box-soft" x="888" y="264" width="122" height="36" rx="8"/><text class="t-small" x="949" y="287" text-anchor="middle">failover pair</text>
+
+<rect class="zone" x="16" y="336" width="400" height="208" rx="12"/>
+<text class="t-title" x="32" y="360">Assets (read-only mirror of FNT Command)</text>
+<rect class="box-muted" x="32" y="376" width="60" height="36" rx="8"/><text class="t-small" x="62" y="399" text-anchor="middle">site</text>
+<rect class="box-muted" x="100" y="376" width="72" height="36" rx="8"/><text class="t-small" x="136" y="399" text-anchor="middle">building</text>
+<rect class="box-muted" x="180" y="376" width="56" height="36" rx="8"/><text class="t-small" x="208" y="399" text-anchor="middle">floor</text>
+<rect class="box-muted" x="244" y="376" width="56" height="36" rx="8"/><text class="t-small" x="272" y="399" text-anchor="middle">room</text>
+<rect class="box-muted" x="308" y="376" width="48" height="36" rx="8"/><text class="t-small" x="332" y="399" text-anchor="middle">row</text>
+<rect class="box-muted" x="364" y="376" width="44" height="36" rx="8"/><text class="t-small" x="386" y="399" text-anchor="middle">rack</text>
+<rect class="box" x="216" y="436" width="90" height="36" rx="8"/><text class="t-title" x="261" y="459" text-anchor="middle">device</text>
+<rect class="box" x="318" y="436" width="90" height="36" rx="8"/><text class="t-title" x="363" y="459" text-anchor="middle">port</text>
+<path class="edge" d="M261,436 L380,414" marker-end="url(#arrow)"/>
+<path class="edge" d="M318,454 L310,454" marker-end="url(#arrow)"/>
+<rect class="box-soft" x="32" y="436" width="160" height="36" rx="8"/><text class="t-small" x="112" y="459" text-anchor="middle">asset link (host ↔ device)</text>
+<text class="t-small t-muted" x="32" y="500">source fnt · external ref = ELID · synced_at</text>
+<text class="t-small t-muted" x="32" y="518">bembel never writes back to FNT Command</text>
+
+<rect class="zone" x="432" y="336" width="290" height="208" rx="12"/>
+<text class="t-title" x="448" y="360">Access</text>
+<rect class="box" x="448" y="376" width="80" height="36" rx="8"/><text class="t-small" x="488" y="399" text-anchor="middle">subject</text>
+<rect class="box" x="538" y="376" width="80" height="36" rx="8"/><text class="t-small" x="578" y="399" text-anchor="middle">binding</text>
+<rect class="box" x="628" y="376" width="80" height="36" rx="8"/><text class="t-small" x="668" y="399" text-anchor="middle">role</text>
+<rect class="box-soft" x="538" y="424" width="80" height="36" rx="8"/><text class="t-small" x="578" y="447" text-anchor="middle">scope</text>
+<rect class="box-soft" x="448" y="424" width="80" height="36" rx="8"/><text class="t-small" x="488" y="447" text-anchor="middle">token</text>
+<rect class="box-soft" x="628" y="424" width="80" height="36" rx="8"/><text class="t-small" x="668" y="440" text-anchor="middle">change</text><text class="t-small" x="668" y="454" text-anchor="middle">request</text>
+<rect class="box-soft" x="448" y="472" width="260" height="36" rx="8"/><text class="t-small" x="578" y="495" text-anchor="middle">audit event (append only)</text>
+<path class="edge" d="M538,394 L532,394" marker-end="url(#arrow)"/>
+<path class="edge" d="M618,394 L624,394" marker-end="url(#arrow)"/>
+<path class="edge" d="M578,412 L578,420" marker-end="url(#arrow)"/>
+
+<rect class="zone" x="738" y="336" width="286" height="208" rx="12"/>
+<text class="t-title" x="754" y="360">Integrations</text>
+<rect class="box" x="754" y="376" width="120" height="36" rx="8"/><text class="t-small" x="814" y="399" text-anchor="middle">source</text>
+<rect class="box" x="888" y="376" width="122" height="36" rx="8"/><text class="t-small" x="949" y="399" text-anchor="middle">sync run</text>
+<rect class="box" x="754" y="424" width="120" height="36" rx="8"/><text class="t-small" x="814" y="447" text-anchor="middle">export</text>
+<rect class="box" x="888" y="424" width="122" height="36" rx="8"/><text class="t-small" x="949" y="447" text-anchor="middle">event, webhook</text>
+<rect class="box-soft" x="754" y="472" width="120" height="36" rx="8"/><text class="t-small" x="814" y="495" text-anchor="middle">finding</text>
+<rect class="box-soft" x="888" y="472" width="122" height="36" rx="8"/><text class="t-small" x="949" y="495" text-anchor="middle">draft</text>
+</svg>
+<figcaption>Object kinds in six domains. A subnet also refers to its fabric and to a VLAN or an IB partition. Each object also has the common fields: owner team, tags, custom attributes, source, external ref and revision.</figcaption>
+</figure>
+
+<h2 id="common">Common fields</h2>
+<p>Each object of each kind has the same base fields. The API gives them in the same place of each resource. Thus a client can filter, sort and show each kind in the same way.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>id</code></td><td>UUIDv7</td><td>Stable id. It sorts by creation time. PostgreSQL 18 makes it with <code>uuidv7()</code>.</td></tr>
+<tr><td><code>kind</code></td><td>string</td><td>The object kind, for example <code>prefix</code> or <code>record</code>.</td></tr>
+<tr><td><code>owner</code></td><td>team id</td><td>The team that owns the object. A binding with a team scope uses it.</td></tr>
+<tr><td><code>tags</code></td><td>map</td><td>Labels <code>key=value</code>. A tag key can be a declared tag key with allowed values.</td></tr>
+<tr><td><code>attributes</code></td><td>JSON object</td><td>Values of custom attributes. A JSON Schema per kind checks them.</td></tr>
+<tr><td><code>description</code></td><td>text</td><td>Free text. The object search and the assistant index it.</td></tr>
+<tr><td><code>source</code></td><td>string</td><td><code>local</code>, <code>ona-import</code>, <code>fnt</code>, <code>openstack:os-prod</code>, <code>k8s:prod-1</code>, <code>libvirt:hv-03</code>.</td></tr>
+<tr><td><code>external_ref</code></td><td>string</td><td>The id in the source system, for example the ELID of FNT Command or <code>ona:hosts:18234</code>.</td></tr>
+<tr><td><code>managed_by</code></td><td>source or null</td><td>If set, only that integration can change the object (<a href="#ownership">ownership</a>).</td></tr>
+<tr><td><code>revision</code></td><td>integer</td><td>Increases with each change. The API gives it as the <code>ETag</code>. <code>If-Match</code> prevents lost updates.</td></tr>
+<tr><td><code>created_at</code>, <code>created_by</code>, <code>updated_at</code>, <code>updated_by</code></td><td>time, subject</td><td>The audit log has the full history. These fields are for lists.</td></tr>
+</tbody>
+</table>
+<p>A <dfn>team</dfn> is an owner of objects. It maps to a group of the IdP, for example <code>hpc-ops</code> to the Keycloak group <code>/teams/hpc-ops</code>. A team is not a tenant with an own data space: all teams see the same tree, and bindings control who can change what (<a href="access.html#scopes">access.html#scopes</a>).</p>
+<p>A <dfn>custom attribute</dfn> is a typed field that an admin declares for one kind: <code>string</code>, <code>integer</code>, <code>boolean</code>, <code>date</code>, <code>enum</code>, <code>url</code>, <code>json</code>. The declaration has a key, a label, a JSON Schema and an optional default. ONA custom attributes import to custom attributes with the same key (<a href="map-ona.html#attributes">map-ona.html#attributes</a>).</p>
+
+<h2 id="addressing">Addressing</h2>
+<p>Addressing has five core kinds: VRF, prefix, range, address and claim. VLANs and fabrics give the L2 context of a subnet (<a href="#fabrics">fabrics</a>).</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 1040 420" role="img" aria-labelledby="tree-t">
+<title id="tree-t">The prefix tree of VRF global with containers, subnets, a range and free space</title>
+<rect class="box-accent" x="16" y="20" width="200" height="44" rx="8"/>
+<text class="t-title t-on" x="32" y="40">VRF global</text><text class="t-small t-on" x="32" y="56">RD 65010:1 · campus routing</text>
+<rect class="box" x="60" y="92" width="240" height="44" rx="8"/>
+<text class="t-mono t-title" x="76" y="112">10.0.0.0/8</text><text class="t-small t-muted" x="76" y="128">container · RFC 1918 · prefix pool</text>
+<rect class="box" x="120" y="164" width="260" height="44" rx="8"/>
+<text class="t-mono t-title" x="136" y="184">10.20.0.0/16</text><text class="t-small t-muted" x="136" y="200">container · Hall 2 HPC · team hpc-ops</text>
+<rect class="box-ok" x="190" y="236" width="300" height="56" rx="8"/>
+<text class="t-mono t-title" x="206" y="256">10.20.4.0/22 kestrel-compute</text><text class="t-small" x="206" y="272">subnet · VLAN 204 · gw 10.20.4.1 · DHCP on</text><text class="t-small t-muted" x="206" y="286">IPv6 twin 2001:db8:4200:204::/64</text>
+<rect class="box-ok" x="190" y="304" width="300" height="40" rx="8"/>
+<text class="t-mono" x="206" y="329">10.20.8.0/24 osprey-gpu · VLAN 208</text>
+<rect class="box-muted" x="190" y="356" width="300" height="40" rx="8"/>
+<text class="t-mono" x="206" y="381">10.20.16.0/22 · planned</text>
+<rect class="box-soft" x="530" y="236" width="230" height="56" rx="8"/>
+<text class="t-title" x="546" y="256">range 10.20.7.0–10.20.7.254</text><text class="t-small" x="546" y="272">purpose dhcp-pool</text><text class="t-small t-muted" x="546" y="286">253 addresses, DHCP gives them</text>
+<rect class="box" x="790" y="236" width="234" height="56" rx="8"/>
+<text class="t-mono t-title" x="806" y="256">10.20.4.44</text><text class="t-small" x="806" y="272">address · allocated</text><text class="t-small t-muted" x="806" y="286">cn-004 eno1 · A + PTR derived</text>
+<rect class="box-soft" x="790" y="304" width="234" height="40" rx="8"/>
+<text class="t-mono" x="806" y="322">10.20.4.212</text><text class="t-small t-muted" x="806" y="337">claim · expires 18:20</text>
+<rect class="zone" x="530" y="304" width="230" height="40" rx="8"/>
+<text class="t-small t-muted" x="546" y="329">free 10.20.9.0/24 … (computed)</text>
+<path class="edge" d="M80,64 L80,88" marker-end="url(#arrow)"/>
+<path class="edge" d="M140,136 L140,160" marker-end="url(#arrow)"/>
+<path class="edge" d="M210,208 L210,232" marker-end="url(#arrow)"/>
+<path class="edge" d="M150,208 L150,324 L186,324" marker-end="url(#arrow)"/>
+<path class="edge" d="M150,324 L150,376 L186,376" marker-end="url(#arrow)"/>
+<path class="edge" d="M490,264 L526,264" marker-end="url(#arrow)"/>
+<path class="edge" d="M760,264 L786,264" marker-end="url(#arrow)"/>
+<path class="edge" d="M760,280 C 775,290 775,318 786,322" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="560" y="40">Containment gives the tree.</text>
+<text class="t-small t-muted" x="560" y="58">bembel stores parent_id for speed, and a trigger</text>
+<text class="t-small t-muted" x="560" y="76">keeps it correct when a prefix is added or removed.</text>
+<text class="t-small t-muted" x="560" y="106">Free space is not stored. bembel computes it</text>
+<text class="t-small t-muted" x="560" y="124">from the gaps between children.</text>
+</svg>
+<figcaption>The prefix tree of VRF global in the story. A container holds prefixes, a subnet holds ranges and addresses. Free space is computed.</figcaption>
+</figure>
+
+<h3 id="vrf">VRF</h3>
+<p>A <dfn>VRF</dfn> is an independent address space. The same prefix can be in two VRFs. In one VRF, a prefix and an address are unique. The default VRF is <code>global</code>. The story has four VRFs: <code>global</code> (campus), <code>hpc-fabric</code> (cluster internal InfiniBand and RoCEv2), <code>oob</code> (BMC and management) and <code>os-provider</code> (OpenStack provider networks). A VRF has an optional route distinguisher and route targets (<a href="#routing">routing</a>).</p>
+<aside class="callout why">
+<p class="callout-title">Why a VRF in a campus without MPLS</p>
+<p>ONA has one global space and rejects overlaps. The organisation already reuses addresses: the InfiniBand fabric, the BMC network and the OpenStack provider networks are separate routing domains. With a VRF, bembel models them as they are and still rejects overlaps inside each one.</p>
+</aside>
+
+<h3 id="prefix">Prefix</h3>
+<p>A <dfn>prefix</dfn> is a CIDR block in a VRF, IPv4 or IPv6. A prefix is one of two kinds:</p>
+<ul>
+<li>A <dfn>container</dfn> holds only other prefixes, for example an aggregate from a RIR, the block of a site or the block of a team. A container can be a <dfn>prefix pool</dfn>: callers can allocate child prefixes from it (<a href="allocation.html#prefix-allocate">allocation.html#prefix-allocate</a>).</li>
+<li>A <dfn>subnet</dfn> is an L3 network. It holds ranges and addresses. It has a gateway, a fabric, a VLAN or an IB partition, a site, a DHCP scope and DNS defaults.</li>
+</ul>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td><code>vrf</code></td><td>VRF id</td><td>Required.</td></tr>
+<tr><td><code>cidr</code></td><td>PostgreSQL <code>cidr</code></td><td>Host bits are zero. Unique in the VRF.</td></tr>
+<tr><td><code>family</code></td><td>4 or 6</td><td>Generated from <code>cidr</code>. Stored, so filters are simple.</td></tr>
+<tr><td><code>kind</code></td><td><code>container</code> | <code>subnet</code></td><td>A subnet has no child prefix. A container has no address.</td></tr>
+<tr><td><code>status</code></td><td><code>planned</code> | <code>active</code> | <code>reserved</code> | <code>deprecated</code></td><td>A planned prefix holds no allocated address.</td></tr>
+<tr><td><code>pool</code></td><td>boolean</td><td>Only for a container.</td></tr>
+<tr><td><code>name</code></td><td>string</td><td>Short label, for example <code>kestrel-compute</code>.</td></tr>
+<tr><td><code>parent_id</code></td><td>prefix id</td><td>Computed. Read only in the API.</td></tr>
+<tr><td><code>gateway</code></td><td>address id</td><td>Subnet only. Normally the first address.</td></tr>
+<tr><td><code>fabric</code>, <code>vlan</code>, <code>ib_partition</code></td><td>ids</td><td>Subnet only. A VLAN for an Ethernet fabric, a partition for InfiniBand.</td></tr>
+<tr><td><code>twin</code></td><td>prefix id</td><td>The other family of a dual stack network. Both share VLAN, fabric and site.</td></tr>
+<tr><td><code>site</code></td><td>site id</td><td>From the asset mirror. Optional.</td></tr>
+<tr><td><code>dns_zone</code></td><td>zone id</td><td>The default forward zone for names of new addresses.</td></tr>
+<tr><td><code>announce</code></td><td>boolean</td><td>The prefix goes into prefix lists (<a href="routing.html#prefix-lists">routing.html#prefix-lists</a>).</td></tr>
+</tbody>
+</table>
+
+<h3 id="range">Range</h3>
+<p>A <dfn>range</dfn> is a contiguous span of addresses in one subnet. It does not need CIDR alignment. Its <code>purpose</code> tells bembel how to treat the addresses in it:</p>
+<table>
+<thead><tr><th>Purpose</th><th>Effect</th><th>ONA source</th></tr></thead>
+<tbody>
+<tr><td><code>dhcp-pool</code></td><td>The DHCP export writes it as a <code>pool</code>. Allocation skips it.</td><td><code>dhcp_pools</code></td></tr>
+<tr><td><code>reserved</code></td><td>Allocation skips it. Only a user with <code>range:override</code> can allocate in it.</td><td>blocks that are not CIDR aligned</td></tr>
+<tr><td><code>static</code></td><td>Allocation prefers it for hosts without DHCP.</td><td>none</td></tr>
+<tr><td><code>infrastructure</code></td><td>Gateways, VRRP and switch addresses. Allocation skips it.</td><td>none</td></tr>
+<tr><td><code>lb-pool</code></td><td>A load balancer allocates in it (MetalLB, Cilium). bembel shows it as used.</td><td>none</td></tr>
+</tbody>
+</table>
+
+<h3 id="address">Address</h3>
+<p>An <dfn>address</dfn> is one IP address in a subnet. It has a status, a DNS name and an optional interface.</p>
+<table>
+<thead><tr><th>Status</th><th>Meaning</th><th>DNS and DHCP</th></tr></thead>
+<tbody>
+<tr><td><code>allocated</code></td><td>In use. Normally on an interface.</td><td>Derived records and a reservation (if a MAC is known).</td></tr>
+<tr><td><code>reserved</code></td><td>Kept for a purpose, not in use yet.</td><td>Records only if a name is set.</td></tr>
+<tr><td><code>claimed</code></td><td>Held by a claim with an expiry (<a href="#claim">claim</a>).</td><td>No records until the claim is confirmed.</td></tr>
+<tr><td><code>deprecated</code></td><td>Released, in a grace time before it is free. Default 7 days.</td><td>Records stay until the grace ends, then go.</td></tr>
+</tbody>
+</table>
+<p>An address with <code>shared: true</code> is on several interfaces: a VIP, an anycast address or a VRRP address. ONA interface clusters import to shared addresses. An address in an IPv6 subnet can be <code>observed</code>: a SLAAC or EUI-64 address that a sync or a lease report found. bembel shows it, but does not allocate it.</p>
+
+<h3 id="claim">Claim</h3>
+<p>A <dfn>claim</dfn> is a temporary reservation of an address or a prefix with an expiry. The caller confirms the claim when the resource exists, or the reaper releases it. The Neutron IPAM driver, the Cluster API provider and the libvirt hook use claims, because their transactions can fail after the allocation (<a href="allocation.html#claims">allocation.html#claims</a>). A claim has a key: the idempotency key of the caller, for example <code>capi:prod-1/default/md-0-x7k2p</code>.</p>
+
+<h3 id="vlan">VLAN and VLAN domain</h3>
+<p>A <dfn>VLAN</dfn> has a VID from 1 to 4094 and a name. A <dfn>VLAN domain</dfn> is the scope in which a VID is unique: a campus, a hall or one fabric. ONA VLAN campuses import to VLAN domains. A subnet refers to one VLAN. Two subnets of a dual stack network refer to the same VLAN.</p>
+
+<h2 id="fabrics">Fabrics</h2>
+<p>A <dfn>fabric</dfn> is the L2 technology domain of a subnet. It answers the question "what carries this network": Ethernet, Ethernet with RoCEv2, or InfiniBand. The chapter <a href="fabrics.html">Fabrics</a> gives all details.</p>
+<figure class="diagram">
+<svg viewBox="0 0 760 250" role="img" aria-labelledby="fab-t">
+<title id="fab-t">Three fabric kinds and what each adds to the model</title>
+<rect class="box" x="16" y="20" width="230" height="210" rx="10"/>
+<text class="t-title" x="32" y="46">ethernet</text>
+<text class="t-small" x="32" y="72">VLAN in a VLAN domain</text>
+<text class="t-small" x="32" y="92">interface: MAC (48 bit)</text>
+<text class="t-small" x="32" y="112">DHCP: hardware ethernet</text>
+<text class="t-small t-muted" x="32" y="150">campus, BMC, storage</text>
+<rect class="box" x="264" y="20" width="230" height="210" rx="10"/>
+<text class="t-title" x="280" y="46">ethernet-roce</text>
+<text class="t-small" x="280" y="72">VLAN in a VLAN domain</text>
+<text class="t-small" x="280" y="92">QoS profile: DSCP 26, PFC 3,</text>
+<text class="t-small" x="280" y="110">ECN on, CNP DSCP 48</text>
+<text class="t-small" x="280" y="130">rails: one subnet per rail</text>
+<text class="t-small t-muted" x="280" y="168">osprey-roce, 400G, 8 rails</text>
+<rect class="box" x="512" y="20" width="230" height="210" rx="10"/>
+<text class="t-title" x="528" y="46">infiniband</text>
+<text class="t-small" x="528" y="72">IB partition: P_Key</text>
+<text class="t-small" x="528" y="92">interface: port GUID (64 bit),</text>
+<text class="t-small" x="528" y="110">IPoIB hardware address</text>
+<text class="t-small" x="528" y="130">LID observed from the SM</text>
+<text class="t-small" x="528" y="150">DHCP: client identifier</text>
+<text class="t-small" x="528" y="170">export: OpenSM partitions.conf</text>
+<text class="t-small t-muted" x="528" y="208">kestrel-ib, NDR</text>
+</svg>
+<figcaption>The fabric of a subnet decides which L2 object it has (VLAN or IB partition) and which identifier its interfaces have (MAC or port GUID).</figcaption>
+</figure>
+<p>An <dfn>IB partition</dfn> has a P_Key from <code>0x0001</code> to <code>0x7ffe</code> (the full member bit makes <code>0x8001</code> from <code>0x0001</code>), a name, an IPoIB flag, an MTU and a membership (full or limited) per member. A <dfn>QoS profile</dfn> holds the lossless settings of a RoCEv2 fabric. Host and switch configuration tools read it from the API.</p>
+
+<h2 id="hosts">Hosts and interfaces</h2>
+<p>A <dfn>host</dfn> is a named logical system with interfaces. Its kind is <code>physical</code>, <code>vm</code>, <code>hypervisor</code>, <code>appliance</code> or <code>container-node</code>. A host has a primary FQDN, an owner team, tags and an optional asset link to a device of the asset mirror. An <dfn>interface</dfn> is a network port of a host. It has a name, a fabric and an identifier: a MAC for Ethernet, a port GUID and the 20-byte IPoIB hardware address for InfiniBand. An interface holds zero or more addresses.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 1040 326" role="img" aria-labelledby="host-t">
+<title id="host-t">Host cn-004 with three interfaces in three VRFs and its asset link</title>
+<rect class="box-accent" x="16" y="110" width="220" height="70" rx="10"/>
+<text class="t-title t-on" x="32" y="136">cn-004.kestrel.example.org</text>
+<text class="t-small t-on" x="32" y="156">host · physical · team hpc-ops</text>
+<rect class="box" x="300" y="20" width="250" height="70" rx="8"/>
+<text class="t-title" x="316" y="44">eno1 · ethernet</text><text class="t-mono t-small" x="316" y="62">MAC 3c:ec:ef:12:0a:44</text><text class="t-small t-muted" x="316" y="80">VLAN 204</text>
+<rect class="box" x="300" y="110" width="250" height="70" rx="8"/>
+<text class="t-title" x="316" y="134">ib0 · infiniband</text><text class="t-mono t-small" x="316" y="152">GUID 0x0c42a1030071a2b4</text><text class="t-small t-muted" x="316" y="170">partition 0x8001 kestrel-ipoib</text>
+<rect class="box" x="300" y="200" width="250" height="70" rx="8"/>
+<text class="t-title" x="316" y="224">bmc · ethernet</text><text class="t-mono t-small" x="316" y="242">MAC 3c:ec:ef:12:0a:45</text><text class="t-small t-muted" x="316" y="260">VLAN 40 in VRF oob</text>
+<rect class="box-ok" x="610" y="20" width="200" height="32" rx="6"/><text class="t-mono t-small" x="622" y="41">10.20.4.44 · global</text>
+<rect class="box-ok" x="610" y="58" width="200" height="32" rx="6"/><text class="t-mono t-small" x="622" y="79">2001:db8:4200:204::44</text>
+<rect class="box-ok" x="610" y="128" width="200" height="32" rx="6"/><text class="t-mono t-small" x="622" y="149">10.100.4.44 · hpc-fabric</text>
+<rect class="box-ok" x="610" y="218" width="200" height="32" rx="6"/><text class="t-mono t-small" x="622" y="239">172.16.4.44 · oob</text>
+<rect class="box-muted" x="860" y="110" width="164" height="70" rx="8"/>
+<text class="t-title" x="876" y="134">device (FNT)</text><text class="t-small" x="876" y="152">Rack A01 U10–11</text><text class="t-mono t-small t-muted" x="876" y="170">SN7K4-0042</text>
+<path class="edge" d="M236,130 L296,55" marker-end="url(#arrow)"/>
+<path class="edge" d="M236,145 L296,145" marker-end="url(#arrow)"/>
+<path class="edge" d="M236,160 L296,235" marker-end="url(#arrow)"/>
+<path class="edge" d="M550,40 L606,36" marker-end="url(#arrow)"/>
+<path class="edge" d="M550,60 L606,74" marker-end="url(#arrow)"/>
+<path class="edge" d="M550,145 L606,144" marker-end="url(#arrow)"/>
+<path class="edge" d="M550,235 L606,234" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M126,180 L126,292 L942,292 L942,184" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="560" y="312" text-anchor="middle">asset link: matched by serial SN7K4-0042</text>
+</svg>
+<figcaption>One host, three interfaces, four addresses in three VRFs. The asset link connects the host to its device in the asset mirror.</figcaption>
+</figure>
+<aside class="callout note">
+<p class="callout-title">An ONA interface is an address</p>
+<p>In ONA, one interface row has one IP address and an optional MAC. A host with an IPv4 and an IPv6 address on one NIC has two interface rows. The import merges rows with the same host and MAC (or the same name) into one bembel interface with several addresses (<a href="map-ona.html#interfaces">map-ona.html#interfaces</a>).</p>
+</aside>
+
+<h2 id="vms">Virtual machines</h2>
+<p>A VM is a host of kind <code>vm</code>. It has a <code>runs_on</code> link to a host of kind <code>hypervisor</code> and a <code>platform</code>: <code>libvirt</code>, <code>openstack</code> or <code>other</code>. All VMs use this one model. Only the source differs: the bembel-agent on a Debian libvirt hypervisor reports libvirt VMs, and the OpenStack sync reports OpenStack VMs. A live migration changes only <code>runs_on</code>. The chapter <a href="vms.html">Virtual machines</a> gives the agent, the libvirt hook and the cloud-init data.</p>
+
+<h2 id="dns">DNS</h2>
+<p>A <dfn>zone</dfn> is a forward or reverse DNS zone. It is in one or more DNS views, it has SOA and NS settings, an owner and DNS servers as delivery targets. A <dfn>DNS view</dfn> is a split-horizon view, for example <code>internal</code> and <code>external</code>. A record is a resource record with name, type, TTL and data in a view.</p>
+<p>bembel has two classes of records:</p>
+<ul>
+<li>A <dfn>derived record</dfn> comes from an address with a DNS name: the A or AAAA record in the forward zone and the PTR record in the reverse zone. A user changes it only through the address. When an address moves to another IP, both records move.</li>
+<li>A <dfn>manual record</dfn> is edited directly: CNAME, MX, SRV, TXT, NS, CAA, and A or AAAA records for names outside bembel. A CNAME can point to any name, also outside bembel.</li>
+</ul>
+<p>Reverse zones are computed from the subnets: <code>20.10.in-addr.arpa</code> for <code>10.20.0.0/16</code>, nibble zones for IPv6, and RFC 2317 zones with the parent CNAMEs for small IPv4 subnets. The BIND export writes all zones per DNS server and per view (<a href="dns.html#export">dns.html#export</a>).</p>
+
+<h2 id="dhcp">DHCP</h2>
+<p>A <dfn>DHCP scope</dfn> holds the DHCP settings of one subnet: on or off, DHCP servers, options and a failover pair. A DHCP pool is a range with the purpose <code>dhcp-pool</code>. A reservation is not a separate object that a user edits: it follows from an allocated address on an interface with a MAC, or with a client identifier for IPoIB. A DHCP option has a code and a value at the global, server, scope or host level. A failover pair is two DHCP servers that share the pools of a scope. The ISC dhcpd export writes <code>dhcpd.conf</code> per server (<a href="dhcp.html#export">dhcp.html#export</a>).</p>
+
+<h2 id="assets">Assets</h2>
+<p>The asset mirror is a read-only copy of FNT Command: site, building, floor, room, row, rack, device and port. Each object has <code>source=fnt</code>, <code>external_ref</code> (the ELID) and <code>synced_at</code>. bembel adds only links: an asset link from a host to a device, and from an interface to a port. A sync matches them by serial, asset tag, MAC and hostname, in this order (<a href="assets.html#matching">assets.html#matching</a>).</p>
+<table>
+<thead><tr><th>Kind</th><th>Main fields</th><th>Used in bembel for</th></tr></thead>
+<tbody>
+<tr><td>site</td><td>name, address</td><td>scope of prefixes, VLAN domains and bindings</td></tr>
+<tr><td>building, floor, room, row</td><td>name, parent</td><td>floor map, location path</td></tr>
+<tr><td>rack</td><td>name, height in U, row, position</td><td>rack elevation</td></tr>
+<tr><td>device</td><td>name, model, manufacturer, serial, asset tag, rack, position U, height U, face, status</td><td>asset link, rack elevation, host page</td></tr>
+<tr><td>port</td><td>name, kind, speed, MAC or GUID, peer port</td><td>asset link of interfaces, switch peer</td></tr>
+</tbody>
+</table>
+
+<h2 id="routing">Routing</h2>
+<p>bembel is the source of truth for routing values, not for router configuration. An ASN is an autonomous system number with an owner, from an ASN range. A VRF has a route distinguisher and import and export route targets. A static route has a VRF, a destination prefix, a next-hop address and an owner. A prefix with <code>announce: true</code> goes into the prefix lists that bembel exports for FRR, BIRD, Junos and Arista EOS (<a href="routing.html">routing.html</a>).</p>
+
+<h2 id="firewall">Firewall groups</h2>
+<p>An <dfn>address group</dfn> is a named dynamic set of addresses and prefixes. A filter defines it, for example "hosts with tag <code>role=login</code> in VRF global". bembel computes the members after each change and publishes the group as a feed: an nftables set, a firewalld ipset, a plain text list for external dynamic lists, or JSON. Firewall policies stay in the firewall tools. bembel owns only the objects (<a href="routing.html#address-groups">routing.html#address-groups</a>).</p>
+
+<h2 id="access">Access</h2>
+<p>A subject is a user, a group or a service. A role is a set of permissions. A binding gives a subject a role in a scope. The scope is global, a VRF, a prefix subtree, a zone subtree, a site subtree, a team or a tag. A binding can AND several scope terms. A token is a personal access token that narrows the permissions of its owner. A change request holds a dangerous change until a second subject approves it. An audit event records each change and each denied request. The chapter <a href="access.html">Access control</a> gives the details.</p>
+
+<h2 id="history">History and events</h2>
+<p>Each table has a history table with the old row and a validity range (<code>tstzrange</code>). Thus bembel can show each object at any time, and "who could do what at time T" for bindings. Each change writes, in the same transaction:</p>
+<ol>
+<li>the new row and the history row;</li>
+<li>an audit event with the subject, the origin (web, CLI, API, assistant, integration), the binding that allowed it and the request id;</li>
+<li>an outbox row. A worker sends it as a CloudEvents event to the webhooks and to the event stream (<a href="api.html#events">api.html#events</a>). It also starts the work that follows: new derived records, a new export bundle, a new embedding.</li>
+</ol>
+<figure class="diagram">
+<svg viewBox="0 0 760 230" role="img" aria-labelledby="tx-t">
+<title id="tx-t">One API change writes four rows in one transaction; workers do the rest</title>
+<rect class="box" x="16" y="90" width="120" height="50" rx="8"/><text class="t-title" x="76" y="120" text-anchor="middle">API call</text>
+<rect class="zone" x="170" y="16" width="300" height="200" rx="12"/>
+<text class="t-title" x="186" y="40">one transaction</text>
+<rect class="box" x="186" y="54" width="268" height="30" rx="6"/><text class="t-small" x="198" y="74">object row (revision + 1)</text>
+<rect class="box" x="186" y="92" width="268" height="30" rx="6"/><text class="t-small" x="198" y="112">history row (old value, valid range)</text>
+<rect class="box" x="186" y="130" width="268" height="30" rx="6"/><text class="t-small" x="198" y="150">audit event (subject, origin, binding)</text>
+<rect class="box-accent" x="186" y="168" width="268" height="30" rx="6"/><text class="t-small t-on" x="198" y="188">outbox row (CloudEvents)</text>
+<rect class="box-soft" x="520" y="40" width="224" height="34" rx="8"/><text class="t-small" x="532" y="62">webhooks and event stream</text>
+<rect class="box-soft" x="520" y="86" width="224" height="34" rx="8"/><text class="t-small" x="532" y="108">derived records, reverse zones</text>
+<rect class="box-soft" x="520" y="132" width="224" height="34" rx="8"/><text class="t-small" x="532" y="154">export bundles (BIND, dhcpd, …)</text>
+<rect class="box-soft" x="520" y="178" width="224" height="34" rx="8"/><text class="t-small" x="532" y="200">embeddings for search</text>
+<path class="edge" d="M136,115 L166,115" marker-end="url(#arrow)"/>
+<path class="edge-accent" d="M454,183 L486,183 L486,57 L516,57" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M486,103 L516,103" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M486,149 L516,149" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M486,195 L516,195" marker-end="url(#arrow-accent)"/>
+</svg>
+<figcaption>The transactional outbox: no event is lost and no event exists for a change that did not commit.</figcaption>
+</figure>
+<p>Derived records are computed in the same transaction as the address. Exports and embeddings are computed after the commit, because they take longer and can be retried.</p>
+
+<h2 id="ownership">Ownership and sources</h2>
+<p>Each object has one writer. The <code>source</code> tells where the object comes from. The <code>managed_by</code> field tells which integration owns it now.</p>
+<table>
+<thead><tr><th>Case</th><th><code>source</code></th><th><code>managed_by</code></th><th>Who can change it</th></tr></thead>
+<tbody>
+<tr><td>A user makes a prefix.</td><td><code>local</code></td><td>null</td><td>Users with a binding in scope.</td></tr>
+<tr><td>The ONA import makes a host.</td><td><code>ona-import</code></td><td>null after cutover; <code>ona-import</code> during the parallel run</td><td>The import during the parallel run, then users.</td></tr>
+<tr><td>The FNT sync makes a device.</td><td><code>fnt</code></td><td><code>fnt</code></td><td>Only the sync. Users add only asset links.</td></tr>
+<tr><td>The OpenStack sync observes a port.</td><td><code>openstack:os-prod</code></td><td><code>openstack:os-prod</code></td><td>Only the sync.</td></tr>
+<tr><td>The Cluster API provider claims an address.</td><td><code>k8s:prod-1</code></td><td><code>k8s:prod-1</code></td><td>The provider. A user can release it only with a change request.</td></tr>
+<tr><td>The bembel-agent reports a libvirt VM.</td><td><code>libvirt:hv-03</code></td><td><code>libvirt:hv-03</code></td><td>The agent of the current hypervisor.</td></tr>
+</tbody>
+</table>
+<p>A sync never deletes an object that a user changed after the sync made it. It writes a finding. An observed object that conflicts with a managed object (for example a Neutron port with an address that a user allocated) is also a finding.</p>
+
+<h2 id="schema">Schema excerpt</h2>
+<p>The full schema comes with the code. This excerpt shows how PostgreSQL 18 enforces the main rules. It needs the extensions <code>btree_gist</code>, <code>ltree</code> and <code>vector</code> (pgvector).</p>
+<pre><code class="language-sql">CREATE TABLE vrf (
+  id          uuid PRIMARY KEY DEFAULT uuidv7(),
+  name        text NOT NULL UNIQUE,
+  rd          text UNIQUE,
+  owner       uuid REFERENCES team,
+  revision    bigint NOT NULL DEFAULT 1
+);
+
+CREATE TABLE prefix (
+  id          uuid PRIMARY KEY DEFAULT uuidv7(),
+  vrf_id      uuid NOT NULL REFERENCES vrf,
+  cidr        cidr NOT NULL,
+  family      smallint GENERATED ALWAYS AS (family(cidr)) STORED,
+  kind        prefix_kind NOT NULL,              -- container | subnet
+  status      prefix_status NOT NULL DEFAULT 'active',
+  pool        boolean NOT NULL DEFAULT false,
+  parent_id   uuid REFERENCES prefix,            -- kept by trigger
+  level       smallint NOT NULL,                 -- containing prefixes in the VRF, kept by trigger
+  vlan_id     uuid REFERENCES vlan,
+  ib_partition_id uuid REFERENCES ib_partition,
+  fabric_id   uuid REFERENCES fabric,
+  twin_id     uuid REFERENCES prefix,
+  owner       uuid REFERENCES team,
+  tags        jsonb NOT NULL DEFAULT '{}',
+  source      text NOT NULL DEFAULT 'local',
+  managed_by  text,
+  external_ref text,
+  revision    bigint NOT NULL DEFAULT 1,
+  UNIQUE (vrf_id, cidr),
+  CHECK (pool = false OR kind = 'container'),
+  CHECK (NOT (vlan_id IS NOT NULL AND ib_partition_id IS NOT NULL)),
+  -- no two prefixes on the same level of the tree overlap in one VRF
+  CONSTRAINT prefix_no_sibling_overlap
+    EXCLUDE USING gist (vrf_id WITH =, level WITH =, cidr inet_ops WITH &amp;&amp;)
+    DEFERRABLE INITIALLY IMMEDIATE
+);
+CREATE INDEX prefix_cidr_gist ON prefix USING gist (vrf_id, cidr inet_ops);
+
+CREATE TABLE address (
+  id          uuid PRIMARY KEY DEFAULT uuidv7(),
+  vrf_id      uuid NOT NULL REFERENCES vrf,
+  prefix_id   uuid NOT NULL REFERENCES prefix,   -- the subnet
+  ip          inet NOT NULL CHECK (masklen(ip) = CASE family(ip) WHEN 4 THEN 32 ELSE 128 END),
+  status      address_status NOT NULL,           -- allocated | reserved | claimed | deprecated
+  shared      boolean NOT NULL DEFAULT false,
+  fqdn        text,                              -- drives derived records
+  claim_id    uuid REFERENCES claim,
+  grace_until timestamptz,
+  UNIQUE (vrf_id, ip)
+);
+
+CREATE TABLE address_interface (                 -- one row, or several for a shared address
+  address_id   uuid REFERENCES address ON DELETE CASCADE,
+  interface_id uuid REFERENCES interface ON DELETE CASCADE,
+  PRIMARY KEY (address_id, interface_id)
+);</code></pre>
+<p>The trigger on <code>prefix</code> sets <code>parent_id</code> to the smallest container in the same VRF that contains the new CIDR (<code>cidr &gt;&gt; new.cidr</code>, ordered by <code>masklen</code> descending), moves the children of the parent that the new prefix contains, and updates <code>level</code> of all descendants. The exclusion uses <code>level</code> and not <code>parent_id</code>, because <code>NULL</code> never equals <code>NULL</code> in an exclusion constraint, so top-level prefixes would not be checked (<a href="allocation.html#level">allocation.html#level</a>). A check trigger on <code>address</code> verifies that <code>ip &lt;&lt; prefix.cidr</code> and that the prefix is a subnet. The chapter <a href="allocation.html#constraints">allocation.html#constraints</a> shows the constraints that allocation relies on.</p>
+</body>
+</html>
