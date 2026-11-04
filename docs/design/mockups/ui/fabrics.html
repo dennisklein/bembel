@@ -17,18 +17,18 @@
   <details class="set-menu vrf-menu">
     <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="set-pop">
-      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · default table</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
-      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>v</kbd></a>
     </div>
   </details>
   <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
     <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
   <span class="spacer"></span>
-  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <a class="cr-chip" href="#" title="1 change request waits for your approval. 1 more is yours and needs another approver.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">1<span class="w"> to approve</span></span></a>
   <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
   <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
   <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
@@ -89,10 +89,10 @@ bembel export opensm --fabric kestrel-ib</div></details>
 <section class="card fab-card" aria-labelledby="f1-t">
   <div class="card-head"><h2 id="f1-t" class="mono">kestrel-ib</h2><span class="right"><span class="fab ib">infiniband</span></span></div>
   <div class="card-body">
-    <p class="fab-d">NDR InfiniBand, 400 Gb/s. Compute nodes and the Lustre servers.</p>
+    <p class="fab-d">NDR InfiniBand, 400 Gb/s. Compute nodes, the Lustre servers and the <a class="gl" href="../../glossary.html#dhcp-server" data-gl="dhcp-server" data-domain="dhcp">DHCP servers</a>.</p>
     <dl class="kv">
       <dt>Subnet manager</dt><dd><span class="mono">sm-kestrel</span> <span class="muted">OpenSM on mgmt-01</span></dd>
-      <dt>Ports</dt><dd><b>412</b> · 398 nodes, 14 switch links</dd>
+      <dt>Ports</dt><dd><b>414</b> · 400 nodes, 14 switch links</dd>
       <dt>Partitions</dt><dd>4 <span class="muted">· 2 with IPoIB</span></dd>
       <dt>Subnet</dt><dd><a class="pfx" href="prefix.html">10.100.0.0<span class="len">/16</span></a> <span class="dchip" data-domain="addr">hpc-fabric</span></dd>
       <dt>Team</dt><dd><span class="team t-hpc-ops"><i></i>hpc-ops</span></dd>
@@ -107,7 +107,7 @@ bembel export opensm --fabric kestrel-ib</div></details>
     <p class="fab-d">400G Ethernet with RoCEv2. GPU nodes, 8 <a class="gl" href="../../glossary.html#rail" data-gl="rail" data-domain="addr">rails</a>, 1 <a class="gl" href="../../glossary.html#vlan" data-gl="vlan" data-domain="addr">VLAN</a> per rail.</p>
     <dl class="kv">
       <dt>Rails</dt><dd>1–8 · VLAN <span class="vid">3101</span>–<span class="vid">3108</span></dd>
-      <dt>Ports</dt><dd><b>80</b> · 10 GPU nodes × 8 rails</dd>
+      <dt>Ports</dt><dd><b>64</b> · 8 GPU nodes × 8 rails</dd>
       <dt>Subnets</dt><dd><a class="pfx" href="prefix.html">10.110.1.0<span class="len">/24</span></a> … <a class="pfx" href="prefix.html">10.110.8.0<span class="len">/24</span></a></dd>
       <dt>VRF</dt><dd><span class="dchip" data-domain="addr">hpc-fabric</span></dd>
       <dt>QoS profile</dt><dd><b class="mono">osprey-roce</b></dd>
@@ -124,7 +124,7 @@ bembel export opensm --fabric kestrel-ib</div></details>
     <p class="fab-d">Campus Ethernet of Hall 2. Services, BMC and management.</p>
     <dl class="kv">
       <dt>VLAN domain</dt><dd><span class="mono">campus-hall2</span></dd>
-      <dt>VLANs</dt><dd><b>14</b> · 3 with IPv6</dd>
+      <dt>VLANs</dt><dd><b>14</b> · 4 with IPv6</dd>
       <dt>Ports</dt><dd><b>1 842</b> · from FNT Command</dd>
       <dt>Subnets</dt><dd><a class="pfx" href="prefix.html">10.20.4.0<span class="len">/22</span></a> and 12 more</dd>
       <dt>VRF</dt><dd><span class="dchip" data-domain="addr">global</span> <span class="dchip" data-domain="addr">oob</span></dd>
@@ -135,11 +135,11 @@ bembel export opensm --fabric kestrel-ib</div></details>
 </section>
 </div>
 <section class="card" id="parts" aria-labelledby="parts-t">
-  <div class="card-head"><h2 id="parts-t">Partitions of kestrel-ib</h2><span class="right">P_Key as in partitions.conf: base key 0x0001–0x7ffe plus the full bit · <a href="vlans.html">All VLANs and partitions</a></span></div>
+  <div class="card-head"><h2 id="parts-t">Partitions of kestrel-ib</h2><span class="right">P_Key: base key 0x0001–0x7ffe · <a href="vlans.html">All VLANs and partitions</a></span></div>
   <div class="table-wrap"><table class="table">
-    <thead><tr><th>P_Key</th><th>Name</th><th>Default member</th><th>IPoIB</th><th>Subnet</th><th class="num">MTU</th><th class="num">Full / limited</th><th></th></tr></thead>
-    <tbody><tr><td><span class="mono"><b>0x7fff</b></span></td><td><b>Default</b></td><td><span class="qs ok">full</span></td><td><span class="qs ok">ipoib</span></td><td>–</td><td class="num">4096</td><td class="num">412 / 0</td><td><a href="#">Members</a></td></tr><tr><td><span class="mono"><b>0x8001</b></span></td><td><b>kestrel-ipoib</b></td><td><span class="qs warn">limited</span></td><td><span class="qs ok">ipoib</span></td><td><a class="pfx" href="prefix.html">10.100.0.0<span class="len">/16</span></a></td><td class="num">4096</td><td class="num">398 / 0</td><td><a href="#">Members</a></td></tr><tr><td><span class="mono"><b>0x8002</b></span></td><td><b>kestrel-lustre</b></td><td><span class="qs warn">limited</span></td><td><span class="qs none muted">no</span></td><td>–</td><td class="num">4096</td><td class="num">2 / 396</td><td><a href="#">Members</a></td></tr><tr><td><span class="mono"><b>0x8003</b></span></td><td><b>kestrel-admin</b></td><td><span class="qs warn">limited</span></td><td><span class="qs none muted">no</span></td><td>–</td><td class="num">2048</td><td class="num">4 / 12</td><td><a href="#">Members</a></td></tr></tbody></table></div>
-  <div class="card-foot"><span class="muted">A full member talks to all members. A limited member talks only to full members. In kestrel-lustre the clients are limited, so they cannot reach each other. The default partition 0x7fff is not editable.</span></div>
+    <thead><tr><th>P_Key</th><th>Name</th><th>Default for new members</th><th>IPoIB</th><th>Subnet</th><th class="num">MTU</th><th class="num">Full / limited</th><th></th></tr></thead>
+    <tbody><tr><td><span class="mono"><b>0x7fff</b></span></td><td><b>Default</b></td><td><span class="qs ok">full</span></td><td><span class="qs ok">ipoib</span></td><td>–</td><td class="num">4096</td><td class="num">414 / 0</td><td><a href="#">Members</a></td></tr><tr><td><span class="mono"><b>0x0001</b></span></td><td><b>kestrel-ipoib</b></td><td><span class="qs warn">limited</span></td><td><span class="qs ok">ipoib</span></td><td><a class="pfx" href="prefix.html">10.100.0.0<span class="len">/16</span></a></td><td class="num">4096</td><td class="num">400 / 0</td><td><a href="#">Members</a></td></tr><tr><td><span class="mono"><b>0x0002</b></span></td><td><b>kestrel-lustre</b></td><td><span class="qs warn">limited</span></td><td><span class="qs none muted">no</span></td><td>–</td><td class="num">4096</td><td class="num">2 / 396</td><td><a href="#">Members</a></td></tr><tr><td><span class="mono"><b>0x0003</b></span></td><td><b>kestrel-admin</b></td><td><span class="qs warn">limited</span></td><td><span class="qs none muted">no</span></td><td>–</td><td class="num">2048</td><td class="num">4 / 12</td><td><a href="#">Members</a></td></tr></tbody></table></div>
+  <div class="card-foot"><span class="muted">A full member talks to all members. A limited member talks only to full members. In kestrel-lustre the limited clients cannot reach each other on 0x0002; they still share Default and kestrel-ipoib. The default partition 0x7fff is not editable.</span></div>
 </section>
 <section class="card" id="rails" aria-labelledby="rails-t">
   <div class="card-head"><h2 id="rails-t">Rails of osprey-roce</h2><span class="right">rail = one leaf, one VLAN, one /24</span></div>
@@ -242,33 +242,36 @@ bembel export opensm --fabric kestrel-ib</div></details>
 <g class="node"><rect x="620" y="272" width="102" height="44" rx="7"/><rect class="pp" x="627.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="637.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="648.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="658.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="669.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="679.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="690.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="700.5" y="269" width="6" height="6" rx="1"/><text class="n" x="671.0" y="297" text-anchor="middle">gpu-006</text><text class="s" x="671.0" y="310" text-anchor="middle">10.110.k.16</text></g>
 <g class="node"><rect x="734" y="272" width="102" height="44" rx="7"/><rect class="pp" x="741.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="751.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="762.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="772.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="783.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="793.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="804.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="814.5" y="269" width="6" height="6" rx="1"/><text class="n" x="785.0" y="297" text-anchor="middle">gpu-007</text><text class="s" x="785.0" y="310" text-anchor="middle">10.110.k.17</text></g>
 <g class="node"><rect x="848" y="272" width="102" height="44" rx="7"/><rect class="pp" x="855.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="865.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="876.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="886.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="897.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="907.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="918.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="928.5" y="269" width="6" height="6" rx="1"/><text class="n" x="899.0" y="297" text-anchor="middle">gpu-008</text><text class="s" x="899.0" y="310" text-anchor="middle">10.110.k.18</text></g>
-<text class="cap" x="70" y="344">8 RAILS · 1 LEAF PER RAIL · 8 GPU NODES SHOWN OF 10 · 400G PER LINK · GPU-001 HIGHLIGHTED</text>
+<text class="cap" x="70" y="344">8 RAILS · 1 LEAF PER RAIL · 8 GPU NODES · 400G PER LINK · GPU-001 HIGHLIGHTED</text>
 </svg></div>
   <div class="card-foot"><span class="muted">Port k of every GPU node goes to leaf k. NCCL and RoCEv2 traffic of a rail stays in its VLAN. The links come from FNT Command. The VLAN and the subnet come from bembel.</span></div>
 </section>
 <section class="card" id="opensm" aria-labelledby="osm-t">
   <div class="card-head"><h2 id="osm-t">OpenSM export</h2><span class="right"><span class="pill st-warn">sm-kestrel pulled 26 h ago</span></span></div>
-  <div class="osm-bar"><span class="seg" role="group" aria-label="File"><button type="button" aria-pressed="true">partitions.conf</button><button type="button" aria-pressed="false">Diff to the pulled copy</button></span><span class="muted small">preview · 21 lines of 408</span>
+  <div class="osm-bar"><span class="seg" role="group" aria-label="File"><button type="button" aria-pressed="true">partitions.conf</button><button type="button" aria-pressed="false">Diff to the pulled copy</button></span><span class="muted small">preview · 22 lines of 410</span>
     <span class="grow"></span><button class="btn btn-sm" type="button">Copy</button><button class="btn btn-sm" type="button">Download</button></div>
   <pre class="log osm"><span class="dim"># partitions.conf for fabric kestrel-ib, generated by bembel</span>
-<span class="dim"># bundle o-20261104-1431-b3c. Do not edit.</span>
+<span class="dim"># bundle b-3a91c4. Do not edit.</span>
 
 <span class="p">Default</span>=0x7fff, ipoib, rate=16, mtu=5, defmember=full : ALL=full ;
 
 <span class="dim"># kestrel-ipoib: IPoIB network 10.100.0.0/16</span>
-<span class="p">kestrel-ipoib</span>=0x8001, ipoib, rate=16, mtu=5, defmember=limited :
+<span class="p">kestrel-ipoib</span>=0x0001, ipoib, rate=16, mtu=5, defmember=limited :
+    0x0c42a10300710067=full,    <span class="dim"># dhcp1 ib0.8001</span>
+    0x0c42a10300710068=full,    <span class="dim"># dhcp2 ib0.8001</span>
     0x0c42a1030071a2b4=full,    <span class="dim"># cn-004 ib0</span>
     0x0c42a1030071a2c8=full,    <span class="dim"># cn-005 ib0</span>
     <span class="dim"># ... 394 more members</span>
     0x0c42a10300a3f160=full,    <span class="dim"># oss-01 ib0</span>
     0x0c42a10300a3f1a0=full ;   <span class="dim"># oss-02 ib0</span>
 
-<span class="dim"># kestrel-lustre: RDMA only, clients cannot reach each other</span>
-<span class="p">kestrel-lustre</span>=0x8002, rate=16, mtu=5, defmember=limited :
-    0x0c42a10300a3f160=full,    <span class="dim"># oss-01 ib0</span>
-    0x0c42a10300a3f1a0=full,    <span class="dim"># oss-02 ib0</span>
+<span class="dim"># kestrel-lustre: RDMA only, clients cannot reach each other on this key</span>
+<span class="p">kestrel-lustre</span>=0x0002, rate=16, mtu=5, defmember=limited :
     0x0c42a1030071a2b4=limited, <span class="dim"># cn-004 ib0</span>
-    0x0c42a1030071a2c8=limited ;<span class="dim"># cn-005 ib0</span></pre>
+    0x0c42a1030071a2c8=limited, <span class="dim"># cn-005 ib0</span>
+    <span class="dim"># ... 394 more members</span>
+    0x0c42a10300a3f160=full,    <span class="dim"># oss-01 ib0</span>
+    0x0c42a10300a3f1a0=full ;   <span class="dim"># oss-02 ib0</span></pre>
   <div class="card-foot"><span class="mono small">bembel export opensm --fabric kestrel-ib --out /etc/opensm/partitions.conf</span><span class="right"><span class="muted">sm-kestrel pulls over HTTPS with an ETag, then sends SIGHUP to OpenSM.</span></span></div>
 </section>
 </div>

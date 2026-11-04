@@ -17,18 +17,18 @@
   <details class="set-menu vrf-menu">
     <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="set-pop">
-      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · default table</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
-      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>v</kbd></a>
     </div>
   </details>
   <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
     <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
   <span class="spacer"></span>
-  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <a class="cr-chip" href="#" title="1 change request waits for your approval. 1 more is yours and needs another approver.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">1<span class="w"> to approve</span></span></a>
   <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
   <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
   <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
@@ -78,13 +78,13 @@
   <div class="actions">
     <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
       <div class="cli-pop"><span class="c"># the groups and their feeds</span>
-bembel group ls
-bembel group show login-nodes --members
+bembel address-group ls
+bembel address-group show login-nodes --members
 <span class="c"># the feed files, as the firewall tools read them</span>
-bembel export group login-nodes --format edl
-bembel export group login-nodes --format nftables
-<span class="c"># prefix list for FRR, one VRF</span>
-bembel export prefix-list --vrf global --format frr</div></details>
+bembel export address-group login-nodes --format text
+bembel export address-group login-nodes --format nft
+<span class="c"># prefix list for FRR, one announcement set</span>
+bembel export prefix-list campus-bgp --format frr --family 4</div></details>
     <button class="btn btn-agent" type="button" data-assistant="group-impact" title="Runs the assistant with the advisory group-impact. Tools: read only. It changes nothing.">Who is in this group?</button>
     <a class="btn btn-primary" href="#">New group…</a>
   </div>
@@ -104,7 +104,7 @@ bembel export prefix-list --vrf global --format frr</div></details>
   <div class="table-wrap"><table class="table gt">
     <thead><tr><th>Group</th><th>Filter</th><th class="num">Members</th><th>Feeds</th><th>Consumers and last pull</th><th></th></tr></thead>
     <tbody>
-<tr class="sel" aria-selected="true"><td><a class="gname" href="#detail"><b class="mono">login-nodes</b></a><div class="muted small">login and gateway hosts of Hall 2</div></td><td><div class="chips-s"><span class="fchip"><b>host.role</b>login</span><span class="fchip"><b>vrf</b>global</span><span class="fchip"><b>team</b>hpc-ops</span></div></td><td class="num">6</td><td><div class="chips-s"><span class="feed nftables">nftables</span><span class="feed EDL">EDL</span><span class="feed firewalld">firewalld</span></div></td><td class="small"><b class="mono">fw-edge</b> pulled 17:55 · <span class="mono">login-fw</span> 17:40</td><td class="act"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for login-nodes">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Edit filter…</a><a href="#" role="menuitem">Copy feed URL</a><a href="#" role="menuitem">Delete…</a></div></details></td></tr>
+<tr class="sel" aria-selected="true"><td><a class="gname" href="#detail"><b class="mono">login-nodes</b></a><div class="muted small">Login nodes of all clusters</div></td><td><div class="chips-s"><span class="fchip"><b>tag</b>role=login</span><span class="fchip"><b>vrf</b>global</span></div></td><td class="num">6</td><td><div class="chips-s"><span class="feed nftables">nftables</span><span class="feed EDL">EDL</span><span class="feed firewalld">firewalld</span></div></td><td class="small"><b class="mono">fw-edge</b> pulled 17:55 · <span class="mono">login-fw</span> 17:40</td><td class="act"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for login-nodes">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Edit filter…</a><a href="#" role="menuitem">Copy feed URL</a><a href="#" role="menuitem">Delete…</a></div></details></td></tr>
 <tr><td><a class="gname" href="#detail"><b class="mono">ceph-public</b></a><div class="muted small">Ceph public network clients</div></td><td><div class="chips-s"><span class="fchip"><b>prefix</b>10.20.12.0/24</span><span class="fchip"><b>tag</b>ceph=public</span></div></td><td class="num">3 prefixes, 41 addresses</td><td><div class="chips-s"><span class="feed nftables">nftables</span><span class="feed EDL">EDL</span></div></td><td class="small"><b class="mono">fw-edge</b> pulled 17:55</td><td class="act"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for ceph-public">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Edit filter…</a><a href="#" role="menuitem">Copy feed URL</a><a href="#" role="menuitem">Delete…</a></div></details></td></tr>
 <tr><td><a class="gname" href="#detail"><b class="mono">slurm-ctl</b></a><div class="muted small">Slurm controllers and DB</div></td><td><div class="chips-s"><span class="fchip"><b>host.role</b>slurm-ctl</span><span class="fchip"><b>vrf</b>global</span></div></td><td class="num">4</td><td><div class="chips-s"><span class="feed nftables">nftables</span><span class="feed firewalld">firewalld</span></div></td><td class="small"><span class="muted">not pulled yet</span></td><td class="act"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for slurm-ctl">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Edit filter…</a><a href="#" role="menuitem">Copy feed URL</a><a href="#" role="menuitem">Delete…</a></div></details></td></tr>
 <tr><td><a class="gname" href="#detail"><b class="mono">bmc-oob</b></a><div class="muted small">BMC networks</div></td><td><div class="chips-s"><span class="fchip"><b>vrf</b>oob</span><span class="fchip"><b>prefix</b>172.16.0.0/16</span></div></td><td class="num">1 prefix, 612 addresses</td><td><div class="chips-s"><span class="feed EDL">EDL</span><span class="feed JSON">JSON</span></div></td><td class="small"><b class="mono">fw-edge</b> pulled 17:55</td><td class="act"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for bmc-oob">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Edit filter…</a><a href="#" role="menuitem">Copy feed URL</a><a href="#" role="menuitem">Delete…</a></div></details></td></tr>
@@ -117,45 +117,41 @@ bembel export prefix-list --vrf global --format frr</div></details>
 
 <div class="rcols" id="detail">
 <section class="card" aria-labelledby="dt-t">
-  <div class="card-head"><h2 id="dt-t"><span class="mono">login-nodes</span> <span class="muted">filter</span></h2><span class="right">revision 7 · <a href="#">History</a> · <a class="btn btn-sm" href="#">Edit…</a></span></div>
-  <div class="card-body"><pre class="log" tabindex="0"><span class="dim"># address group login-nodes, revision 7, edited by a.berger 2026-10-30</span>
+  <div class="card-head"><h2 id="dt-t"><span class="mono">login-nodes</span> <span class="muted">filter</span></h2><span class="right">revision 43 · <a href="#">History</a> · <a class="btn btn-sm" href="#">Edit…</a></span></div>
+  <div class="card-body"><pre class="log" tabindex="0"><span class="dim"># address group login-nodes, revision 43, 2026-11-04T17:52:07Z</span>
 <span class="p">name</span>: login-nodes
 <span class="p">owner</span>: hpc-ops
-<span class="p">description</span>: login and gateway hosts of Hall 2
-<span class="p">filter</span>:
-  <span class="p">all</span>:
-    - <span class="p">host.role</span>: login
-    - <span class="p">vrf</span>: global
-    - <span class="p">team</span>: hpc-ops
-  <span class="p">any_of_tags</span>:
-    - <span class="p">environment</span>: prod
-<span class="p">include</span>:
-  <span class="p">addresses</span>: primary        <span class="dim"># the primary address of each host</span>
-  <span class="p">prefixes</span>:  [ <span class="ok">198.51.100.0/28</span> ]  <span class="dim"># announced login VIP range</span>
-<span class="p">families</span>: [ 4, 6 ]
+<span class="p">description</span>: Login nodes of all clusters
+<span class="p">families</span>: [4, 6]
+<span class="p">members</span>:
+  - <span class="p">from</span>: hosts
+    <span class="p">where</span>: { <span class="p">tags</span>: { <span class="p">role</span>: login }, <span class="p">vrf</span>: global }
+    <span class="p">take</span>: addresses
+<span class="p">exclude</span>:
+  - { <span class="p">address</span>: 10.20.4.99 }
+<span class="p">limits</span>: { <span class="p">min</span>: 2, <span class="p">max</span>: 200 }
 <span class="p">feeds</span>:
-  <span class="p">nftables</span>: { <span class="p">set</span>: login_nodes, <span class="p">table</span>: inet filter }
-  <span class="p">edl</span>: { <span class="p">ttl</span>: 300 }
-  <span class="p">firewalld</span>: { <span class="p">ipset</span>: login-nodes }</pre></div>
-  <div class="card-foot"><span><b>6 members</b> now: 4 hosts and 2 prefixes. The filter runs on every read. The feeds show the same set.</span></div>
+  <span class="p">nft</span>:       { <span class="p">sets</span>: { 4: login_nodes_v4, 6: login_nodes_v6 }, <span class="p">table</span>: inet filter }
+  <span class="p">firewalld</span>: { <span class="p">ipsets</span>: { 4: login-nodes-v4, 6: login-nodes-v6 } }
+  <span class="p">text</span>:      {}</pre></div>
+  <div class="card-foot"><span><b>6 entries</b> now: 3 hosts, 2 families. A worker builds a new revision when the data change. The feeds show the same set.</span></div>
   <div class="table-wrap"><table class="table">
-    <thead><tr><th>Host</th><th>Address</th><th>Why it matches</th></tr></thead><tbody><tr><td><a class="fqdn" href="#">login-01<span class="dom">.kestrel.example.org</span></a></td><td><span class="ip">10.20.4.10</span></td><td class="muted">eno1 · primary</td></tr><tr><td><a class="fqdn" href="#">login-02<span class="dom">.kestrel.example.org</span></a></td><td><span class="ip">10.20.4.11</span></td><td class="muted">eno1 · primary</td></tr><tr><td><a class="fqdn" href="#">login-03<span class="dom">.kestrel.example.org</span></a></td><td><span class="ip">10.20.4.12</span></td><td class="muted">eno1 · primary</td></tr><tr><td><a class="fqdn" href="#">login-04<span class="dom">.kestrel.example.org</span></a></td><td><span class="ip">10.20.4.13</span></td><td class="muted">eno1 · primary</td></tr></tbody></table></div>
+    <thead><tr><th>Host</th><th>Address</th><th>Why it matches</th></tr></thead><tbody><tr><td><a class="fqdn" href="#">login-01<span class="dom">.kestrel.example.org</span></a></td><td><span class="ip">10.20.4.101</span></td><td class="muted">eno1 · tag role=login, VRF global</td></tr><tr><td><a class="fqdn" href="#">login-01<span class="dom">.kestrel.example.org</span></a></td><td><span class="ip">2001:db8:4200:204::101</span></td><td class="muted">eno1 · tag role=login, VRF global</td></tr><tr><td><a class="fqdn" href="#">login-02<span class="dom">.kestrel.example.org</span></a></td><td><span class="ip">10.20.4.102</span></td><td class="muted">eno1 · tag role=login, VRF global</td></tr><tr><td><a class="fqdn" href="#">login-02<span class="dom">.kestrel.example.org</span></a></td><td><span class="ip">2001:db8:4200:204::102</span></td><td class="muted">eno1 · tag role=login, VRF global</td></tr><tr><td><a class="fqdn" href="#">login-03<span class="dom">.kestrel.example.org</span></a></td><td><span class="ip">10.20.4.103</span></td><td class="muted">eno1 · tag role=login, VRF global</td></tr><tr><td><a class="fqdn" href="#">login-03<span class="dom">.kestrel.example.org</span></a></td><td><span class="ip">2001:db8:4200:204::103</span></td><td class="muted">eno1 · tag role=login, VRF global</td></tr></tbody></table></div>
 </section>
 
 <div class="rcol2">
 <section class="card" aria-labelledby="edl-t">
-  <div class="card-head"><h2 id="edl-t">Feed: external dynamic list</h2><span class="right"><a class="mono small" href="#">/v1/feeds/login-nodes.txt</a><button class="copy" type="button" data-copy="https://bembel.example.org/v1/feeds/login-nodes.txt" aria-label="Copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button></span></div>
-  <div class="card-body"><pre class="log" tabindex="0"><span class="dim"># login-nodes · 6 entries · generated 2026-11-04T17:52:07Z · revision 7</span>
-10.20.4.10
-10.20.4.11
-10.20.4.12
-10.20.4.13
-198.51.100.0/28
-2001:db8:4200:204::10
-2001:db8:4200:204::11</pre></div>
+  <div class="card-head"><h2 id="edl-t">Feed: external dynamic list</h2><span class="right"><a class="mono small" href="#">/v1/feeds/login-nodes?format=text</a><button class="copy" type="button" data-copy="https://bembel.example.org/v1/feeds/login-nodes?format=text" aria-label="Copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button></span></div>
+  <div class="card-body"><pre class="log" tabindex="0"><span class="dim"># bembel address-group login-nodes, revision 43, 2026-11-04T17:52:07Z</span>
+10.20.4.101
+10.20.4.102
+10.20.4.103
+2001:db8:4200:204::101
+2001:db8:4200:204::102
+2001:db8:4200:204::103</pre></div>
   <div class="card-foot"><span>Plain text over HTTPS, one entry per line. Palo Alto EDL, OPNsense URL table, FortiGate threat feed.</span></div>
   <ul class="rows mini cons">
-    <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">fw-edge</b> <span class="muted">Palo Alto EDL</span></span><span class="s">Pulled today 17:55 · 200 · ETag <span class="mono">"b2c46f1e…"</span> · 6 entries</span></li>
+    <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">fw-edge</b> <span class="muted">Palo Alto EDL</span></span><span class="s">Pulled today 17:55 · 200 · ETag <span class="mono">"c07a55"</span> · 6 entries</span></li>
     <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">login-fw</b> <span class="muted">nftables file</span></span><span class="s">Pulled today 17:40 · 304</span></li>
   </ul>
 </section>
@@ -163,19 +159,15 @@ bembel export prefix-list --vrf global --format frr</div></details>
 </div>
 
 <section class="card frr" aria-labelledby="pl-t">
-  <div class="card-head"><h2 id="pl-t">Prefix list for FRR</h2><span class="right"><span class="seg" role="group" aria-label="Format"><button type="button" aria-pressed="true">frr</button><button type="button">bird</button><button type="button">junos</button><button type="button">eos</button></span></span></div>
-  <div class="card-body"><pre class="log" tabindex="0"><span class="dim">! bembel export prefix-list --vrf global --format frr · bundle b-0f19a2 · 9 prefixes</span>
-ip prefix-list BEMBEL-ANNOUNCE-v4 seq 10 permit 10.20.0.0/16 le 24
-ip prefix-list BEMBEL-ANNOUNCE-v4 seq 20 permit 10.30.0.0/16 le 24
-ip prefix-list BEMBEL-ANNOUNCE-v4 seq 30 permit 198.51.100.0/24
-ip prefix-list BEMBEL-ANNOUNCE-v4 seq 40 permit 198.51.100.0/28
-ip prefix-list BEMBEL-ANNOUNCE-v4 seq 50 permit 10.100.0.0/16 le 22
+  <div class="card-head"><h2 id="pl-t">Prefix list for FRR</h2><span class="right"><select class="select" aria-label="Announcement set"><option>campus-bgp</option><option>border</option><option>fabric-bgp</option></select> <span class="seg" role="group" aria-label="Format"><button type="button" aria-pressed="true">frr</button><button type="button">bird</button><button type="button">junos</button><button type="button">eos</button></span></span></div>
+  <div class="card-body"><pre class="log" tabindex="0"><span class="dim">! bembel prefix-list campus-bgp, revision 58, 2026-11-04T10:05:00Z</span>
+ip prefix-list BEMBEL-CAMPUS-BGP-V4 seq 10 permit 10.20.4.0/22
+ip prefix-list BEMBEL-CAMPUS-BGP-V4 seq 20 permit 10.20.8.0/24
+ip prefix-list BEMBEL-CAMPUS-BGP-V4 seq 30 permit 10.20.12.0/24
+ip prefix-list BEMBEL-CAMPUS-BGP-V4 seq 40 permit 10.20.20.0/24
 <span class="dim">!</span>
-ipv6 prefix-list BEMBEL-ANNOUNCE-v6 seq 10 permit 2001:db8:4200::/48
-ipv6 prefix-list BEMBEL-ANNOUNCE-v6 seq 20 permit 2001:db8:4200:204::/64
-ipv6 prefix-list BEMBEL-ANNOUNCE-v6 seq 30 permit 2001:db8:4200:300::/56 le 64
-ipv6 prefix-list BEMBEL-ANNOUNCE-v6 seq 40 permit 2001:db8:4200:400::/56 le 64</pre></div>
-  <div class="card-foot"><span>Prefixes with <span class="mono">announce=true</span> in VRF <span class="dchip" data-domain="addr">global</span>. Delivered to <b class="mono">frr-core</b>, pulled 17:40.</span><span class="right"><a href="exports.html#t-frr-core">Target</a></span></div>
+ipv6 prefix-list BEMBEL-CAMPUS-BGP-V6 seq 10 permit 2001:db8:4200:204::/64</pre></div>
+  <div class="card-foot"><span>Prefixes with <span class="mono">announce=true</span> and tag <span class="mono">announce=campus-bgp</span> in VRF <span class="dchip" data-domain="addr">global</span>. Delivered to <b class="mono">frr-core</b>.</span><span class="right"><a href="exports.html#t-frr-core">Target</a></span></div>
 </section>
 
 </main>
