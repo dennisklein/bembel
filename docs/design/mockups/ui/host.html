@@ -17,18 +17,18 @@
   <details class="set-menu vrf-menu">
     <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="set-pop">
-      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · default table</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
-      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>v</kbd></a>
     </div>
   </details>
   <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
     <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
   <span class="spacer"></span>
-  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <a class="cr-chip" href="#" title="1 change request waits for your approval. 1 more is yours and needs another approver.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">1<span class="w"> to approve</span></span></a>
   <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
   <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
   <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
@@ -75,7 +75,7 @@
 <div class="page-head">
   <div><nav class="crumbs" aria-label="Breadcrumb"><a href="hosts.html">Hosts</a><span class="sep">›</span><span class="cur">cn-004.kestrel.example.org</span></nav>
     <h1><span class="fqdn">cn-004<span class="dom">.kestrel.example.org</span></span></h1>
-    <div class="sub"><span class="pill st-neutral">physical</span><span class="pill st-ok">active</span><span>compute node · team hpc-ops</span><span class="sep">·</span><span class="src">local</span><span class="sep">·</span><span class="muted">3 interfaces, 5 addresses, 3 VRFs</span></div></div>
+    <div class="sub"><span class="pill st-neutral">physical</span><span class="pill st-ok">active</span><span>compute node · team hpc-ops</span><span class="sep">·</span><span class="src">ona-import</span><span class="sep">·</span><span class="muted">3 interfaces, 4 addresses, 3 VRFs</span></div></div>
   <div class="actions">
     <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
       <div class="cli-pop">bembel host show cn-004.kestrel.example.org
@@ -84,7 +84,7 @@ bembel address allocate --prefix 10.20.4.0/22 --host cn-004 --interface eno2
 bembel host rm cn-004.kestrel.example.org</div></details>
     <button class="btn btn-agent" type="button" data-assistant="explain-host" title="Runs the assistant with the advisory explain-host. Tools: read only. It changes nothing.">Explain this host</button>
     <a class="btn" href="#">Edit</a>
-    <details class="more"><summary class="btn" aria-label="More actions">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Rename…<span class="code-sub">changes 5 DNS names</span></a><a href="#" role="menuitem">Unlink asset…</a><hr><button type="button" role="menuitem">Delete…<span class="code-sub">Frees 5 addresses, 2 reservations</span></button></div></details>
+    <details class="more"><summary class="btn" aria-label="More actions">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Rename…<span class="code-sub">changes 5 DNS names</span></a><a href="#" role="menuitem">Unlink asset…</a><hr><button type="button" role="menuitem">Delete…<span class="code-sub">Frees 4 addresses, 3 reservations</span></button></div></details>
     <a class="btn btn-primary" href="#">Add interface…</a>
   </div>
 </div>
@@ -101,13 +101,13 @@ bembel host rm cn-004.kestrel.example.org</div></details>
       <td><div class="al"><span><a class="ip" href="address.html">10.20.4.44</a> <span class="pill st-ok">allocated</span></span><span><span class="ip">2001:db8:4200:204::44</span> <span class="pill st-ok">allocated</span></span><span class="cap">SLAAC fe80::3eec:efff:fe12:a44 observed</span></div></td>
       <td class="o1"><span class="dchip" data-domain="addr">VLAN <b>204</b></span> <span class="fab eth">ethernet</span></td><td class="o2"><span class="mono-s">sw-mgmt-a01 Gi1/0/14</span></td></tr>
     <tr><td><span class="ifn">ib0</span><span class="sub">InfiniBand · NDR 400G · IPoIB</span></td>
-      <td><div class="hw"><span class="guid" title="Port GUID, 8 bytes">GUID 0x1070fd0300a1b2c4</span><span class="cap">IPoIB hardware address 00:00:10:49:fe:80:00:00:00:00:00:00:10:70:fd:03:00:a1:b2:c4</span><span class="cap">LID 212 (observed from sm-kestrel)</span></div></td>
+      <td><div class="hw"><span class="guid" title="Port GUID, 8 bytes">port GUID 0c42a1030071a2b4</span><span class="cap">IPoIB hardware address 80:00:02:08:fe:80:00:00:00:00:00:00:0c:42:a1:03:00:71:a2:b4</span><span class="cap">LID 41 (observed from sm-kestrel)</span></div></td>
       <td><div class="al"><span><span class="ip">10.100.4.44</span> <span class="pill st-ok">allocated</span> <span class="dchip" data-domain="addr">hpc-fabric</span></span></div></td>
-      <td class="o1"><span class="dchip" data-domain="addr">partition <b>0x8001</b></span> <span class="fab ib">infiniband</span></td><td class="o2"><span class="mono-s">ib-leaf-a01 p17</span></td></tr>
+      <td class="o1"><span class="dchip" data-domain="addr">partition <b>0x0001</b></span> <span class="fab ib">infiniband</span></td><td class="o2"><span class="mono-s">ib-leaf-a01 p17</span></td></tr>
     <tr><td><span class="ifn">bmc</span><span class="sub">Ethernet · 1G · IPMI</span></td>
-      <td><div class="hw"><span class="mac">3c:ec:ef:12:0a:45</span></div></td>
+      <td><div class="hw"><span class="mac">3c:ec:ef:12:1a:44</span></div></td>
       <td><div class="al"><span><span class="ip">172.16.4.44</span> <span class="pill st-ok">allocated</span> <span class="dchip" data-domain="addr">oob</span></span></div></td>
-      <td class="o1"><span class="dchip" data-domain="addr">VLAN <b>10</b></span> <span class="fab eth">ethernet</span></td><td class="o2"><span class="mono-s">sw-mgmt-a01 Gi1/0/38</span></td></tr>
+      <td class="o1"><span class="dchip" data-domain="addr">VLAN <b>120</b></span> <span class="fab eth">ethernet</span></td><td class="o2"><span class="mono-s">sw-mgmt-a01 Gi1/0/38</span></td></tr>
     </tbody></table></div>
   <div class="card-foot"><span>The MAC of an Ethernet interface and the GUID of an InfiniBand interface identify it for DHCP. ib0 gets a client identifier made from the GUID.</span></div>
 </section>
@@ -118,9 +118,9 @@ bembel host rm cn-004.kestrel.example.org</div></details>
     <li><span class="ty">A</span><span class="nm"><span class="fqdn">cn-004<span class="dom">.kestrel.example.org</span></span></span><span class="mono-s">10.20.4.44</span><span class="s">primary name of the <a class="gl" href="../../glossary.html#host" data-gl="host" data-domain="addr">host</a> · TTL 3600</span></li>
     <li><span class="ty">AAAA</span><span class="nm"><span class="fqdn">cn-004<span class="dom">.kestrel.example.org</span></span></span><span class="mono-s">2001:db8:4200:204::44</span></li>
     <li><span class="ty">PTR</span><span class="nm"><span class="fqdn">44.4.20.10.in-addr.arpa</span></span><span class="mono-s">cn-004.kestrel.example.org</span></li>
-    <li><span class="ty">A</span><span class="nm"><span class="fqdn">cn-004-ib<span class="dom">.kestrel.example.org</span></span></span><span class="mono-s">10.100.4.44</span><span class="s"><a class="gl" href="../../glossary.html#zone" data-gl="zone" data-domain="dns">zone</a> kestrel.example.org, <a class="gl" href="../../glossary.html#address" data-gl="address" data-domain="addr">address</a> in <a class="gl" href="../../glossary.html#vrf" data-gl="vrf" data-domain="addr">VRF</a> hpc-fabric</span></li>
+    <li><span class="ty">A</span><span class="nm"><span class="fqdn">cn-004-ib0<span class="dom">.kestrel.example.org</span></span></span><span class="mono-s">10.100.4.44</span><span class="s"><a class="gl" href="../../glossary.html#zone" data-gl="zone" data-domain="dns">zone</a> kestrel.example.org, <a class="gl" href="../../glossary.html#address" data-gl="address" data-domain="addr">address</a> in <a class="gl" href="../../glossary.html#vrf" data-gl="vrf" data-domain="addr">VRF</a> hpc-fabric</span></li>
     <li><span class="ty">A</span><span class="nm"><span class="fqdn">cn-004-bmc<span class="dom">.oob.example.org</span></span></span><span class="mono-s">172.16.4.44</span></li>
-    <li><span class="ty">CNAME</span><span class="nm"><span class="fqdn">node44<span class="dom">.kestrel.example.org</span></span></span><span class="mono-s">cn-004.kestrel.example.org</span><span class="s"><a class="gl" href="../../glossary.html#manual-record" data-gl="manual-record" data-domain="dns">manual record</a>, edited by m.huber on 2026-05-12</span></li>
+    <li><span class="ty">CNAME</span><span class="nm"><span class="fqdn">node44<span class="dom">.kestrel.example.org</span></span></span><span class="mono-s">cn-004.kestrel.example.org</span><span class="s"><a class="gl" href="../../glossary.html#manual-record" data-gl="manual-record" data-domain="dns">manual record</a>, imported from ONA</span></li>
   </ul>
 </section>
 
@@ -128,8 +128,8 @@ bembel host rm cn-004.kestrel.example.org</div></details>
   <div class="card-head"><h2 id="dh-t">DHCP reservations</h2><span class="right"><a href="dhcp.html">DHCP scopes</a></span></div>
   <div class="table-wrap"><table class="table ifc-t"><thead><tr><th>Scope</th><th>Interface</th><th>Fixed address</th><th>Identifier</th><th>Server</th></tr></thead><tbody>
     <tr><td>kestrel-compute <span class="muted">10.20.4.0/22</span></td><td class="mono-s">eno1</td><td><span class="ip">10.20.4.44</span></td><td><span class="mac">3c:ec:ef:12:0a:44</span></td><td>dhcp-a <span class="qs ok">in sync</span></td></tr>
-    <tr><td>kestrel-ipoib <span class="muted">10.100.0.0/16</span></td><td class="mono-s">ib0</td><td><span class="ip">10.100.4.44</span></td><td><span class="mono-s">client-id 00:10:70:fd:03:00:a1:b2:c4</span></td><td>dhcp-a <span class="qs ok">in sync</span></td></tr>
-    <tr><td>kestrel-bmc <span class="muted">172.16.4.0/22</span></td><td class="mono-s">bmc</td><td><span class="ip">172.16.4.44</span></td><td><span class="mac">3c:ec:ef:12:0a:45</span></td><td>dhcp-a <span class="qs ok">in sync</span></td></tr>
+    <tr><td>kestrel-ipoib <span class="muted">10.100.0.0/16</span></td><td class="mono-s">ib0</td><td><span class="ip">10.100.4.44</span></td><td><span class="mono-s">client-id ff:00:00:00:00:00:02:00:00:02:c9:00:0c:42:a1:03:00:71:a2:b4</span></td><td>dhcp-a <span class="qs ok">in sync</span></td></tr>
+    <tr><td>kestrel-bmc <span class="muted">172.16.4.0/22</span></td><td class="mono-s">bmc</td><td><span class="ip">172.16.4.44</span></td><td><span class="mac">3c:ec:ef:12:1a:44</span></td><td>dhcp-a <span class="qs ok">in sync</span></td></tr>
   </tbody></table></div>
 </section>
 </div>
@@ -142,9 +142,9 @@ bembel host rm cn-004.kestrel.example.org</div></details>
     <dt>Kind</dt><dd>physical <span class="muted">· <a class="gl" href="../../glossary.html#role" data-gl="role" data-domain="access">role</a> compute</span></dd>
     <dt>Team</dt><dd>hpc-ops</dd>
     <dt>Tags</dt><dd><span class="tag">cluster=kestrel</span><span class="tag">env=prod</span></dd>
-    <dt>Source</dt><dd><span class="src">local</span></dd>
-    <dt>Created</dt><dd>2026-03-02 by a.berger</dd>
-    <dt>Updated</dt><dd>2026-10-21 by <a class="gl" href="../../glossary.html#sync" data-gl="sync" data-domain="integ">sync</a> <span class="src managed">fnt</span></dd>
+    <dt>Source</dt><dd><span class="src">ona-import</span> <span class="muted mono">ona:hosts:8812</span></dd>
+    <dt>Created</dt><dd>2026-10-23 01:31 by import imp-20261023-0131</dd>
+    <dt>Updated</dt><dd>2026-11-03 03:00 by <a class="gl" href="../../glossary.html#sync" data-gl="sync" data-domain="integ">sync</a> <span class="src managed">fnt</span></dd>
   </dl></div>
 </section>
 
@@ -164,10 +164,8 @@ bembel host rm cn-004.kestrel.example.org</div></details>
 <section class="card" id="hist" aria-labelledby="hi-t">
   <div class="card-head"><h2 id="hi-t">History</h2><span class="right"><a href="audit.html">Audit log</a></span></div>
   <div class="card-body"><ol class="hist">
-    <li><span><b>sync</b> <span class="src managed">fnt</span> updated the device link</span><span class="when">2026-10-21 02:15</span></li>
-    <li><span><b>m.huber</b> added CNAME node44</span><span class="when">2026-05-12 09:30 · CLI</span></li>
-    <li><span><b>a.berger</b> added interface ib0 and 10.100.4.44</span><span class="when">2026-03-02 10:50 · web UI</span></li>
-    <li><span><b>a.berger</b> created the host with eno1 and 10.20.4.44</span><span class="when">2026-03-02 10:41 · web UI</span></li>
+    <li><span><b>sync</b> <span class="src managed">fnt</span> updated the device link</span><span class="when">2026-11-03 03:00 · full reconcile</span></li>
+    <li><span>import <span class="mono">imp-20261023-0131</span> created the host from ONA (<span class="mono">ona:hosts:8812</span>) with eno1, ib0, bmc, 4 addresses and the CNAME node44</span><span class="when">2026-10-23 01:31 · ona-import</span></li>
   </ol></div>
 </section>
 </div>
@@ -188,6 +186,7 @@ bembel host rm cn-004.kestrel.example.org</div></details>
     <tr><td><kbd>g</kbd> <kbd>r</kbd></td><td>Racks</td></tr>
     <tr><td><kbd>g</kbd> <kbd>c</kbd></td><td>Change requests</td></tr>
     <tr><td><kbd>/</kbd></td><td>Jump to an IP, prefix, MAC, host, zone or page</td></tr>
+    <tr><td><kbd>v</kbd></td><td>Open the VRF switcher</td></tr>
     <tr><td><kbd>Shift</kbd> <kbd>A</kbd></td><td>Open the assistant</td></tr>
     <tr><td><kbd>?</kbd></td><td>Help for the element under the pointer, else for this page</td></tr>
     <tr><td><kbd>Esc</kbd></td><td>Close a dialog, a menu or a pane</td></tr>

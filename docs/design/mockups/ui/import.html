@@ -17,18 +17,18 @@
   <details class="set-menu vrf-menu">
     <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="set-pop">
-      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · default table</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
-      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>v</kbd></a>
     </div>
   </details>
   <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
     <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
   <span class="spacer"></span>
-  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <a class="cr-chip" href="#" title="1 change request waits for your approval. 1 more is yours and needs another approver.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">1<span class="w"> to approve</span></span></a>
   <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
   <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
   <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
@@ -73,14 +73,15 @@
 
 <div class="page-head">
   <div><h1>ONA migration</h1>
-    <div class="sub"><span>Import run <b class="mono">imp-20261104-0912</b></span><span class="sep">·</span><span>Started today 09:12 by d.klein, 6 min 41 s</span><span class="sep">·</span><span>Source OpenNetAdmin 19.0.x on MariaDB <span class="mono">ona-db.example.org</span></span></div></div>
+    <div class="sub"><span>Import run <b class="mono">imp-20261104-0912</b></span><span class="sep">·</span><span>Started today 09:12 by the timer (<span class="mono">system:ona-import</span>), 3 min 19 s</span><span class="sep">·</span><span>Source OpenNetAdmin 19.0.x on MariaDB <span class="mono">ona-db.example.org</span></span></div></div>
   <div class="actions">
     <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
-      <div class="cli-pop">bembel import ona --dsn mysql://ona@ona-db.example.org/ona --dry-run
+      <div class="cli-pop">bembel import ona --dsn mysql://bembel_ro@ona-db.example.org/ona --dry-run
 bembel import show imp-20261104-0912
-bembel import findings --state open --code ona.overlap
+bembel import findings list --run imp-20261104-0912 --state open --code ona.overlap
+bembel import findings accept ID --reason TEXT
 bembel export diff --against ona --night 12</div></details>
-    <button class="btn" type="button">Run again…</button>
+    <button class="btn" type="button" disabled title="The timer runs the import. ONA is the writer until the freeze on 2026-11-09.">Run again…</button>
     <a class="btn btn-primary" href="export-diff.html">Export diff</a>
   </div>
 </div>
@@ -93,76 +94,91 @@ bembel export diff --against ona --night 12</div></details>
     <div class="table-wrap"><table class="table kinds">
       <thead><tr><th>ONA table</th><th>bembel kind</th><th class="num">Rows</th><th class="num">Imported</th><th class="num">Findings</th></tr></thead>
       <tbody>
-        <tr><td class="mono">hosts</td><td>host</td><td class="num">41 038</td><td class="num">41 038</td><td class="num">38</td></tr>
-        <tr><td class="mono">interfaces</td><td>interface, address</td><td class="num">44 706</td><td class="num">44 512</td><td class="num">67</td></tr>
-        <tr><td class="mono">subnets</td><td>prefix (subnet)</td><td class="num">1 912</td><td class="num">1 900</td><td class="num">52</td></tr>
-        <tr><td class="mono">blocks</td><td>prefix (container)</td><td class="num">86</td><td class="num">86</td><td class="num">0</td></tr>
-        <tr><td class="mono">dns</td><td>record, derived or manual</td><td class="num">62 104</td><td class="num">62 008</td><td class="num">96</td></tr>
-        <tr><td class="mono">vlans, vlan_campuses</td><td>VLAN, VLAN domain</td><td class="num">412</td><td class="num">412</td><td class="num">0</td></tr>
-        <tr><td class="mono">dhcp_pools, dhcp_failover_groups</td><td>range, failover pair</td><td class="num">231</td><td class="num">231</td><td class="num">0</td></tr>
-        <tr><td class="mono">locations, custom_attributes</td><td>site, tag, attribute</td><td class="num">1 044</td><td class="num">1 044</td><td class="num">0</td></tr>
+        <tr><td class="mono">hosts</td><td>host</td><td class="num">41 037</td><td class="num">41 023</td><td class="num">22</td></tr>
+        <tr><td class="mono">interfaces</td><td>interface, address</td><td class="num">47 612</td><td class="num">41 426 interfaces / 47 597 addresses</td><td class="num">96</td></tr>
+        <tr><td class="mono">subnets</td><td>prefix (subnet)</td><td class="num">1 904</td><td class="num">1 899</td><td class="num">16</td></tr>
+        <tr><td class="mono">blocks</td><td>prefix (container)</td><td class="num">56</td><td class="num">41 containers</td><td class="num">8</td></tr>
+        <tr><td class="mono">dns</td><td>record, derived or manual</td><td class="num">62 318</td><td class="num">62 278</td><td class="num">58</td></tr>
+        <tr><td class="mono">vlans, vlan_campuses</td><td>VLAN, VLAN domain</td><td class="num">388</td><td class="num">384</td><td class="num">3</td></tr>
+        <tr><td class="mono">dhcp_pools, dhcp_failover_groups</td><td>range, failover pair</td><td class="num">842</td><td class="num">842 ranges</td><td class="num">7</td></tr>
+        <tr><td class="mono">locations, custom_attributes</td><td>site, tag, attribute</td><td class="num">2 160</td><td class="num">2 160</td><td class="num">0</td></tr>
       </tbody></table></div>
     <div class="fsum">
       <div class="big"><b>214</b><span>findings</span></div>
-      <div class="progress lg" aria-hidden="true"><i class="p-ok" style="width:80%"></i><i class="p-waiting" style="width:20%"></i></div>
-      <p class="statline"><span><b>171</b> fixed</span><span><b>43</b> open</span><span><b>0</b> accepted</span></p>
+      <div class="progress lg" aria-hidden="true"><i class="p-failed" style="width:17%"></i><i class="p-blocked" style="width:52%"></i><i class="p-waiting" style="width:31%"></i></div>
+      <p class="statline"><span><b>37</b> error</span><span><b>110</b> warn</span><span><b>67</b> info</span><span><b>1</b> new</span><span><b>6</b> closed</span></p>
       <ul class="bycode">
-        <li><span class="mono">ona.orphan-dns</span><b>96</b></li>
-        <li><span class="mono">ona.dup-mac</span><b>38</b></li>
-        <li><span class="mono">ona.ipv6-ambiguous</span><b>31</b></li>
-        <li><span class="mono">ona.stale-subnet-id</span><b>28</b></li>
-        <li><span class="mono">ona.overlap</span><b>21</b></li>
+        <li><span class="mono">ona.orphan-dns</span><b>37</b></li>
+        <li><span class="mono">ona.stale-subnet-id</span><b>29</b></li>
+        <li><span class="mono">ona.dup-mac</span><b>21</b></li>
+        <li><span class="mono">ona.zero-date</span><b>18</b></li>
+        <li><span class="mono">ona.ptr-mismatch</span><b>16</b></li>
       </ul>
+      <p class="small muted">The other 4 <a class="gl" href="../../glossary.html#finding" data-gl="finding" data-domain="integ">findings</a> are on other tables: <span class="mono">ona.sequence-drift</span> 2, <span class="mono">ona.perm-orphan</span> 2.</p>
     </div>
   </div>
 </section>
 
 <section class="card" id="findings" aria-labelledby="fi-t">
-  <div class="card-head"><h2 id="fi-t">Findings</h2><span class="right">10 of 43 open</span></div>
+  <div class="card-head"><h2 id="fi-t">Findings</h2><span class="right">10 of 214 open · 2 of 6 closed</span></div>
   <div class="filterbar">
-    <span class="seg" role="group" aria-label="State"><button type="button" aria-pressed="true">open <span class="n">43</span></button><button type="button">fixed <span class="n">171</span></button><button type="button">all <span class="n">214</span></button></span>
-    <select class="select" aria-label="Code"><option>Any code</option><option>ona.orphan-dns</option><option>ona.dup-mac</option><option>ona.overlap</option><option>ona.ipv6-ambiguous</option><option>ona.stale-subnet-id</option></select>
+    <span class="seg" role="group" aria-label="State"><button type="button" aria-pressed="true">open <span class="n">214</span></button><button type="button">accepted <span class="n">0</span></button><button type="button" aria-pressed="true">closed <span class="n">6</span></button></span>
+    <select class="select" aria-label="Code"><option>Any code</option><option>ona.orphan-dns</option><option>ona.stale-subnet-id</option><option>ona.dup-mac</option><option>ona.zero-date</option><option>ona.ptr-mismatch</option><option>ona.overlap</option><option>ona.ipv6-ambiguous</option></select>
     <select class="select" aria-label="Severity"><option>Any severity</option><option>error</option><option>warn</option><option>info</option></select>
-    <span class="grow"></span>
-    <button class="btn btn-sm" type="button">Apply all suggested fixes…</button>
   </div>
   <div class="table-wrap"><table class="table finds">
     <thead><tr><th>Code</th><th>Severity</th><th>Object</th><th>Suggested fix</th><th>State</th><th><span class="sr-only">Actions</span></th></tr></thead>
     <tbody>
       <tr class="sel"><td class="code"><span class="mono">ona.overlap</span></td><td><span class="pill st-failed">error</span></td>
-        <td><span class="pfx">10.20.4.0<span class="len">/22</span></span> and <span class="pfx">10.20.6.0<span class="len">/24</span></span><span class="s">Subnets kestrel-compute and old-test-6 overlap in one address space.</span><button class="btn btn-sm btn-agent expl" type="button" data-assistant="explain-finding" title="Runs the assistant with the advisory explain-finding. Tools: read only. It changes nothing.">Explain this finding</button></td>
-        <td>Move old-test-6 to VRF <span class="mono">lab</span>, or delete it. It has 0 addresses.</td><td><span class="pill st-warn">open</span></td>
-        <td class="ra"><button class="btn btn-sm" type="button">Fix…</button></td></tr>
+        <td><span class="pfx">10.20.4.0<span class="len">/22</span></span> and <span class="pfx">10.20.6.0<span class="len">/24</span></span><span class="s">Subnets kestrel-compute and old-test-6 overlap in one address space. The /24 stays out of the model.</span><button class="btn btn-sm btn-agent expl" type="button" data-assistant="explain-finding" title="Runs the assistant with the advisory explain-finding. Tools: read only. It changes nothing.">Explain this finding</button></td>
+        <td>In ONA, delete old-test-6. It has 0 addresses. Or put it in VRF <span class="mono">lab</span> with a map-file rule.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Accept with reason…</button> <details class="more"><summary class="btn btn-sm" aria-label="More actions">⋯</summary><div class="more-pop"><a href="#">Show ONA rows<span class="code-sub mono">ona:subnets:412, ona:subnets:977</span></a><button type="button">Copy map-file rule<span class="code-sub mono">vrf: [{cidr: 10.20.6.0/24, vrf: lab}]</span></button></div></details></td></tr>
       <tr><td class="code"><span class="mono">ona.dup-mac</span></td><td><span class="pill st-warn">warn</span></td>
-        <td><span class="mac">3c:ec:ef:12:0a:51</span><span class="s">On hosts gpu-014 and gpu-014-old, interface eno1.</span></td>
-        <td>Keep it on gpu-014. Clear the MAC on gpu-014-old.</td><td><span class="pill st-warn">open</span></td>
-        <td class="ra"><button class="btn btn-sm" type="button">Fix…</button></td></tr>
+        <td><span class="mac">3c:ec:ef:44:2e:01</span><span class="s">On hosts gpu-014 and gpu-014-old, interface eno1.</span></td>
+        <td>In ONA, clear the MAC on gpu-014-old, or add <span class="mono">resolve keep: first</span>.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Accept with reason…</button> <details class="more"><summary class="btn btn-sm" aria-label="More actions">⋯</summary><div class="more-pop"><a href="#">Show ONA rows<span class="code-sub mono">ona:interfaces:31877, ona:interfaces:46210</span></a><button type="button">Copy map-file rule<span class="code-sub mono">resolve: [{finding: ona.dup-mac, refs: [...], keep: first}]</span></button></div></details></td></tr>
       <tr><td class="code"><span class="mono">ona.orphan-dns</span></td><td><span class="pill st-warn">warn</span></td>
-        <td><span class="fqdn">lic02<span class="dom">.kestrel.example.org</span></span> A <span class="ip">10.20.4.9</span><span class="s">The record has no host. ONA kept it after the host was deleted.</span></td>
-        <td>Import as a manual A record, owner hpc-ops.</td><td><span class="pill st-warn">open</span></td>
-        <td class="ra"><button class="btn btn-sm" type="button">Fix…</button></td></tr>
+        <td><span class="fqdn">lic02<span class="dom">.kestrel.example.org</span></span> A <span class="ip">10.20.4.9</span><span class="s">The record points to an interface that ONA deleted with its host. The row is not imported.</span></td>
+        <td>In ONA, delete the record, or add the host lic02 again.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Accept with reason…</button> <details class="more"><summary class="btn btn-sm" aria-label="More actions">⋯</summary><div class="more-pop"><a href="#">Show ONA rows<span class="code-sub mono">ona:dns:71402</span></a></div></details></td></tr>
       <tr><td class="code"><span class="mono">ona.ipv6-ambiguous</span></td><td><span class="pill st-warn">warn</span></td>
-        <td><span class="mono">ip_addr = 4254076641…6564</span><span class="s">Decimal in a column that holds IPv4 as a 32 bit number.</span></td>
-        <td>Read as <span class="ip">2001:db8:4200:204::4</span>. The subnet is dual stack.</td><td><span class="pill st-warn">open</span></td>
-        <td class="ra"><button class="btn btn-sm" type="button">Fix…</button></td></tr>
+        <td><span class="mono">ip_addr = 68</span><span class="s">Value up to 0xFFFFFFFF fits an IPv4 subnet and an IPv6 subnet in ::/96; IPv4 and IPv6 share DECIMAL(39,0).</span></td>
+        <td>Imported as <span class="ip">0.0.0.68</span> (IPv4). If it is IPv6 (<span class="ip">::44</span>), set <span class="mono">family: {ona:interfaces:ID: v6}</span> in the map file.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Accept with reason…</button> <details class="more"><summary class="btn btn-sm" aria-label="More actions">⋯</summary><div class="more-pop"><a href="#">Show ONA rows<span class="code-sub mono">ona:interfaces:30211</span></a><button type="button">Copy map-file rule<span class="code-sub mono">resolve: [{finding: ona.ipv6-ambiguous, ref: "ona:interfaces:30211", family: v6}]</span></button></div></details></td></tr>
       <tr><td class="code"><span class="mono">ona.stale-subnet-id</span></td><td><span class="pill st-neutral">info</span></td>
         <td><span class="mono">interfaces.id 20931</span><span class="s">Points at subnet id 77, which no longer exists.</span></td>
-        <td>Find the subnet by the address: <span class="pfx">10.20.8.0<span class="len">/24</span></span>.</td><td><span class="pill st-warn">open</span></td>
-        <td class="ra"><button class="btn btn-sm" type="button">Fix…</button></td></tr>
-      <tr><td class="code"><span class="mono">ona.orphan-dns</span></td><td><span class="pill st-warn">warn</span></td>
-        <td><span class="fqdn">oss-03<span class="dom">.kestrel.example.org</span></span> A <span class="ip">10.20.4.73</span><span class="s">No host oss-03. The rack plan has oss-01 and oss-02.</span></td>
-        <td>Delete the record. No address uses it.</td><td><span class="pill st-ok">fixed</span></td>
-        <td class="ra"><button class="btn btn-sm btn-ghost" type="button">Undo</button></td></tr>
+        <td>No fix needed. The import uses the subnet that holds the address: <span class="pfx">10.20.8.0<span class="len">/24</span></span>. In ONA, save the interface again to correct the id.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Accept with reason…</button> <details class="more"><summary class="btn btn-sm" aria-label="More actions">⋯</summary><div class="more-pop"><a href="#">Show ONA rows<span class="code-sub mono">ona:interfaces:20931</span></a></div></details></td></tr>
       <tr><td class="code"><span class="mono">ona.overlap</span></td><td><span class="pill st-failed">error</span></td>
         <td><span class="pfx">172.16.4.0<span class="len">/22</span></span> and <span class="pfx">172.16.4.0<span class="len">/24</span></span><span class="s">The same network twice. Both are in the ONA default space.</span></td>
-        <td>Delete the /24. It holds 3 addresses. Move them to the /22.</td><td><span class="pill st-warn">open</span></td>
-        <td class="ra"><button class="btn btn-sm" type="button">Fix…</button></td></tr>
+        <td>In ONA, delete the /24 and move its 3 addresses to the /22.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Accept with reason…</button> <details class="more"><summary class="btn btn-sm" aria-label="More actions">⋯</summary><div class="more-pop"><a href="#">Show ONA rows<span class="code-sub mono">ona:subnets:118, ona:subnets:1204</span></a></div></details></td></tr>
+      <tr><td class="code"><span class="mono">ona.ptr-mismatch</span></td><td><span class="pill st-warn">warn</span></td>
+        <td><span class="ip">10.20.4.116</span><span class="s">The PTR row names node76.kestrel.example.org. The A name of the address is cn-076.kestrel.example.org.</span></td>
+        <td>In ONA, set the PTR to the A name. Until then a manual PTR record keeps the old answer.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Accept with reason…</button> <details class="more"><summary class="btn btn-sm" aria-label="More actions">⋯</summary><div class="more-pop"><a href="#">Show ONA rows<span class="code-sub mono">ona:dns:88140, ona:dns:88141</span></a></div></details></td></tr>
+      <tr><td class="code"><span class="mono">ona.zero-date</span></td><td><span class="pill st-neutral">info</span></td>
+        <td><span class="mono">interfaces.last_response</span><span class="s">The date 0000-00-00 00:00:00 on the interface of oss-01.</span></td>
+        <td>No fix needed. The address gets no last-seen time.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Accept with reason…</button> <details class="more"><summary class="btn btn-sm" aria-label="More actions">⋯</summary><div class="more-pop"><a href="#">Show ONA rows<span class="code-sub mono">ona:interfaces:9016</span></a></div></details></td></tr>
+      <tr><td class="code"><span class="mono">ona.host-no-name</span></td><td><span class="pill st-failed">error</span></td>
+        <td><span class="mono">hosts.id 30177</span><span class="s">The host has no A record, so it has no name. It stays out of the model. Its 1 address stays as an address without an interface.</span></td>
+        <td>In ONA, add an A record for the host, or delete the host.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Accept with reason…</button> <details class="more"><summary class="btn btn-sm" aria-label="More actions">⋯</summary><div class="more-pop"><a href="#">Show ONA rows<span class="code-sub mono">ona:hosts:30177</span></a></div></details></td></tr>
       <tr><td class="code"><span class="mono">ona.dup-mac</span></td><td><span class="pill st-warn">warn</span></td>
-        <td><span class="mac">3c:ec:ef:12:0a:45</span><span class="s">On cn-004 interface bmc and on the host cn-004-bmc.</span></td>
-        <td>Merge the two hosts. The BMC address is in VRF oob.</td><td><span class="pill st-ok">fixed</span></td>
-        <td class="ra"><button class="btn btn-sm btn-ghost" type="button">Undo</button></td></tr>
+        <td><span class="mac">3c:ec:ef:12:1d:08</span><span class="s">On cn-117 eno1 and on cn-311 eno1.</span></td>
+        <td>In ONA, correct the MAC of the replaced node, or add <span class="mono">resolve keep: first</span>.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Accept with reason…</button> <details class="more"><summary class="btn btn-sm" aria-label="More actions">⋯</summary><div class="more-pop"><a href="#">Show ONA rows<span class="code-sub mono">ona:interfaces:5120, ona:interfaces:48802</span></a><button type="button">Copy map-file rule<span class="code-sub mono">resolve: [{finding: ona.dup-mac, refs: [...], keep: first}]</span></button></div></details></td></tr>
+      <tr><td class="code"><span class="mono">ona.orphan-dns</span></td><td><span class="pill st-warn">warn</span></td>
+        <td><span class="fqdn">oss-03<span class="dom">.kestrel.example.org</span></span> A <span class="ip">10.20.4.73</span><span class="s">No host oss-03. The rack plan has oss-01 and oss-02.</span></td>
+        <td>Deleted in ONA. No address used it.</td><td><span class="pill st-ok">closed</span><span class="s small muted">closed by run imp-20261104-0912</span></td>
+        <td class="ra"></td></tr>
+      <tr><td class="code"><span class="mono">ona.dup-mac</span></td><td><span class="pill st-warn">warn</span></td>
+        <td><span class="mac">3c:ec:ef:12:1a:44</span><span class="s">On cn-004 interface bmc and on the host cn-004-bmc.</span></td>
+        <td>Fixed in ONA: the host cn-004-bmc is gone. The BMC address stays on cn-004 in VRF oob.</td><td><span class="pill st-ok">closed</span><span class="s small muted">closed by run imp-20261104-0912</span></td>
+        <td class="ra"></td></tr>
     </tbody></table></div>
-  <div class="card-foot"><span>A fix is a normal change with the origin <span class="org web">web</span> and the source <span class="src">ona-import</span>. It goes in the audit log.</span><span class="right"><button class="btn btn-sm" type="button">Show 35 more</button></span></div>
+  <div class="card-foot"><span>Until the cutover ONA is the writer. Fix the row in ONA or add a map-file rule. The next import run closes the finding. An accept goes in the audit log.</span><span class="right"><button class="btn btn-sm" type="button">Show 204 more</button></span></div>
 </section>
 </div>
 
@@ -170,15 +186,15 @@ bembel export diff --against ona --night 12</div></details>
 <section class="card" id="parallel" aria-labelledby="par-t">
   <div class="card-head"><h2 id="par-t">Parallel run</h2><span class="right">night 12 of 14</span></div>
   <div class="card-body par">
-    <div class="nights" role="img" aria-label="Diff per night: 5 118 lines on night 1, 3 lines on night 12. Nights 13 and 14 are still to come.">
-      <i class="n-bad" title="Night 1: 5 118 lines">1</i><i class="n-bad" title="Night 2: 904 lines">2</i><i class="n-bad" title="Night 3: 311 lines">3</i><i class="n-warn" title="Night 4: 86 lines">4</i><i class="n-warn" title="Night 5: 40 lines">5</i><i class="n-warn" title="Night 6: 21 lines">6</i><i class="n-warn" title="Night 7: 12 lines">7</i><i class="n-ok" title="Night 8: 4 lines, explained">8</i><i class="n-ok" title="Night 9: 0 lines">9</i><i class="n-ok" title="Night 10: 0 lines">10</i><i class="n-ok" title="Night 11: 2 lines, explained">11</i><i class="n-warn cur" title="Night 12: 3 lines">12</i><i class="n-todo" title="Night 13">13</i><i class="n-todo" title="Night 14">14</i></div>
-    <p class="small muted">Each night bembel builds the BIND and dhcpd <a class="gl" href="../../glossary.html#export" data-gl="export" data-domain="integ">exports</a> and diffs them against the files that ONA makes.</p>
+    <div class="nights" role="img" aria-label="Diff per night: nights 1 to 12 have no unexplained line, with 14 explained lines on night 1 and 9 on night 12. Nights 13 and 14 are still to come.">
+      <i class="n-ok" title="Night 1: 14 lines, all explained">1</i><i class="n-ok" title="Night 2: 13 lines, all explained">2</i><i class="n-ok" title="Night 3: 13 lines, all explained">3</i><i class="n-ok" title="Night 4: 12 lines, all explained">4</i><i class="n-ok" title="Night 5: 12 lines, all explained">5</i><i class="n-ok" title="Night 6: 11 lines, all explained">6</i><i class="n-ok" title="Night 7: 11 lines, all explained">7</i><i class="n-ok" title="Night 8: 10 lines, all explained">8</i><i class="n-ok" title="Night 9: 10 lines, all explained">9</i><i class="n-ok" title="Night 10: 9 lines, all explained">10</i><i class="n-ok" title="Night 11: 9 lines, all explained">11</i><i class="n-ok cur" title="Night 12: 9 lines, all explained">12</i><i class="n-todo" title="Night 13">13</i><i class="n-todo" title="Night 14">14</i></div>
+    <p class="small muted">Each night bembel builds the BIND and dhcpd <a class="gl" href="../../glossary.html#export" data-gl="export" data-domain="integ">exports</a> and diffs them against the files that ONA makes. The counter is 12: no night had an unexplained line.</p>
   </div>
   <ul class="rows mini tg">
-    <li><span class="t"><span class="dot" style="color:var(--s-warn)" aria-hidden="true"></span><b class="mono">ns1</b> BIND <span class="pill st-warn">diff 3 lines</span></span><span class="s">kestrel.example.org: 2 <a class="gl" href="../../glossary.html#record" data-gl="record" data-domain="dns">records</a> only in bembel, 1 TXT with other quoting</span></li>
-    <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">ns2</b> BIND <span class="qs ok">equal</span></span><span class="s">Same <a class="gl" href="../../glossary.html#zone" data-gl="zone" data-domain="dns">zone</a> serials as ns1 after the transfer</span></li>
-    <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">dhcp1</b> ISC dhcpd <span class="qs ok">equal</span></span><span class="s">dhcpd -t ok · 1 912 <a class="gl" href="../../glossary.html#subnet" data-gl="subnet" data-domain="addr">subnets</a> · 2 140 <a class="gl" href="../../glossary.html#reservation" data-gl="reservation" data-domain="dhcp">reservations</a></span></li>
-    <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">dhcp2</b> ISC dhcpd <span class="qs ok">equal</span></span><span class="s"><a class="gl" href="../../glossary.html#failover-pair" data-gl="failover-pair" data-domain="dhcp">Failover pair</a> dhcp-a</span></li>
+    <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">ns1</b> BIND <span class="qs ok">5 lines, explained</span></span><span class="s">5 lines differ from ONA, all explained (KD-001, KD-002, KD-004). kestrel.example.org: 1 TXT split at 255 bytes (KD-002)</span></li>
+    <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">ns2</b>, <b class="mono">ns3</b> BIND <span class="qs ok">1 line each, explained</span></span><span class="s">1 line, KD-001</span></li>
+    <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">dhcp1</b> ISC dhcpd <span class="qs ok">1 line, explained</span></span><span class="s">1 line, KD-003 · dhcpd -t ok · 611 <a class="gl" href="../../glossary.html#subnet" data-gl="subnet" data-domain="addr">subnets</a> · 1 873 <a class="gl" href="../../glossary.html#reservation" data-gl="reservation" data-domain="dhcp">reservations</a></span></li>
+    <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">dhcp2</b> ISC dhcpd <span class="qs ok">1 line, explained</span></span><span class="s">1 line, KD-003 · <a class="gl" href="../../glossary.html#failover-pair" data-gl="failover-pair" data-domain="dhcp">Failover pair</a> dhcp-a</span></li>
   </ul>
   <div class="card-foot"><a href="export-diff.html">Show the diff of night 12</a><span class="right"><button class="btn btn-sm btn-agent" type="button" data-assistant="explain-diff" title="Runs the assistant with the advisory explain-diff. Tools: read only. It changes nothing.">Explain diff</button></span></div>
 </section>
@@ -186,8 +202,9 @@ bembel export diff --against ona --night 12</div></details>
 <section class="card" id="state" aria-labelledby="st-t">
   <div class="card-head"><h2 id="st-t">ONA today</h2></div>
   <ul class="rows mini">
-    <li><span class="t">ONA is the source until the cutover</span><span class="s">Users still edit ONA. The import <span class="src">ona-import</span> reads it each night at 01:31.</span></li>
-    <li><span class="t"><b>2 nights</b> to the end of the parallel run</span><span class="s">The <a class="gl" href="../../glossary.html#cutover" data-gl="cutover" data-domain="integ">cutover</a> needs 14 nights with an empty or explained diff. Window A is on 2026-11-09.</span></li>
+    <li><span class="t">ONA is the writer until the freeze on 2026-11-09</span><span class="s">Users still edit ONA. The import <span class="src">ona-import</span> reads it each night at 01:31, and every 10 min from 07:02 to 19:52.</span></li>
+    <li><span class="t">No edits on this page</span><span class="s">Fix a <a class="gl" href="../../glossary.html#finding" data-gl="finding" data-domain="integ">finding</a> in ONA or in the <a class="gl" href="../../glossary.html#map-file" data-gl="map-file" data-domain="integ">map file</a>, or accept it with a reason. The page has no edit actions until <span class="mono">bembel import ona --release</span>.</span></li>
+    <li><span class="t"><b>2 nights</b> to the end of the parallel run</span><span class="s">The <a class="gl" href="../../glossary.html#cutover" data-gl="cutover" data-domain="integ">cutover</a> needs 14 nights in a row with no unexplained line. Window A is on 2026-11-09.</span></li>
   </ul>
 </section>
 </div>

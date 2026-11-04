@@ -17,18 +17,18 @@
   <details class="set-menu vrf-menu">
     <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="set-pop">
-      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · default table</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
-      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>v</kbd></a>
     </div>
   </details>
   <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
     <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
   <span class="spacer"></span>
-  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <a class="cr-chip" href="#" title="1 change request waits for your approval. 1 more is yours and needs another approver.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">1<span class="w"> to approve</span></span></a>
   <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
   <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
   <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
@@ -79,7 +79,7 @@
       <div class="cli-pop">bembel token ls
 bembel token create cli-laptop --role network-admin \
   --scope vrf=global --expires 2027-02-01
-bembel token revoke tk-0c41</div></details>
+bembel token revoke e9d4Rw1L</div></details>
     <button class="btn btn-primary" type="button">New token…</button>
   </div>
 </div>
@@ -88,26 +88,26 @@ bembel token revoke tk-0c41</div></details>
 <section class="card" id="tokens" aria-labelledby="tok-t">
   <div class="card-head"><h2 id="tok-t">Your tokens</h2><span class="right">4 tokens · 3 active · stored as hashes</span></div>
   <div class="table-wrap"><table class="table tok">
-    <thead><tr><th>Name</th><th>Token</th><th>Role and scope (narrowed)</th><th>Expires</th><th>Last used</th><th>Created</th><th><span class="sr-only">Actions</span></th></tr></thead>
+    <thead><tr><th>Name</th><th>Token</th><th>Permissions and scope (narrowed)</th><th>Expires</th><th>Last used</th><th>Created</th><th><span class="sr-only">Actions</span></th></tr></thead>
     <tbody>
-      <tr><td><b>cli-laptop</b></td><td><span class="mono tp">bem_pat_…7f2a</span></td>
-        <td><span class="role">network-admin</span> <span class="scope"><span>vrf</span><span>global</span></span></td>
-        <td>2027-02-01</td><td>today 17:58 <span class="muted small">CLI</span></td><td class="muted">2026-08-03</td>
+      <tr><td><b>cli-laptop</b></td><td><span class="mono tp">bem_pat_7f2aK9cE_…</span></td>
+        <td><span class="role">network-admin</span> set <span class="sep">·</span> <span class="scope"><span>vrf</span><span>global</span></span></td>
+        <td>2027-02-01</td><td>today 17:58 <span class="muted small">CLI</span></td><td class="muted">2026-10-02</td>
         <td class="ra"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="More actions for cli-laptop">⋯</summary><div class="more-pop" role="menu"><a href="audit.html" role="menuitem">Show in audit log</a><button type="button" role="menuitem">Revoke…</button></div></details></td></tr>
-      <tr><td><b>grafana-read</b></td><td><span class="mono tp">bem_pat_…b310</span></td>
-        <td><span class="role">viewer</span> <span class="scope"><span>global</span></span></td>
-        <td>2026-12-31</td><td>today 18:00 <span class="muted small">API</span></td><td class="muted">2026-05-19</td>
+      <tr><td><b>grafana-read</b></td><td><span class="mono tp">bem_pat_b310Tz8M_…</span></td>
+        <td><span class="role">viewer</span> set <span class="sep">·</span> <span class="scope"><span>global</span></span></td>
+        <td>2026-12-31</td><td>today 18:00 <span class="muted small">API</span></td><td class="muted">2026-09-30</td>
         <td class="ra"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="More actions for grafana-read">⋯</summary><div class="more-pop" role="menu"><a href="audit.html" role="menuitem">Show in audit log</a><button type="button" role="menuitem">Revoke…</button></div></details></td></tr>
-      <tr><td><b>ci-docs</b></td><td><span class="mono tp">bem_pat_…e9d4</span></td>
-        <td><span class="role">allocator</span> <span class="scope"><span>prefix</span><span>10.20.8.0/24</span></span></td>
-        <td><span class="pill st-warn">in 26 d</span> <span class="muted small">2026-11-30</span></td><td>yesterday 22:14 <span class="muted small">API</span></td><td class="muted">2026-09-01</td>
+      <tr><td><b>ci-docs</b></td><td><span class="mono tp">bem_pat_e9d4Rw1L_…</span></td>
+        <td><span class="role">allocator</span> set <span class="sep">·</span> <span class="scope"><span>prefix</span><span>10.20.8.0/24</span></span></td>
+        <td><span class="pill st-warn">in 26 d</span> <span class="muted small">2026-11-30</span></td><td>yesterday 22:14 <span class="muted small">API</span></td><td class="muted">2026-10-01</td>
         <td class="ra"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="More actions for ci-docs">⋯</summary><div class="more-pop" role="menu"><a href="audit.html" role="menuitem">Show in audit log</a><button type="button" role="menuitem">Extend…</button><button type="button" role="menuitem">Revoke…</button></div></details></td></tr>
-      <tr class="gone"><td><b>old-export-test</b></td><td><span class="mono tp">bem_pat_…1c08</span></td>
-        <td><span class="role">viewer</span> <span class="scope"><span>vrf</span><span>oob</span></span></td>
-        <td><span class="pill st-neutral">expired</span> <span class="muted small">2026-10-01</span></td><td class="muted">never</td><td class="muted">2026-07-14</td>
+      <tr class="gone"><td><b>old-export-test</b></td><td><span class="mono tp">bem_pat_1c08Pa5N_…</span></td>
+        <td><span class="role">viewer</span> set <span class="sep">·</span> <span class="scope"><span>vrf</span><span>oob</span></span></td>
+        <td><span class="pill st-neutral">expired</span> <span class="muted small">2026-10-06</span></td><td class="muted">never</td><td class="muted">2026-09-29</td>
         <td class="ra"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="More actions for old-export-test">⋯</summary><div class="more-pop" role="menu"><button type="button" role="menuitem">Delete</button></div></details></td></tr>
     </tbody></table></div>
-  <div class="card-foot"><span>bembel shows a token once, at creation. It keeps only the hash and the prefix <code>bem_pat_</code> with the last 4 characters.</span></div>
+  <div class="card-foot"><span>bembel shows a token once, at creation. It keeps only <code>sha256(secret)</code> and the public id. A token has a list of permissions and scope terms. A role only fills the list.</span></div>
 </section>
 
 <div class="dlgs">
@@ -116,8 +116,8 @@ bembel token revoke tk-0c41</div></details>
   <header><h2 id="nt-t">New token</h2><span class="step-n">for d.klein</span></header>
   <div class="body">
     <label class="field">Name<input class="input" value="runbook-bot"><span class="muted small">Say what uses the token. The audit log shows this name.</span></label>
-    <div class="field"><span>Role <span class="muted small">only roles that you have</span></span>
-      <div class="chips" role="group" aria-label="Role"><span class="chip">network-admin</span><span class="chip on" aria-pressed="true">allocator</span><span class="chip">approver</span></div></div>
+    <div class="field"><span>Permissions from a role (template) <span class="muted small">only roles that you have</span></span>
+      <div class="chips" role="group" aria-label="Permissions from a role (template)"><span class="chip">viewer</span><span class="chip on" aria-pressed="true">allocator</span><span class="chip">network-admin</span></div></div>
     <div class="field"><span>Scope <span class="muted small">narrows the scope of your binding</span></span>
       <div class="scope-edit">
         <span class="scope"><span>prefix</span><span>10.20.0.0/16</span></span><button class="x" type="button" aria-label="Remove term">×</button><span class="and">and</span>
@@ -127,7 +127,7 @@ bembel token revoke tk-0c41</div></details>
       <div class="hrow"><span class="seg" role="group" aria-label="Expiry"><button type="button">7 d</button><button type="button">30 d</button><button type="button" aria-pressed="true">90 d</button><button type="button">1 year</button></span>
         <input class="input mono" value="2027-02-02" aria-label="Expiry date" size="10"></div>
       <span class="muted small">No token without an expiry. The longest is 1 year.</span></div>
-    <div class="effect"><b>This token can</b> <code>prefix:allocate</code> <code>address:allocate</code> <code>address:release</code> <code>claim:write</code> in <span class="pfx">10.20.0.0<span class="len">/16</span></span> for team hpc-ops. It cannot change bindings or approve.</div>
+    <div class="effect"><b>This token can</b> <code>prefix:allocate</code>, <code>address:create update allocate release</code>, <code>claim:create confirm release</code>, <code>host:create update</code>, <code>interface:create update</code> and read in <span class="pfx">10.20.0.0<span class="len">/16</span></span> for team hpc-ops. It cannot change bindings, apply drafts or approve.</div>
     <div class="cmd"><code>bembel token create runbook-bot --role allocator --scope prefix=10.20.0.0/16 --scope team=hpc-ops --expires 2027-02-02</code></div>
   </div>
   <footer><button class="btn" type="button">Cancel</button><button class="btn btn-primary" type="button">Create token</button></footer>
@@ -137,11 +137,11 @@ bembel token revoke tk-0c41</div></details>
   <header><h2 id="ct-t">Token created</h2><span class="step-n">shown once</span></header>
   <div class="body">
     <div class="banner warn"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M12 3 2 20h20zM12 10v4M12 17h.01"/></svg><div class="grow"><b>Copy the token now.</b> bembel cannot show it again. If you lose it, revoke it and make a new one.</div></div>
-    <div class="secret"><code>bem_pat_8Hq2vNf0Lk5RzX3mT7cWbY1uPd9sJeA6g4oI<b>7f2a</b></code>
-      <button class="btn btn-sm" type="button" data-copy="bem_pat_8Hq2vNf0Lk5RzX3mT7cWbY1uPd9sJeA6g4oI7f2a"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2h3"/></svg>Copy</button></div>
-    <dl class="kv"><dt>Name</dt><dd>runbook-bot</dd><dt>Role</dt><dd><span class="role">allocator</span> <span class="scope"><span><a class="gl" href="../../glossary.html#prefix" data-gl="prefix" data-domain="addr">prefix</a></span><span>10.20.0.0/16</span></span><span class="and">and</span><span class="scope"><span><a class="gl" href="../../glossary.html#team" data-gl="team" data-domain="access">team</a></span><span>hpc-ops</span></span></dd>
-      <dt>Expires</dt><dd>2027-02-02, in 90 d</dd><dt>Id</dt><dd><span class="mono">tk-7f2a91</span></dd></dl>
-    <div class="cmd"><code>export BEMBEL_TOKEN=bem_pat_…7f2a</code></div>
+    <div class="secret"><code>bem_pat_<b>8Hq2vNf0</b>_sLytQuAmuLG2meU2xoPsazf2WvUGsltUK6-FRrw-UYM</code>
+      <button class="btn btn-sm" type="button" data-copy="bem_pat_8Hq2vNf0_sLytQuAmuLG2meU2xoPsazf2WvUGsltUK6-FRrw-UYM"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2h3"/></svg>Copy</button></div>
+    <dl class="kv"><dt>Name</dt><dd>runbook-bot</dd><dt>Permissions</dt><dd><span class="role">allocator</span> set <span class="scope"><span><a class="gl" href="../../glossary.html#prefix" data-gl="prefix" data-domain="addr">prefix</a></span><span>10.20.0.0/16</span></span><span class="and">and</span><span class="scope"><span><a class="gl" href="../../glossary.html#team" data-gl="team" data-domain="access">team</a></span><span>hpc-ops</span></span></dd>
+      <dt>Expires</dt><dd>2027-02-02, in 90 d</dd><dt>Id</dt><dd><span class="mono">8Hq2vNf0</span></dd></dl>
+    <div class="cmd"><code>export BEMBEL_TOKEN=bem_pat_8Hq2vNf0_…</code></div>
   </div>
   <footer><span class="left">The audit log has the event <code>token:create</code>.</span><button class="btn btn-primary" type="button">I have copied it</button></footer>
 </div></div>

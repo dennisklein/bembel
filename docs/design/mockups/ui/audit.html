@@ -17,18 +17,18 @@
   <details class="set-menu vrf-menu">
     <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="set-pop">
-      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · default table</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
-      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>v</kbd></a>
     </div>
   </details>
   <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
     <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
   <span class="spacer"></span>
-  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <a class="cr-chip" href="#" title="1 change request waits for your approval. 1 more is yours and needs another approver.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">1<span class="w"> to approve</span></span></a>
   <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
   <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
   <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
@@ -91,15 +91,15 @@ bembel audit show ev-01JC8Z4T6K --format json</div></details>
     <select class="select" aria-label="Object kind"><option>Any kind</option><option>prefix</option><option>address</option><option>record</option><option>binding</option><option>token</option></select>
     <select class="select" aria-label="Time"><option>Today, 00:00 to now</option><option>Last hour</option><option>Last 7 days</option></select>
     <span class="seg" role="group" aria-label="Decision"><button type="button" aria-pressed="true">All <span class="n">143</span></button><button type="button">allow <span class="n">139</span></button><button type="button">deny <span class="n">3</span></button><button type="button">pending <span class="n">1</span></button></span>
-    <span class="seg" role="group" aria-label="Origin"><button type="button" aria-pressed="true">Any origin</button><button type="button">web</button><button type="button">cli</button><button type="button">api</button><button type="button">assistant</button></span>
+    <span class="seg" role="group" aria-label="Origin"><button type="button" aria-pressed="true">Any origin</button><button type="button">ui</button><button type="button">cli</button><button type="button">api</button><button type="button">assistant</button><button type="button">agent</button><button type="button">sync</button><button type="button">system</button></span>
   </div>
   <div class="table-wrap"><table class="table audit">
     <thead><tr><th>Time</th><th>Subject</th><th>Origin</th><th>Action</th><th>Object</th><th>Decision</th><th>Via binding</th></tr></thead>
     <tbody>
-      <tr><td class="tm">18:01:07</td><td class="sb">k8s:prod-1:capi-system:capi-ipam</td><td><span class="org api">api</span></td><td><code>address:claim</code></td><td><span class="ip">10.30.12.41</span></td><td><span class="pill st-ok">allow</span></td><td><span class="id">b-0009</span></td></tr>
-      <tr><td class="tm">17:52:30</td><td class="sb">a.berger</td><td><span class="org web">web</span></td><td><code>address:allocate</code></td><td><a class="ip" href="#">10.20.4.212</a> <span class="muted small">gpu-021</span></td><td><span class="pill st-ok">allow</span></td><td><span class="id">b-0004</span></td></tr>
-      <tr><td class="tm">17:41:12</td><td class="sb">a.berger</td><td><span class="org web">web</span></td><td><code>prefix:delete</code></td><td><span class="pfx">10.20.16.0<span class="len">/22</span></span> <span class="muted small">3 children</span></td><td><a class="pill st-pending" href="change-request.html">pending</a></td><td><span class="id">b-0004</span> <span class="muted small">held: cr-0042</span></td></tr>
-      <tr class="open"><td class="tm">17:30:21</td><td class="sb">m.huber</td><td><span class="org cli">cli</span></td><td><code>record:write</code></td><td><span class="fqdn">wiki<span class="dom">.example.org</span></span> <span class="muted small">CNAME</span></td><td><span class="pill st-ok">allow</span></td><td><span class="id">b-0005</span></td></tr>
+      <tr><td class="tm">18:01:07</td><td class="sb">k8s:prod-1:capi-system:capi-ipam</td><td><span class="org api">api</span></td><td><code>address:allocate</code></td><td><span class="ip">10.30.12.41</span> <span class="muted small">one IPAddressClaim of prod-1</span></td><td><span class="pill st-ok">allow</span></td><td><span class="id">b-0009</span></td></tr>
+      <tr><td class="tm">17:52:30</td><td class="sb">system:ona-import</td><td><span class="org sync">sync</span></td><td><code>address:create</code></td><td><a class="ip" href="#">10.20.4.212</a> <span class="muted small">cn-621 (added in ONA by a.berger, imp-20261104-1752)</span></td><td><span class="pill st-ok">allow</span></td><td class="muted">system</td></tr>
+      <tr><td class="tm">17:41:12</td><td class="sb">a.berger</td><td><span class="org ui">ui</span></td><td><code>prefix:delete</code></td><td><span class="pfx">10.20.16.0<span class="len">/22</span></span> <span class="muted small">3 children</span></td><td><a class="pill st-pending" href="change-request.html">pending</a></td><td><span class="id">b-0010</span> <span class="muted small">held: cr-0042</span></td></tr>
+      <tr class="open"><td class="tm">17:30:21</td><td class="sb">m.huber</td><td><span class="org cli">cli</span></td><td><code>record:update</code></td><td><span class="fqdn">wiki<span class="dom">.example.org</span></span> <span class="muted small">CNAME</span></td><td><span class="pill st-ok">allow</span></td><td><span class="id">b-0005</span></td></tr>
       <tr class="xrow"><td colspan="7">
         <div class="xdet">
           <dl class="kv"><dt>Event</dt><dd><span class="mono">ev-01JC8Z4T6K9Q2</span> <span class="muted">· request <span class="mono">req-7d31c0</span> · revision 17 to 18</span></dd>
@@ -117,22 +117,23 @@ bembel audit show ev-01JC8Z4T6K --format json</div></details>
 <span class="dim">    "updated_by": "m.huber"</span>
 <span class="dim">  }</span></pre>
         </div></td></tr>
-      <tr class="denyrow"><td class="tm">17:12:03</td><td class="sb">s.yildiz</td><td><span class="org web">web</span></td><td><code>prefix:allocate</code></td><td><span class="pfx">10.20.8.0<span class="len">/24</span></span> <span class="muted small">osprey-gpu</span></td><td><span class="pill st-failed">deny</span></td><td class="muted">no binding</td></tr>
+      <tr class="denyrow"><td class="tm">17:12:03</td><td class="sb">s.yildiz</td><td><span class="org ui">ui</span></td><td><code>prefix:allocate</code></td><td><span class="pfx">10.20.8.0<span class="len">/24</span></span> <span class="muted small">osprey-gpu</span></td><td><span class="pill st-failed">deny</span></td><td class="muted">no binding</td></tr>
       <tr class="xrow deny"><td colspan="7">
         <div class="xdet">
-          <dl class="kv"><dt>Reason</dt><dd><code>access.denied</code> No binding of s.yildiz gives <code>prefix:allocate</code> in <span class="pfx">10.20.0.0<span class="len">/16</span></span>.</dd>
+          <dl class="kv"><dt>Reason</dt><dd><code>permission.denied</code> No binding of s.yildiz gives <code>prefix:allocate</code> or <code>prefix:read</code> on <span class="pfx">10.20.8.0<span class="len">/24</span></span>. a.berger cannot read the prefix, so the API answered <code>404 resource.not-found</code>.</dd>
             <dt>Looked at</dt><dd><span class="id">b-0008</span> <span class="role">allocator</span> <span class="scope"><span>prefix</span><span>10.30.0.0/16</span></span><span class="and">and</span><span class="scope"><span>team</span><span>openstack</span></span>: the prefix is outside the scope.</dd></dl>
           <pre class="log jsdiff"><span class="dim">{ "decision": "deny", "action": "prefix:allocate",</span>
-<span class="dim">  "object": { "kind": "prefix", "id": "10.20.8.0/24", "owner": "hpc-ops" },</span>
-<span class="err">  "missing": ["prefix:allocate in prefix=10.20.0.0/16"],</span>
-<span class="dim">  "http": 403 }</span></pre>
+<span class="dim">  "object": { "kind": "prefix", "id": "10.20.8.0/24", "owner": "gpu-ops" },</span>
+<span class="err">  "missing": ["prefix:allocate on prefix 10.20.8.0/24"],</span>
+<span class="dim">  "http": 404 }</span></pre>
         </div></td></tr>
       <tr><td class="tm">16:20:09</td><td class="sb">d.klein</td><td><span class="org asst">assistant</span></td><td><code>prefix:update</code></td><td><span class="pfx">10.20.12.0<span class="len">/24</span></span> <span class="muted small">description</span></td><td><span class="pill st-ok">allow</span></td><td><span class="id">b-0001</span> <span class="muted small">draft dr-0019</span></td></tr>
-      <tr><td class="tm">15:47:02</td><td class="sb">d.klein</td><td><span class="org web">web</span></td><td><code>binding:create</code></td><td><span class="id">b-0009</span> <span class="muted small">capi-ipam</span></td><td><span class="pill st-ok">allow</span></td><td><span class="id">b-0001</span></td></tr>
-      <tr><td class="tm">15:30:00</td><td class="sb">fnt-sync</td><td><span class="org api">api</span></td><td><code>asset:sync</code></td><td>2 311 devices <span class="muted small">4 unmatched</span></td><td><span class="pill st-ok">allow</span></td><td><span class="id">b-0010</span></td></tr>
-      <tr><td class="tm">14:12:33</td><td class="sb">a.berger</td><td><span class="org web">web</span></td><td><code>token:create</code></td><td><span class="mono">bem_pat_…c5e1</span></td><td><span class="pill st-ok">allow</span></td><td><span class="id">self</span></td></tr>
-      <tr><td class="tm">09:12:08</td><td class="sb">d.klein</td><td><span class="org cli">cli</span></td><td><code>import:run</code></td><td><span class="mono">imp-20261104-0912</span></td><td><span class="pill st-ok">allow</span></td><td><span class="id">b-0001</span></td></tr>
-      <tr><td class="tm">08:00:00</td><td class="sb">system:reaper</td><td><span class="org api">api</span></td><td><code>claim:expire</code></td><td>7 claims <span class="muted small">released</span></td><td><span class="pill st-ok">allow</span></td><td class="muted">system</td></tr>
+      <tr><td class="tm">16:12:07</td><td class="sb">system:ona-import</td><td><span class="org sync">sync</span></td><td><code>address:create</code></td><td><a class="ip" href="#">10.20.4.51</a> <span class="muted small">cn-011 (added in ONA by a.berger, imp-20261104-1612)</span></td><td><span class="pill st-ok">allow</span></td><td class="muted">system</td></tr>
+      <tr><td class="tm">15:47:02</td><td class="sb">d.klein</td><td><span class="org ui">ui</span></td><td><code>binding:create</code></td><td><span class="id">b-0009</span> <span class="muted small">capi-ipam</span></td><td><span class="pill st-ok">allow</span></td><td><span class="id">b-0001</span></td></tr>
+      <tr><td class="tm">15:30:00</td><td class="sb">system:sync-fnt</td><td><span class="org sync">sync</span></td><td><code>source:sync</code></td><td><span class="mono">fnt</span> <span class="muted small">2 311 devices, 4 unmatched</span></td><td><span class="pill st-ok">allow</span></td><td class="muted">system</td></tr>
+      <tr><td class="tm">14:12:33</td><td class="sb">a.berger</td><td><span class="org ui">ui</span></td><td><code>token:create</code></td><td><span class="mono">bem_pat_c5e1Hy3D_…</span></td><td><span class="pill st-ok">allow</span></td><td><span class="id">self</span></td></tr>
+      <tr><td class="tm">09:12:08</td><td class="sb">system:ona-import</td><td><span class="org sync">sync</span></td><td><code>source:sync</code></td><td><span class="mono">ona-import imp-20261104-0912</span> <span class="muted small">timer</span></td><td><span class="pill st-ok">allow</span></td><td class="muted">system</td></tr>
+      <tr><td class="tm">08:00:00</td><td class="sb">system:reaper</td><td><span class="org system">system</span></td><td><code>claim:release</code></td><td>7 claims released <span class="muted small">(claim-expired)</span></td><td><span class="pill st-ok">allow</span></td><td class="muted">system</td></tr>
     </tbody></table></div>
   <div class="card-foot"><span>An event has the subject, the origin, the action, the object, the decision and, for a change, the object before and after. Reads are not logged, but a denied read is.</span>
     <span class="right"><button class="btn btn-sm" type="button">Older events</button></span></div>

@@ -294,9 +294,9 @@
 <tr><td>Runs table</td><td>Run id, kind (delta, full), start, duration, devices, changed, unmatched, conflicts, result. A retried run shows the pill "retried" and the reason.</td><td>A user sees that the sync is healthy, and sees a slow FNT.</td></tr>
 </tbody>
 </table>
-<aside class="callout why"><p class="callout-title">Why</p><p>The sync could link on a weak match, for example a similar name. The cost of a wrong link is high: a wrong rack under a host, a wrong cable behind an IP. The cost of a click is low. So bembel links without a user only for one exact match of a rule. All other cases wait here. Each action is an API call and an audit event with the origin <code>web</code>.</p></aside>
+<aside class="callout why"><p class="callout-title">Why</p><p>The sync could link on a weak match, for example a similar name. The cost of a wrong link is high: a wrong rack under a host, a wrong cable behind an IP. The cost of a click is low. So bembel links without a user only for one exact match of a rule. All other cases wait here. Each action is an API call and an audit event with the origin <code>ui</code>.</p></aside>
 <ul>
-  <li><b>Link.</b> Sets the asset link of host and device. The ports link to the interfaces by MAC and name. The button needs the permission <code>asset-link:write</code> in the scope of the host.</li>
+  <li><b>Link.</b> Sets the asset link of host and device. The ports link to the interfaces by MAC and name. The button needs the permission <code>asset:link</code> in the site of the device.</li>
   <li><b>Create host….</b> Opens a dialog with the name, kind, team and subnet. The dialog shows the CLI command. The host starts without an address.</li>
   <li><b>Ignore.</b> Marks the device as "no host needed", with a reason. The device leaves the list.</li>
   <li><b>Keep bembel name.</b> Stores an accepted difference. The conflict leaves the list until one of the names changes.</li>
@@ -335,9 +335,9 @@
 <thead><tr><th>Part</th><th>Content</th><th>Why</th></tr></thead>
 <tbody>
 <tr><td>kestrel-ib card</td><td>NDR InfiniBand, 400 Gb/s. Subnet manager <code>sm-kestrel</code> (OpenSM on mgmt-01). 412 ports. 4 partitions, 2 with IPoIB. Subnet <code>10.100.0.0/16</code> in VRF hpc-fabric. Team hpc-ops. The pill "not pulled for 26 h".</td><td>The user sees the size of the fabric and whether the SM has the newest file. The pill is the same warning as on the Overview.</td></tr>
-<tr><td>osprey-roce card</td><td>400G Ethernet with RoCEv2. Rails 1–8 with VLAN 3101 to 3108. 80 ports (10 GPU nodes × 8 rails). The subnets 10.110.1.0/24 to 10.110.8.0/24. The QoS profile as four values: DSCP 26, PFC 3, ECN on, CNP DSCP 48.</td><td>The switch and host config tools read these four values. They must be the same on both sides. The card makes them easy to read.</td></tr>
+<tr><td>osprey-roce card</td><td>400G Ethernet with RoCEv2. Rails 1–8 with VLAN 3101 to 3108. 64 ports (8 GPU nodes × 8 rails). The subnets 10.110.1.0/24 to 10.110.8.0/24. The QoS profile as four values: DSCP 26, PFC 3, ECN on, CNP DSCP 48.</td><td>The switch and host config tools read these four values. They must be the same on both sides. The card makes them easy to read.</td></tr>
 <tr><td>campus card</td><td>The VLAN domain <code>campus-hall2</code>, 14 VLANs, 1 842 ports from FNT, VRF global and oob, no QoS profile.</td><td>The page covers all network types. A site with only Ethernet still has a useful card.</td></tr>
-<tr><td>Partitions table</td><td>P_Key, name, default member (full or limited), IPoIB flag, subnet, MTU, members full and limited. Rows: Default 0x7fff, kestrel-ipoib 0x8001, kestrel-lustre 0x8002 (the two OSS servers are full, the 396 clients are limited), kestrel-admin 0x8003.</td><td>It shows who can reach whom. The default partition is shown but not editable.</td></tr>
+<tr><td>Partitions table</td><td>P_Key (the base key), name, default for new members (full or limited), IPoIB flag, subnet, MTU, members full and limited. Rows: Default 0x7fff, kestrel-ipoib 0x0001, kestrel-lustre 0x0002 (the two OSS servers are full, the 396 clients are limited), kestrel-admin 0x0003.</td><td>It shows who can reach whom on each key. Limited members of kestrel-lustre cannot reach each other on 0x0002; they still share Default and kestrel-ipoib. The default partition is shown but not editable.</td></tr>
 <tr><td>Rail diagram</td><td>Two spines, 8 leaf switches (one per rail, with VLAN and subnet), 8 GPU nodes. Every node has one link to each leaf. The links of <code>gpu-001</code> are highlighted.</td><td>A rail design is hard to read in a table. The picture shows that rail k of every node goes to leaf k, and why one rail is one VLAN.</td></tr>
 <tr><td>OpenSM preview</td><td>The first lines of <code>partitions.conf</code> as the export will write them, with the bundle id, the partitions, the GUIDs of the members and a comment per member. Buttons: Copy, Download. A second tab shows the diff to the file that the SM pulled.</td><td>The user reads the file before the agent on <code>sm-kestrel</code> pulls it. A wrong member list can cut off a node from the fabric.</td></tr>
 </tbody>
@@ -381,8 +381,8 @@
   <li><b>Toolbar.</b> The switch VLANs 22 | IB partitions 4 | All, a text filter (VID, name or prefix) and the chip of the site.</li>
   <li><b>VLAN domain cards.</b> <code>campus-hall2</code> (VID 1–4094, 14 VLANs) and <code>osprey-roce</code> (VID 3100–3199, rails 1–8). A card head names the domain. A VID is unique inside one domain only.</li>
   <li><b>Table.</b> VID, name, subnets v4, subnets v6, fabric, site, team. A dual-stack VLAN shows both subnets: VLAN 204 has <code>10.20.4.0/22</code> and <code>2001:db8:4200:204::/64</code>. A fold keeps the 8 more VLANs of the campus domain.</li>
-  <li><b>Free VIDs line.</b> A grey dashed line under each table: "Free VIDs 121–203 · 205–207 · 209–211 · 213–239 · 241–499". The hint "Next free for a /24: 213" and the button Allocate next VID… sit on the same line.</li>
-  <li><b>Partitions card.</b> <code>kestrel-ib</code> with its four partitions and the free P_Keys (0x8004 up to 0xfffe).</li>
+  <li><b>Free VIDs line.</b> A grey dashed line under each table: "Free VIDs 121–199 · 201–203 · 205–207 · 209–211 · 213–219 · 221–239 · 241–263 · 265–499". The hint "Next free for a /24: 213" and the button Allocate next VID… sit on the same line.</li>
+  <li><b>Partitions card.</b> <code>kestrel-ib</code> with its four partitions and the free P_Keys (0x0004 up to 0x7ffe).</li>
 </ul>
 <p>Why free IDs: a network engineer needs a new VLAN more often than a list of the old ones. The hint answers it without a calculation. The numbers come from the VLAN domain, not from a guess.</p>
 

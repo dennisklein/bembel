@@ -17,18 +17,18 @@
   <details class="set-menu vrf-menu">
     <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="set-pop">
-      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · default table</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
-      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>v</kbd></a>
     </div>
   </details>
   <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
     <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
   <span class="spacer"></span>
-  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <a class="cr-chip" href="#" title="1 change request waits for your approval. 1 more is yours and needs another approver.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">1<span class="w"> to approve</span></span></a>
   <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
   <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
   <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
@@ -76,7 +76,7 @@
 <div class="page-head">
   <div>
     <div class="zhead"><h1 class="mono">kestrel.example.org</h1><span class="dchip" data-domain="dns">view internal</span><span class="pill st-ok">exported</span></div>
-    <div class="sub"><span>forward zone, child of <a class="fqdn" href="zone.html">example.org</a></span><span class="sep">·</span><span>Team <b>hpc-ops</b></span><span class="sep">·</span><span>1 846 records: 1 802 derived, 44 manual</span><span class="sep">·</span><span>exported 17:58, bundle <span class="id" title="sha256:7c41e0">b-7c41e0</span></span></div>
+    <div class="sub"><span>forward zone, child of <a class="fqdn" href="zone.html">example.org</a></span><span class="sep">·</span><span>Team <b>hpc-ops</b></span><span class="sep">·</span><span>1 846 records: 1 803 derived, 43 manual</span><span class="sep">·</span><span>exported 17:58, bundle <span class="id" title="sha256:7c41e0">b-7c41e0</span></span></div>
   </div>
   <div class="actions">
     <span class="seg" role="group" aria-label="View"><a href="zone.html" aria-current="page">internal <span class="n">1 846</span></a><a href="#">external <span class="n">3</span></a></span>
@@ -141,7 +141,7 @@ _slurmctld._tcp.kestrel.example.org.  3600  IN  SRV  20 0 6817 ctl02.kestrel.exa
     <div><div class="pv-h">Same change in the terminal</div>
       <div class="cmd"><code>bembel record add kestrel.example.org --view internal --name _slurmctld._tcp --type SRV --data "30 0 6817 ctl03.kestrel.example.org."</code><button class="copy" type="button" data-copy="bembel record add kestrel.example.org" aria-label="Copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button></div></div>
   </div>
-  <footer><span class="left">You have <b>dns-editor</b> in zone <span class="mono">example.org</span>. The audit event names you. Undo: delete the record.</span>
+  <footer><span class="left">You have <b>network-admin</b> in <span class="mono">global</span>. The audit event names you. Undo: delete the record.</span>
     <a class="btn" href="zone.html">Cancel</a><a class="btn btn-primary" href="zone.html">Create record</a></footer>
 </div>
 <dialog id="help" class="dlg" aria-labelledby="help-t">

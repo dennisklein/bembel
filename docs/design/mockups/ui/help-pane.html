@@ -17,18 +17,18 @@
   <details class="set-menu vrf-menu">
     <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="set-pop">
-      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · default table</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
-      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>v</kbd></a>
     </div>
   </details>
   <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
     <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
   <span class="spacer"></span>
-  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <a class="cr-chip" href="#" title="1 change request waits for your approval. 1 more is yours and needs another approver.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">1<span class="w"> to approve</span></span></a>
   <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
   <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
   <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
@@ -77,8 +77,8 @@
   <div class="actions">
     <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
       <div class="cli-pop">bembel prefix ls --vrf global
-bembel prefix allocate 10.20.0.0/16 --length 24 --team osprey</div></details>
-    <button class="btn btn-primary" type="button">Allocate…</button>
+bembel prefix allocate 10.20.0.0/16 --length 24 --team hpc-ops</div></details>
+    <button class="btn btn-primary" type="button" data-allocate>Allocate…</button>
   </div>
 </div>
 
@@ -91,16 +91,16 @@ bembel prefix allocate 10.20.0.0/16 --length 24 --team osprey</div></details>
     <tbody>
       <tr><td><span class="pfx">10.0.0.0<span class="len">/8</span></span></td><td>RFC 1918</td><td><span class="tag">container</span> <span class="term" data-term="pool" tabindex="0">pool</span></td><td><span class="pill st-ok">active</span></td><td><span class="meter" style="--v:6" aria-hidden="true"></span> <span class="meter-t">6 %</span></td></tr>
       <tr><td class="l1"><span class="pfx">10.20.0.0<span class="len">/16</span></span></td><td>Hall 2 HPC</td><td><span class="tag">container</span></td><td><span class="pill st-ok">active</span></td><td><span class="meter warn" style="--v:71" aria-hidden="true"></span> <span class="meter-t">71 %</span></td></tr>
-      <tr><td class="l2"><span class="pfx">10.20.4.0<span class="len">/22</span></span></td><td>kestrel-compute</td><td><span class="tag">subnet</span></td><td><span class="pill st-ok">active</span></td><td><span class="meter failed" style="--v:92" aria-hidden="true"></span> <span class="meter-t">92 %</span></td></tr>
+      <tr class="hintrow"><td class="l2"><span class="pfx">10.20.4.0<span class="len">/22</span></span></td><td>kestrel-compute</td><td><span class="tag">subnet</span></td><td><span class="pill st-ok">active</span> <span class="pill st-pending"><a class="term seen-no" href="#" data-term="claim">claimed</a> 7</span></td><td><span class="meter failed" style="--v:92" aria-hidden="true"></span> <span class="meter-t">92 %</span></td></tr>
       <tr><td class="l2"><span class="pfx">10.20.8.0<span class="len">/24</span></span></td><td>osprey-gpu</td><td><span class="tag">subnet</span></td><td><span class="pill st-ok">active</span></td><td><span class="meter" style="--v:41" aria-hidden="true"></span> <span class="meter-t">41 %</span></td></tr>
       <tr><td class="l2"><span class="pfx">10.20.12.0<span class="len">/24</span></span></td><td>ceph-public</td><td><span class="tag">subnet</span></td><td><span class="pill st-ok">active</span></td><td><span class="meter" style="--v:33" aria-hidden="true"></span> <span class="meter-t">33 %</span></td></tr>
       <tr><td class="l2"><span class="pfx">10.20.16.0<span class="len">/22</span></span></td><td>Hall 2 row C</td><td><span class="tag">container</span></td><td><span class="pill st-pending">planned</span></td><td class="muted">0 %</td></tr>
       <tr><td class="l1"><span class="pfx">10.30.0.0<span class="len">/16</span></span></td><td>OpenStack</td><td><span class="tag">container</span> <span class="term" data-term="pool" tabindex="0">pool</span></td><td><span class="pill st-ok">active</span></td><td><span class="meter" style="--v:44" aria-hidden="true"></span> <span class="meter-t">44 %</span></td></tr>
-      <tr class="hintrow"><td class="l2"><span class="pfx">10.30.12.0<span class="len">/24</span></span></td><td>capi prod-1</td><td><span class="tag">subnet</span></td>
-        <td><span class="pill st-pending"><a class="term seen-no" href="#" data-term="claim">claimed</a> 2</span></td>
+      <tr><td class="l2"><span class="pfx">10.30.12.0<span class="len">/24</span></span></td><td>capi prod-1</td><td><span class="tag">subnet</span></td>
+        <td><span class="pill st-ok">active</span></td>
         <td><span class="meter" style="--v:19" aria-hidden="true"></span> <span class="meter-t">19 %</span></td></tr>
     </tbody></table></div>
-  <div class="hintcard pos" role="tooltip"><div class="kind"><span>Concept</span></div><div class="ht">Claim</div><p>A <a class="gl" href="../../glossary.html#claim" data-gl="claim" data-domain="addr">claim</a> is a temporary <a class="gl" href="../../glossary.html#reservation" data-gl="reservation" data-domain="dhcp">reservation</a> of an <a class="gl" href="../../glossary.html#address" data-gl="address" data-domain="addr">address</a> with a time to live. An integration confirms it. The <a class="gl" href="../../glossary.html#reaper" data-gl="reaper" data-domain="addr">reaper</a> frees an expired claim.</p><div class="hc"><span class="ps">$ </span>bembel claim ls --prefix 10.30.12.0/24</div><div class="hf"><span><kbd>?</kbd> more</span></div></div>
+  <div class="hintcard pos" role="tooltip"><div class="kind"><span>Concept</span></div><div class="ht">Claim</div><p>A <a class="gl" href="../../glossary.html#claim" data-gl="claim" data-domain="addr">claim</a> is a temporary hold on an <a class="gl" href="../../glossary.html#address" data-gl="address" data-domain="addr">address</a> with an expiry. The caller confirms it, or the <a class="gl" href="../../glossary.html#reaper" data-gl="reaper" data-domain="addr">reaper</a> releases it.</p><div class="hc"><span class="ps">$ </span>bembel address ls --prefix 10.20.4.0/22 --status claimed</div><div class="hf"><span><kbd>?</kbd> more</span></div></div>
 </section>
 </main>
 
@@ -112,13 +112,19 @@ bembel prefix allocate 10.20.0.0/16 --length 24 --team osprey</div></details>
   <div class="hp-body" id="help-body" aria-live="polite">
     <div class="hp-sec"><span class="kindtag">This page</span><h2>Prefixes</h2><p class="lead">Every <a class="gl" href="../../glossary.html#prefix" data-gl="prefix" data-domain="addr">prefix</a> of one <a class="gl" href="../../glossary.html#vrf" data-gl="vrf" data-domain="addr">VRF</a> as a tree: <a class="gl" href="../../glossary.html#container" data-gl="container" data-domain="addr">containers</a>, <a class="gl" href="../../glossary.html#subnet" data-gl="subnet" data-domain="addr">subnets</a> and the free space below them.</p></div>
     <div><h4>Words on this page</h4><div class="hp-chips"><a href="#" data-chip="prefix">Prefix</a><a href="#" data-chip="subnet">Subnet</a><a href="#" data-chip="claim">Claim</a><a href="#" data-chip="pool">Prefix pool</a></div></div>
-    <div><h4>How do I…</h4><ul class="hp-list"><li><a href="#">Find a free subnet</a></li><li><a href="#">Free a subnet</a></li><li><a href="#">Move an address</a></li></ul></div>
+    <div><h4>How do I…</h4><ul class="hp-list">
+      <li><a href="#">Find a free subnet</a><p class="hp-src"><code>bembel prefix free 10.20.0.0/16 --len 24</code> <button class="btn btn-sm btn-ghost" type="button" data-show="find-free-prefix">Show me</button></p></li>
+      <li><a href="#">Free a subnet</a><p class="hp-src"><code>bembel prefix rm &lt;cidr&gt;</code> <button class="btn btn-sm btn-ghost" type="button" data-show="free-a-subnet">Show me</button></p></li>
+      <li><a href="#">Allocate an address</a><p class="hp-src"><code>bembel address allocate --prefix &lt;cidr&gt;</code> <button class="btn btn-sm btn-ghost" type="button" data-show="allocate-address">Show me</button></p></li></ul></div>
     <div><h4>Keys</h4><dl class="hp-keys">
-      <dt><kbd>?</kbd></dt><dd>Help for what the pointer is on, else for this page</dd>
+      <dt><kbd>?</kbd></dt><dd>Open this pane for what the pointer is on, else for this page</dd>
+      <dt><kbd>a</kbd></dt><dd>Open the <a class="gl" href="../../glossary.html#allocate" data-gl="allocate" data-domain="addr">Allocate</a> dialog (<kbd>Ctrl</kbd> <kbd>Enter</kbd> confirms)</dd>
+      <dt><kbd>Shift</kbd> <kbd>A</kbd></dt><dd>Open the <a class="gl" href="../../glossary.html#assistant" data-gl="assistant" data-domain="integ">assistant</a> panel</dd>
       <dt><kbd>/</kbd></dt><dd>Jump to an IP, prefix, MAC, <a class="gl" href="../../glossary.html#host" data-gl="host" data-domain="addr">host</a>, <a class="gl" href="../../glossary.html#zone" data-gl="zone" data-domain="dns">zone</a> or page</dd>
       <dt><kbd>g</kbd> <kbd>p</kbd></dt><dd>Go to Prefixes</dd>
       <dt><kbd>Esc</kbd></dt><dd>Close the hint, the dialog or this pane</dd></dl></div>
     <p class="hp-src">In a terminal: <code>bembel help prefixes</code></p>
+    <p class="hp-src"><button class="btn btn-sm btn-agent" type="button" data-assistant="this-page" title="Opens the assistant with this page as context. Tools: read only. It changes nothing.">Ask the assistant about this page</button></p>
   </div>
   <div class="hp-foot"><span>Hints</span><div class="seg" role="group" aria-label="Hints"><button type="button" aria-pressed="true" data-hints="on">On</button><button type="button" data-hints="off">Off</button></div><span class="grow"></span><a href="#">All topics</a></div>
 </aside>
@@ -136,6 +142,8 @@ bembel prefix allocate 10.20.0.0/16 --length 24 --team osprey</div></details>
     <tr><td><kbd>g</kbd> <kbd>r</kbd></td><td>Racks</td></tr>
     <tr><td><kbd>g</kbd> <kbd>c</kbd></td><td>Change requests</td></tr>
     <tr><td><kbd>/</kbd></td><td>Jump to an IP, prefix, MAC, host, zone or page</td></tr>
+    <tr><td><kbd>v</kbd></td><td>Open the VRF switcher</td></tr>
+    <tr><td><kbd>a</kbd></td><td>Open the Allocate dialog, on a page with an Allocate button (<kbd>Ctrl</kbd> <kbd>Enter</kbd> confirms)</td></tr>
     <tr><td><kbd>Shift</kbd> <kbd>A</kbd></td><td>Open the assistant</td></tr>
     <tr><td><kbd>?</kbd></td><td>Help for the element under the pointer, else for this page</td></tr>
     <tr><td><kbd>Esc</kbd></td><td>Close a dialog, a menu or a pane</td></tr>

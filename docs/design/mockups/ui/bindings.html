@@ -17,18 +17,18 @@
   <details class="set-menu vrf-menu">
     <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="set-pop">
-      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · default table</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
-      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>v</kbd></a>
     </div>
   </details>
   <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
     <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
   <span class="spacer"></span>
-  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <a class="cr-chip" href="#" title="1 change request waits for your approval. 1 more is yours and needs another approver.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">1<span class="w"> to approve</span></span></a>
   <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
   <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
   <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
@@ -78,21 +78,21 @@
 
 <div class="page-head">
   <div><h1>Roles and bindings</h1>
-    <div class="sub"><span><b>9</b> bindings</span><span class="sep">·</span><span><b>6</b> subjects</span><span class="sep">·</span><span><b>7</b> roles</span><span class="sep">·</span><span><b>4</b> trusted issuers</span><span class="sep">·</span><span>Allow only. No binding means no access.</span></div></div>
+    <div class="sub"><span><b>10</b> bindings</span><span class="sep">·</span><span><b>6</b> subjects</span><span class="sep">·</span><span><b>7</b> built-in roles</span><span class="sep">·</span><span><b>4</b> trusted issuers</span><span class="sep">·</span><span>Allow only. No binding means no access.</span></div></div>
   <div class="actions">
     <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
       <div class="cli-pop">bembel binding ls --subject d.klein
 bembel binding create --subject a.berger --role allocator \
   --scope prefix=10.20.0.0/16 --scope team=hpc-ops --expires 2027-03-31
-bembel access explain --subject d.klein \
-  --action change-request:approve --object cr-0042</div></details>
+bembel access check --explain --as kc:d.klein \
+  change-request:approve change-request/cr-0042</div></details>
     <button class="btn btn-agent" type="button" data-assistant="explain-access" title="Runs the assistant with the advisory explain-access. Tools: read only. It changes nothing.">Explain my access</button>
     <button class="btn btn-primary" type="button">New binding…</button>
   </div>
 </div>
 
 <nav class="tabs" aria-label="Access">
-  <a class="tab" href="bindings.html" aria-current="page">Bindings<span class="n">9</span></a>
+  <a class="tab" href="bindings.html" aria-current="page">Bindings<span class="n">10</span></a>
   <a class="tab" href="#roles">Roles<span class="n">7</span></a>
   <a class="tab" href="#">Subjects<span class="n">6</span></a>
   <a class="tab" href="#issuers">Issuers<span class="n">4</span></a>
@@ -101,11 +101,11 @@ bembel access explain --subject d.klein \
 <div class="two">
 <div class="stack">
 <section class="card" id="bindings" aria-labelledby="bind-t">
-  <div class="card-head"><h2 id="bind-t">Bindings</h2><span class="right">9 of 9</span></div>
+  <div class="card-head"><h2 id="bind-t">Bindings</h2><span class="right">10 of 10</span></div>
   <div class="filterbar">
     <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Filter bindings</span><input type="search" placeholder="Subject, role or scope"></label>
-    <span class="seg" role="group" aria-label="Subject kind"><button type="button" aria-pressed="true">All <span class="n">9</span></button><button type="button">User <span class="n">5</span></button><button type="button">Group <span class="n">2</span></button><button type="button">Service <span class="n">1</span></button></span>
-    <select class="select" aria-label="Role"><option>Any role</option><option>network-admin</option><option>approver</option><option>allocator</option></select>
+    <span class="seg" role="group" aria-label="Subject kind"><button type="button" aria-pressed="true">All <span class="n">10</span></button><button type="button">User <span class="n">7</span></button><button type="button">Group <span class="n">2</span></button><button type="button">Service <span class="n">1</span></button></span>
+    <select class="select" aria-label="Role"><option>Any role</option><option>network-admin</option><option>approver</option><option>allocator</option><option>planner</option></select>
     <select class="select" aria-label="Scope kind"><option>Any scope</option><option>global</option><option>vrf</option><option>prefix</option><option>zone</option><option>team</option></select>
     <label class="chip"><input class="check" type="checkbox"> Expires in 60 d <span class="n">1</span></label>
   </div>
@@ -117,15 +117,17 @@ bembel access explain --subject d.klein \
       <tr class="hit" id="b-0007"><td><span class="subj"><svg class="sk" aria-hidden="true"><use href="#sk-user"/></svg><span><b>d.klein</b><span class="s">id.example.org</span></span></span></td>
         <td><span class="role">approver</span></td><td><span class="scope"><span>prefix</span><span>10.20.0.0/16</span></span></td><td>bootstrap</td><td class="muted">never</td><td class="srcc"><span class="src managed">config</span><span class="id" title="b-0007">b-0007</span></td></tr>
       <tr><td><span class="subj"><svg class="sk" aria-hidden="true"><use href="#sk-group"/></svg><span><b>hpc-ops</b><span class="s">id.example.org</span></span></span></td>
-        <td><span class="role">viewer</span></td><td><span class="scope"><span>global</span></span></td><td>bootstrap</td><td class="muted">never</td><td class="srcc"><span class="src managed">config</span><span class="id" title="b-0002">b-0002</span></td></tr>
+        <td><span class="role">viewer</span></td><td><span class="scope"><span>team</span><span>hpc-ops</span></span></td><td>bootstrap</td><td class="muted">never</td><td class="srcc"><span class="src managed">config</span><span class="id" title="b-0002">b-0002</span></td></tr>
       <tr><td><span class="subj"><svg class="sk" aria-hidden="true"><use href="#sk-group"/></svg><span><b>hpc-ops</b><span class="s">id.example.org</span></span></span></td>
         <td><span class="role">allocator</span></td><td><span class="scope"><span>vrf</span><span>hpc-fabric</span></span><span class="and">and</span><span class="scope"><span>team</span><span>hpc-ops</span></span></td><td>d.klein</td><td class="muted">never</td><td class="srcc"><span class="src">local</span><span class="id" title="b-0003">b-0003</span><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="More actions for b-0003">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Edit…</a><a href="#" role="menuitem">Explain access of hpc-ops</a><button type="button" role="menuitem">Delete…</button></div></details></td></tr>
       <tr><td><span class="subj"><svg class="sk" aria-hidden="true"><use href="#sk-user"/></svg><span><b>a.berger</b><span class="s">id.example.org</span></span></span></td>
         <td><span class="role">allocator</span></td><td><span class="scope"><span>prefix</span><span>10.20.0.0/16</span></span><span class="and">and</span><span class="scope"><span>team</span><span>hpc-ops</span></span></td><td>d.klein</td><td>2027-03-31</td><td class="srcc"><span class="src">local</span><span class="id" title="b-0004">b-0004</span><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="More actions for b-0004">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Edit…</a><a href="#" role="menuitem">Explain access of a.berger</a><button type="button" role="menuitem">Delete…</button></div></details></td></tr>
+      <tr><td><span class="subj"><svg class="sk" aria-hidden="true"><use href="#sk-user"/></svg><span><b>a.berger</b><span class="s">id.example.org</span></span></span></td>
+        <td><span class="role" title="Custom role: *:read, prefix:traverse, prefix:create, prefix:update, prefix:delete">planner</span></td><td><span class="scope"><span>prefix</span><span>10.20.16.0/22</span></span></td><td>d.klein</td><td>2027-03-31</td><td class="srcc"><span class="src">local</span><span class="id" title="b-0010">b-0010</span><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="More actions for b-0010">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Edit…</a><a href="#" role="menuitem">Explain access of a.berger</a><button type="button" role="menuitem">Delete…</button></div></details></td></tr>
       <tr><td><span class="subj"><svg class="sk" aria-hidden="true"><use href="#sk-user"/></svg><span><b>m.huber</b><span class="s">id.example.org</span></span></span></td>
         <td><span class="role">dns-editor</span></td><td><span class="scope"><span>zone</span><span>example.org</span></span> <span class="muted small">subtree</span></td><td>d.klein</td><td class="muted">never</td><td class="srcc"><span class="src">local</span><span class="id" title="b-0005">b-0005</span><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="More actions for b-0005">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Edit…</a><a href="#" role="menuitem">Explain access of m.huber</a><button type="button" role="menuitem">Delete…</button></div></details></td></tr>
       <tr><td><span class="subj"><svg class="sk" aria-hidden="true"><use href="#sk-user"/></svg><span><b>m.huber</b><span class="s">id.example.org</span></span></span></td>
-        <td><span class="role">approver</span></td><td><span class="scope"><span>vrf</span><span>global</span></span></td><td>d.klein</td><td>2027-06-30</td><td class="srcc"><span class="src">local</span><span class="id" title="b-0006">b-0006</span><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="More actions for b-0006">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Edit…</a><button type="button" role="menuitem">Delete…</button></div></details></td></tr>
+        <td><span class="role">approver</span></td><td><span class="scope"><span>global</span></span></td><td>bootstrap</td><td>2027-06-30</td><td class="srcc"><span class="src managed">config</span><span class="id" title="b-0006">b-0006</span></td></tr>
       <tr><td><span class="subj"><svg class="sk" aria-hidden="true"><use href="#sk-user"/></svg><span><b>s.yildiz</b><span class="s">id.example.org</span></span></span></td>
         <td><span class="role">allocator</span></td><td><span class="scope"><span>prefix</span><span>10.30.0.0/16</span></span><span class="and">and</span><span class="scope"><span>team</span><span>openstack</span></span></td><td>d.klein</td><td><span class="pill st-warn">in 41 d</span> <span class="muted small">2026-12-15</span></td><td class="srcc"><span class="src">local</span><span class="id" title="b-0008">b-0008</span><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="More actions for b-0008">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Edit…</a><button type="button" role="menuitem">Extend…</button><button type="button" role="menuitem">Delete…</button></div></details></td></tr>
       <tr><td><span class="subj"><svg class="sk" aria-hidden="true"><use href="#sk-service"/></svg><span><b>capi-ipam</b><span class="s" title="k8s:prod-1:capi-system:capi-ipam">k8s:prod-1</span></span></span></td>
@@ -139,13 +141,13 @@ bembel access explain --subject d.klein \
   <div class="table-wrap"><table class="table roles">
     <thead><tr><th>Role</th><th>Gives</th><th class="num">Bindings</th></tr></thead>
     <tbody>
-      <tr><td><span class="role">viewer</span></td><td class="perm"><code>*:read</code></td><td class="num">1</td></tr>
-      <tr><td><span class="role">allocator</span></td><td class="perm"><code>prefix:allocate</code> <code>address:allocate</code> <code>address:release</code> <code>claim:write</code></td><td class="num">4</td></tr>
-      <tr><td><span class="role">dns-editor</span></td><td class="perm"><code>zone:write</code> <code>record:write</code> <code>record:delete</code></td><td class="num">1</td></tr>
-      <tr><td><span class="role">dhcp-editor</span></td><td class="perm"><code>dhcp-scope:write</code> <code>range:write</code> <code>reservation:write</code></td><td class="num">0</td></tr>
-      <tr><td><span class="role">network-admin</span></td><td class="perm">all of the above, <code>prefix:write</code> <code>prefix:delete</code> <code>vlan:write</code> <code>host:write</code> <code>export:read</code></td><td class="num">1</td></tr>
-      <tr><td><span class="role">approver</span></td><td class="perm"><code>change-request:approve</code> <code>change-request:reject</code></td><td class="num">2</td></tr>
-      <tr><td><span class="role">admin</span></td><td class="perm">all, with <code>binding:write</code> <code>token:admin</code> <code>source:write</code></td><td class="num">0</td></tr>
+      <tr><td><span class="role">viewer</span></td><td class="perm"><code>*:read</code> <code>prefix:traverse</code> <code>assistant:use</code></td><td class="num">1</td></tr>
+      <tr><td><span class="role">allocator</span></td><td class="perm">viewer + <code>prefix:allocate</code> <code>address:create update allocate release</code> <code>claim:create confirm release</code> <code>host:create update</code> <code>interface:create update</code></td><td class="num">4</td></tr>
+      <tr><td><span class="role">dns-editor</span></td><td class="perm">viewer + <code>zone:update</code> <code>record:create update delete</code> <code>export:read</code></td><td class="num">1</td></tr>
+      <tr><td><span class="role">dhcp-editor</span></td><td class="perm">viewer + <code>dhcp-scope:create update delete</code> <code>range:create update delete</code> <code>export:read</code></td><td class="num">0</td></tr>
+      <tr><td><span class="role">network-admin</span></td><td class="perm">viewer + <code>create update delete</code> on the data kinds, <code>prefix:allocate</code> <code>address:allocate release</code> <code>claim:create confirm release</code> <code>asset:link</code> <code>export:build</code> <code>source:sync</code> <code>binding:read create delete</code> <code>change-request:read</code> <code>audit:read</code></td><td class="num">1</td></tr>
+      <tr><td><span class="role">approver</span></td><td class="perm">viewer + <code>change-request:read approve</code></td><td class="num">2</td></tr>
+      <tr><td><span class="role">admin</span></td><td class="perm">every permission, with <code>role:*</code> <code>binding:*</code> <code>token:admin</code> <code>source:*</code> <code>audit:read</code> <code>webhook:*</code> <code>change-request:*</code></td><td class="num">0</td></tr>
     </tbody></table></div>
 </section>
 </div>
@@ -169,7 +171,7 @@ bembel access explain --subject d.klein \
       <li class="yes"><span class="n">✓</span><span><b>Scope.</b> <span class="scope"><span>prefix</span><span>10.20.0.0/16</span></span> holds <span class="pfx">10.20.16.0<span class="len">/22</span></span>, the object of cr-0042.</span></li>
       <li class="yes"><span class="n">✓</span><span><b>Four-eyes.</b> The requester is <span class="mono">a.berger</span>, not <span class="mono">d.klein</span>.</span></li>
     </ol>
-    <div class="cmd"><code>bembel access explain --subject d.klein --action change-request:approve --object cr-0042</code></div>
+    <div class="cmd"><code>bembel access check --explain --as kc:d.klein change-request:approve change-request/cr-0042</code></div>
   </div>
 </section>
 

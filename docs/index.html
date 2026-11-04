@@ -103,10 +103,10 @@
 </div>
 <ol class="timeline">
 <li><time>2026-10-23</time><p>The parallel run starts. Each night, bembel and a shadow copy of ONA build BIND and dhcpd files, and a job diffs them.</p></li>
-<li><time>2026-11-04 01:31</time><p>Night 12 of 14: the nightly import <code>imp-20261104-0131</code> has 219 findings. All diffs are explained.</p></li>
+<li><time>2026-11-04 01:31</time><p>Night 12 of 14: the nightly import <code>imp-20261104-0131</code> has 219 findings. All diffs are explained. Nights 1 to 12 had no unexplained line, so the counter is 12. Two nights remain.</p></li>
 <li class="is-key"><time>09:12</time><p>Import run <code>imp-20261104-0912</code> has 214 findings: orphan records, duplicate MACs, overlapping subnets, IPv6 stored as decimal.</p></li>
-<li><time>14:20</time><p>a.berger allocates <code>10.20.4.45</code> for <code>cn-045</code>. The A, AAAA and PTR records and the reservation follow.</p></li>
-<li class="is-key"><time>16:40</time><p>a.berger asks to delete the planned <code>10.20.16.0/22</code>. The change request <code>cr-0042</code> waits for a second user with approver rights.</p></li>
+<li><time>16:12</time><p>a.berger adds <code>cn-011</code> (<code>10.20.4.51</code>) in ONA. The import at 16:12 brings the A and PTR records and the DHCP reservation into bembel. ONA stays the writer until the freeze.</p></li>
+<li class="is-key"><time>17:41</time><p>a.berger asks to delete the planned container <code>10.20.16.0/22</code> (Hall 2 row C, 4 prefixes, 0 addresses). The change request <code>cr-0042</code> is a bembel-only action and waits for a second user with approver rights.</p></li>
 <li><time>2026-11-09</time><p>Cutover window A: freeze, final import, DNS goes live. DHCP follows on 11-11, secondary first.</p></li>
 </ol>
 </div>

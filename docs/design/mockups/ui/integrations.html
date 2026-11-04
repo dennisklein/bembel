@@ -17,18 +17,18 @@
   <details class="set-menu vrf-menu">
     <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="set-pop">
-      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · default table</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
-      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>v</kbd></a>
     </div>
   </details>
   <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
     <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
   <span class="spacer"></span>
-  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <a class="cr-chip" href="#" title="1 change request waits for your approval. 1 more is yours and needs another approver.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">1<span class="w"> to approve</span></span></a>
   <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
   <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
   <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
@@ -87,22 +87,22 @@ bembel agent ls</div></details>
 <div class="srcgrid">
 <section class="card srccard" id="fnt" aria-labelledby="fnt-t">
   <div class="card-head"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><h2 id="fnt-t"><span class="src managed">fnt</span> FNT Command</h2><span class="right"><button class="btn btn-sm" type="button">Run now</button></span></div>
-  <div class="card-body"><dl class="kv"><dt>Last run</dt><dd>delta today 17:45 <span class="qs ok">ok</span> · 12 s</dd><dt>Objects</dt><dd>2 311 <a class="gl" href="../../glossary.html#device" data-gl="device" data-domain="assets">devices</a>, 3 rooms, 18 <a class="gl" href="../../glossary.html#rack" data-gl="rack" data-domain="assets">racks</a>, 4 unmatched</dd><dt>Errors</dt><dd>0 · <a href="#">4 matches to review</a></dd><dt>Schedule</dt><dd>delta every 15 min · full reconcile 02:00</dd><dt>Access</dt><dd>read only mirror, service <span class="mono">fnt-sync</span></dd></dl></div>
+  <div class="card-body"><dl class="kv"><dt>Last run</dt><dd>delta today 17:45 <span class="qs ok">ok</span> · 12 s</dd><dt>Objects</dt><dd>2 311 <a class="gl" href="../../glossary.html#device" data-gl="device" data-domain="assets">devices</a>, 3 rooms, 18 <a class="gl" href="../../glossary.html#rack" data-gl="rack" data-domain="assets">racks</a>, 4 unmatched</dd><dt>Errors</dt><dd>0 · <a href="#">4 matches to review</a></dd><dt>Schedule</dt><dd>delta every 15 min · full reconcile 03:00</dd><dt>Access</dt><dd>read only mirror, service <span class="mono">fnt-sync</span></dd></dl></div>
 </section>
 
 <section class="card srccard" id="os-prod" aria-labelledby="os-t">
   <div class="card-head"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><h2 id="os-t"><span class="src managed">openstack:os-prod</span> OpenStack</h2><span class="right"><button class="btn btn-sm" type="button">Run now</button></span></div>
-  <div class="card-body"><dl class="kv"><dt>Last run</dt><dd>poll today 18:01 <span class="qs ok">ok</span> · 6 s</dd><dt>Objects</dt><dd>38 networks, 61 <a class="gl" href="../../glossary.html#subnet" data-gl="subnet" data-domain="addr">subnets</a>, 1 902 <a class="gl" href="../../glossary.html#port" data-gl="port" data-domain="assets">ports</a>, 214 floating IPs</dd><dt>Errors</dt><dd>0 · 0 conflicts</dd><dt>Schedule</dt><dd>poll every 5 min · phase 1, read only</dd><dt>Mapping</dt><dd>Keystone project to <a class="gl" href="../../glossary.html#team" data-gl="team" data-domain="access">team</a>, 9 projects</dd></dl></div>
+  <div class="card-body"><dl class="kv"><dt>Last run</dt><dd>poll today 18:01 <span class="qs ok">ok</span> · 6 s</dd><dt>Objects</dt><dd>38 networks, 61 <a class="gl" href="../../glossary.html#subnet" data-gl="subnet" data-domain="addr">subnets</a>, 1 902 <a class="gl" href="../../glossary.html#port" data-gl="port" data-domain="assets">ports</a>, 214 floating IPs</dd><dt>Errors</dt><dd>0 · 0 conflicts</dd><dt>Schedule</dt><dd>poll every 2 min · phase 1, read only</dd><dt>Mapping</dt><dd>Keystone project to <a class="gl" href="../../glossary.html#team" data-gl="team" data-domain="access">team</a>, 9 projects</dd></dl></div>
 </section>
 
 <section class="card srccard" id="k8s-prod-1" aria-labelledby="k1-t">
-  <div class="card-head"><span class="dot" style="color:var(--s-warn)" aria-hidden="true"></span><h2 id="k1-t"><span class="src managed">k8s:prod-1</span> Kubernetes</h2><span class="right"><button class="btn btn-sm" type="button">Run now</button></span></div>
-  <div class="card-body"><dl class="kv"><dt>Last run</dt><dd>reconcile today 18:00 <span class="qs ok">ok</span></dd><dt>Objects</dt><dd>36 <a class="gl" href="../../glossary.html#claim" data-gl="claim" data-domain="addr">claims</a> from Cluster API, 4 LB pools</dd><dt>Errors</dt><dd><span class="qs warn">2 claims expire in less than 1 h</span></dd><dt>Schedule</dt><dd><a class="gl" href="../../glossary.html#event" data-gl="event" data-domain="integ">event</a> driven, reconcile every 10 min</dd><dt>Identity</dt><dd><span class="mono">k8s:prod-1:capi-system:capi-ipam</span></dd></dl></div>
+  <div class="card-head"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><h2 id="k1-t"><span class="src managed">k8s:prod-1</span> Kubernetes</h2><span class="right"><button class="btn btn-sm" type="button">Run now</button></span></div>
+  <div class="card-body"><dl class="kv"><dt>Last run</dt><dd>reconcile today 18:00 <span class="qs ok">ok</span></dd><dt>Objects</dt><dd>36 <a class="gl" href="../../glossary.html#address" data-gl="address" data-domain="addr">addresses</a> for IPAddressClaims, 4 LB pools</dd><dt>Errors</dt><dd>0</dd><dt>Schedule</dt><dd><a class="gl" href="../../glossary.html#event" data-gl="event" data-domain="integ">event</a> driven, reconcile every 10 min</dd><dt>Identity</dt><dd><span class="mono">k8s:prod-1:capi-system:capi-ipam</span></dd></dl></div>
 </section>
 
 <section class="card srccard" id="k8s-dev-2" aria-labelledby="k2-t">
   <div class="card-head"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><h2 id="k2-t"><span class="src managed">k8s:dev-2</span> Kubernetes</h2><span class="right"><button class="btn btn-sm" type="button">Run now</button></span></div>
-  <div class="card-body"><dl class="kv"><dt>Last run</dt><dd>reconcile today 17:59 <span class="qs ok">ok</span></dd><dt>Objects</dt><dd>12 <a class="gl" href="../../glossary.html#claim" data-gl="claim" data-domain="addr">claims</a>, 1 LB pool</dd><dt>Errors</dt><dd>0</dd><dt>Schedule</dt><dd><a class="gl" href="../../glossary.html#event" data-gl="event" data-domain="integ">event</a> driven, reconcile every 10 min</dd><dt>Identity</dt><dd><span class="mono">k8s:dev-2:capi-system:capi-ipam</span></dd></dl></div>
+  <div class="card-body"><dl class="kv"><dt>Last run</dt><dd>reconcile today 17:59 <span class="qs ok">ok</span></dd><dt>Objects</dt><dd>12 <a class="gl" href="../../glossary.html#address" data-gl="address" data-domain="addr">addresses</a> for IPAddressClaims, 1 LB pool</dd><dt>Errors</dt><dd>0</dd><dt>Schedule</dt><dd><a class="gl" href="../../glossary.html#event" data-gl="event" data-domain="integ">event</a> driven, reconcile every 10 min</dd><dt>Identity</dt><dd><span class="mono">k8s:dev-2:capi-system:capi-ipam</span></dd></dl></div>
 </section>
 
 <section class="card srccard wide" id="libvirt" aria-labelledby="lv-t">
@@ -122,8 +122,8 @@ bembel agent ls</div></details>
 
 <section class="card srccard" id="ona-import" aria-labelledby="ona-t">
   <div class="card-head"><span class="dot" style="color:var(--c-text-3)" aria-hidden="true"></span><h2 id="ona-t"><span class="src">ona-import</span> OpenNetAdmin</h2><span class="right"><span class="pill st-neutral">read only</span></span></div>
-  <div class="card-body"><dl class="kv"><dt>Last run</dt><dd>imp-20261104-0912 · today 09:12 · 6 min 41 s</dd><dt>Objects</dt><dd>41 038 <a class="gl" href="../../glossary.html#host" data-gl="host" data-domain="addr">hosts</a>, 1 900 <a class="gl" href="../../glossary.html#subnet" data-gl="subnet" data-domain="addr">subnets</a>, 62 008 <a class="gl" href="../../glossary.html#record" data-gl="record" data-domain="dns">records</a></dd><dt>Findings</dt><dd><a href="import.html">214, 171 fixed</a></dd><dt>Schedule</dt><dd>none · <a class="gl" href="../../glossary.html#parallel-run" data-gl="parallel-run" data-domain="integ">parallel run</a> night 12 of 14</dd></dl></div>
-  <div class="card-foot"><button class="btn btn-sm" type="button" disabled title="The import runs by hand: bembel import ona. ONA is read only since 2026-10-20.">Run now</button><a class="right" href="import.html">ONA migration</a></div>
+  <div class="card-body"><dl class="kv"><dt>Last run</dt><dd>imp-20261104-1752 · today 17:52 · 3 min 19 s</dd><dt>Rows</dt><dd>41 037 <a class="gl" href="../../glossary.html#host" data-gl="host" data-domain="addr">hosts</a>, 1 904 <a class="gl" href="../../glossary.html#subnet" data-gl="subnet" data-domain="addr">subnets</a>, 62 318 DNS rows</dd><dt>Findings</dt><dd><a href="import.html">214 (37 error)</a></dd><dt>Schedule</dt><dd>01:31 nightly, every 10 min 07:02–19:52 · <a class="gl" href="../../glossary.html#parallel-run" data-gl="parallel-run" data-domain="integ">parallel run</a> night 12 of 14</dd></dl></div>
+  <div class="card-foot"><button class="btn btn-sm" type="button" disabled title="The timer runs the import. ONA is the writer until the freeze on 2026-11-09.">Run now</button><a class="right" href="import.html">ONA migration</a></div>
 </section>
 
 <section class="card srccard wide" id="issuers" aria-labelledby="is-t">
@@ -131,7 +131,7 @@ bembel agent ls</div></details>
   <div class="table-wrap"><table class="table iss">
     <thead><tr><th>Issuer</th><th>For</th><th>Audience</th><th>Subject claim</th><th>Bindings</th></tr></thead>
     <tbody>
-      <tr><td class="mono">https://id.example.org/realms/main</td><td>users, groups (claim <code>groups</code>)</td><td class="mono">bembel</td><td class="mono">sub</td><td>8</td></tr>
+      <tr><td class="mono">https://id.example.org/realms/main</td><td>users, groups (claim <code>groups</code>)</td><td class="mono">bembel</td><td class="mono">sub</td><td>9</td></tr>
       <tr><td class="mono">https://k8s-prod-1.example.org</td><td>service accounts of prod-1</td><td class="mono">bembel</td><td class="mono">sub</td><td>1</td></tr>
       <tr><td class="mono">https://k8s-dev-2.example.org</td><td>service accounts of dev-2</td><td class="mono">bembel</td><td class="mono">sub</td><td>0 <span class="muted small">uses a token</span></td></tr>
       <tr><td class="mono">https://ci.example.org</td><td>CI jobs</td><td class="mono">bembel</td><td class="mono">sub</td><td><span class="pill st-warn">0</span> <span class="muted small">no binding yet</span></td></tr>

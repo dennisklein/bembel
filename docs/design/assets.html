@@ -38,7 +38,7 @@
 <rect class="box-accent" x="260" y="50" width="170" height="90" rx="8"/>
 <text class="t-title t-on" x="276" y="76">sync worker</text>
 <text class="t-small t-on" x="276" y="98">bembel serve</text>
-<text class="t-small t-on" x="276" y="118">full 02:30, delta 15 min</text>
+<text class="t-small t-on" x="276" y="118">full 03:00, delta 15 min</text>
 <rect class="box" x="500" y="50" width="170" height="90" rx="8"/>
 <text class="t-title" x="516" y="76">PostgreSQL</text>
 <text class="t-small" x="516" y="98">asset tables, raw payload</text>
@@ -101,7 +101,7 @@
       password_file: /run/secrets/fnt-password
       group: example-readers
     schedule:
-      full: "30 2 * * *"        # nightly reconcile
+      full: "0 3 * * *"         # nightly reconcile
       delta: "*/15 * * * *"     # every 15 minutes
     page_size: 500
     min_ratio: 0.8              # abort a full run that reads < 80 % of the last count
@@ -147,7 +147,7 @@
 }</code></pre>
 
 <h2 id="sync">Sync</h2>
-<p>A sync run reads FNT Command and makes the mirror equal to it. There are two modes. The <dfn>full</dfn> run reads all entities every night at 02:30. The <dfn>delta</dfn> run reads only objects that changed since the last successful run, every 15 minutes.</p>
+<p>A sync run reads FNT Command and makes the mirror equal to it. There are two modes. The <dfn>full</dfn> run reads all entities every night at 03:00. The <dfn>delta</dfn> run reads only objects that changed since the last successful run, every 15 minutes.</p>
 <figure class="diagram wide">
 <svg viewBox="0 0 900 250" role="img" aria-labelledby="sp-t">
 <title id="sp-t">The sync pipeline: login, scrollQuery per entity, hash compare, upsert or soft delete, match, run log</title>
@@ -194,7 +194,7 @@
   <li><strong>Delta.</strong> If the tenant has a last-modified attribute, the delta asks for objects with a value after the start of the last successful run minus 2 minutes. If an entity has no such attribute, the delta reads the entity in full and uses the hash compare.</li>
   <li><strong>Soft delete.</strong> The full run sets <code>missing_since</code> on objects it did not see. A second full run without the object sets <code>deleted_at</code>. The object leaves the views. The asset link, the history and the audit events stay. If the object returns, <code>deleted_at</code> clears.</li>
   <li><strong>Guard.</strong> A full run that reads less than <code>min_ratio</code> (80 %) of the last object count aborts before it marks anything. This protects the mirror from a partial FNT outage.</li>
-  <li><strong>Locks.</strong> One sync run per source at a time. The worker takes <code>pg_try_advisory_lock</code> for the source. The three replicas never run the same source together (<a href="operations.html#ha">High availability</a>).</li>
+  <li><strong>Locks.</strong> One sync run per source at a time. The worker takes the <code>job_lease</code> row <code>sync:fnt</code> (<a href="operations.html#workers">Workers</a>) with a TTL of 2 minutes and renews it every 30 s and in each page transaction. One page of 500 objects is one transaction. A run that loses the lease stops. After a crash the lease frees after its TTL. The three replicas never run the same source together (<a href="operations.html#ha">High availability</a>).</li>
   <li><strong>Backoff.</strong> A <code>429</code> or <code>5xx</code> response makes the client wait (1 s, 2 s, 4 s … up to 60 s, 6 tries). Then the run fails and the next schedule tries again.</li>
 </ul>
 <h3 id="sync-log">Run log and metrics</h3>
@@ -301,11 +301,11 @@ links: 3 new, 2 in review      duration 4m 12s      result ok</pre>
   <li><strong>Link by MAC.</strong> A match of a port MAC to an interface MAC links the two interfaces. If the devices differ from the host link, it is a finding too.</li>
   <li><strong>One device, one host.</strong> A device links to one host. A blade chassis with four nodes has four devices. A second host that matches the same device goes to review.</li>
   <li><strong>Virtual machines.</strong> A host of kind <code>vm</code> never matches a device. Its <code>runs_on</code> link points to the hypervisor host, which has the asset link.</li>
-  <li><strong>The review list.</strong> Each entry has the host, the candidate devices and the rule that produced them. A user with <code>assetlink:write</code> picks one, rejects all, or opens both objects. The decision becomes a <em>manual link</em> (or a manual "no link"). Manual links win over every rule, and the next sync does not change them.</li>
+  <li><strong>The review list.</strong> Each entry has the host, the candidate devices and the rule that produced them. A user with <code>asset:link</code> in the site of the device picks one, rejects all, or opens both objects. The decision becomes a <em>manual link</em> (or a manual "no link"). Manual links win over every rule, and the next sync does not change them.</li>
   <li><strong>The unmatched lists.</strong> Two lists: hosts without a device, and devices without a host. Both have a filter by team and by site.</li>
   <li><strong>Re-run.</strong> The matcher runs after each sync run for the objects that changed, and nightly for all. A rule link can change when the data changes. The audit event <code>asset-link.changed</code> records old and new.</li>
 </ul>
-<p>Story data: the host <code>cn-004.kestrel.example.org</code> has the serial <code>SN7K4-0042</code>. FNT has one device with that serial in Rack A01 at U10 to U11. Rule 1 links them. The MAC <code>3c:ec:ef:12:0a:44</code> then links the interface <code>eno1</code> to the port <code>eno1</code> of the device, and <code>3c:ec:ef:12:0a:45</code> links <code>bmc</code> to the BMC port.</p>
+<p>Story data: the host <code>cn-004.kestrel.example.org</code> has the serial <code>SN7K4-0042</code>. FNT has one device with that serial in Rack A01 at U10 to U11. Rule 1 links them. The MAC <code>3c:ec:ef:12:0a:44</code> then links the interface <code>eno1</code> to the port <code>eno1</code> of the device, and <code>3c:ec:ef:12:1a:44</code> links <code>bmc</code> to the BMC port.</p>
 
 <h2 id="conflicts">Conflicts</h2>
 <p>Both systems hold some data about the same thing. bembel decides per field who wins. The sync never overwrites the loser. It shows a difference when the two disagree.</p>

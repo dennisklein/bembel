@@ -17,18 +17,18 @@
   <details class="set-menu vrf-menu">
     <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="set-pop">
-      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · default table</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
-      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>v</kbd></a>
     </div>
   </details>
   <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
     <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
   <span class="spacer"></span>
-  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <a class="cr-chip" href="#" title="1 change request waits for your approval. 1 more is yours and needs another approver.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">1<span class="w"> to approve</span></span></a>
   <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
   <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
   <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
@@ -103,12 +103,12 @@ bembel asset link show gpu-001</div></details>
   <div class="card-foot"><span>11 ports in FNT · 11 linked to an interface of the host</span><span class="right"><span class="muted">The port rows are read only. The address column is edited on the host.</span></span></div>
 </section>
 <section class="card" id="history" aria-labelledby="hist-t">
-  <div class="card-head"><h2 id="hist-t">History of sync changes</h2><span class="right">4 changes in 82 days · <a href="sync-review.html">Sync runs</a></span></div>
+  <div class="card-head"><h2 id="hist-t">History of sync changes</h2><span class="right">4 changes in 12 days · <a href="sync-review.html">Sync runs</a></span></div>
   <ul class="rows hist">
-    <li><span class="t"><b>Asset tag set</b> <span class="muted">·</span> <span class="mono">HPC-0101</span> <span class="muted">(was empty)</span></span><span class="s">2026-10-21 03:00 · full reconcile <span class="id" title="sync run sr-20261021-0300">sr-0300</span> · field <span class="mono">asset_tag</span></span><span class="acts"><span class="pill st-neutral">info</span></span></li>
-    <li><span class="t"><b>NIC replaced</b> <span class="muted">·</span> MAC of <span class="mono">nic8</span> <span class="mac">b8:3f:d2:9a:09:08</span> <span class="arrow">→</span> <span class="mac">b8:3f:d2:9a:01:08</span></span><span class="s">2026-09-30 03:00 · full reconcile · the link stays (serial). bembel updated the MAC of <a class="gl" href="../../glossary.html#interface" data-gl="interface" data-domain="addr">interface</a> <span class="mono">rail8</span>. 1 <a class="gl" href="../../glossary.html#export" data-gl="export" data-domain="integ">export</a> changed.</span><span class="acts"><span class="pill st-warn">MAC</span></span></li>
-    <li><span class="t"><b>Moved</b> <span class="muted">·</span> Rack A03 U30–31 <span class="arrow">→</span> Rack A02 U4–5</span><span class="s">2026-09-02 03:00 · full reconcile · fields <span class="mono">rack</span>, <span class="mono">position_u</span></span><span class="acts"><span class="pill st-info">position</span></span></li>
-    <li><span class="t"><b>First seen</b> <span class="muted">·</span> asset link created by serial</span><span class="s">2026-08-14 17:45 · delta · <a class="gl" href="../../glossary.html#host" data-gl="host" data-domain="addr">host</a> <span class="fqdn">gpu-001<span class="dom">.kestrel.example.org</span></span> had the serial since the <a class="gl" href="../../glossary.html#ona-import" data-gl="ona-import" data-domain="integ">ONA import</a></span><span class="acts"><span class="pill st-ok">linked</span></span></li>
+    <li><span class="t"><b>Asset tag set</b> <span class="muted">·</span> <span class="mono">HPC-0101</span> <span class="muted">(was empty)</span></span><span class="s">2026-11-02 03:00 · full reconcile <span class="id" title="sync run sr-20261102-0300">sr-0300</span> · field <span class="mono">asset_tag</span></span><span class="acts"><span class="pill st-neutral">info</span></span></li>
+    <li><span class="t"><b>NIC replaced</b> <span class="muted">·</span> MAC of <span class="mono">nic8</span> <span class="mac">b8:3f:d2:9a:09:08</span> <span class="arrow">→</span> <span class="mac">b8:3f:d2:9a:01:08</span></span><span class="s">2026-10-30 03:00 · full reconcile · the link stays (serial). bembel updated the MAC of <a class="gl" href="../../glossary.html#interface" data-gl="interface" data-domain="addr">interface</a> <span class="mono">rail8</span>. 1 <a class="gl" href="../../glossary.html#export" data-gl="export" data-domain="integ">export</a> changed.</span><span class="acts"><span class="pill st-warn">MAC</span></span></li>
+    <li><span class="t"><b>Moved</b> <span class="muted">·</span> Rack A03 U30–31 <span class="arrow">→</span> Rack A02 U4–5</span><span class="s">2026-10-27 03:00 · full reconcile · fields <span class="mono">rack</span>, <span class="mono">position_u</span></span><span class="acts"><span class="pill st-info">position</span></span></li>
+    <li><span class="t"><b>First seen</b> <span class="muted">·</span> asset link created by serial</span><span class="s">2026-10-23 03:00 · full reconcile · <a class="gl" href="../../glossary.html#host" data-gl="host" data-domain="addr">host</a> <span class="fqdn">gpu-001<span class="dom">.kestrel.example.org</span></span> had the serial since the <a class="gl" href="../../glossary.html#ona-import" data-gl="ona-import" data-domain="integ">ONA import</a></span><span class="acts"><span class="pill st-ok">linked</span></span></li>
   </ul>
 </section>
 </div>
@@ -143,7 +143,7 @@ bembel asset link show gpu-001</div></details>
       <dt>DHCP</dt><dd><a class="gl" href="../../glossary.html#reservation" data-gl="reservation" data-domain="dhcp">reservation</a> for <span class="mac">3c:ec:ef:44:21:01</span> in <b>dhcp-a</b></dd>
     </dl>
   </div>
-  <div class="card-foot"><a class="btn btn-sm btn-primary" href="hosts.html">Open host</a><a class="btn btn-sm" href="#">Change link…</a></div>
+  <div class="card-foot"><a class="btn btn-sm" href="hosts.html">Open host</a><a class="btn btn-sm" href="#">Change link…</a></div>
 </section>
 <section class="card" id="face" aria-labelledby="face-t">
   <div class="card-head"><h2 id="face-t">Front face</h2><span class="right">Rack A02 · U4–5</span></div>
@@ -169,6 +169,7 @@ bembel asset link show gpu-001</div></details>
     <tr><td><kbd>g</kbd> <kbd>r</kbd></td><td>Racks</td></tr>
     <tr><td><kbd>g</kbd> <kbd>c</kbd></td><td>Change requests</td></tr>
     <tr><td><kbd>/</kbd></td><td>Jump to an IP, prefix, MAC, host, zone or page</td></tr>
+    <tr><td><kbd>v</kbd></td><td>Open the VRF switcher</td></tr>
     <tr><td><kbd>Shift</kbd> <kbd>A</kbd></td><td>Open the assistant</td></tr>
     <tr><td><kbd>?</kbd></td><td>Help for the element under the pointer, else for this page</td></tr>
     <tr><td><kbd>Esc</kbd></td><td>Close a dialog, a menu or a pane</td></tr>
