@@ -16,6 +16,38 @@
     t.setAttribute("aria-label", "Theme: " + next);
   });
 
+  // 1b. Design system: bembel (default) or GSI (try-out, gsi.css). ?brand=gsi or ?brand=bembel
+  //     sets it; localStorage "bembel-brand" keeps it, shared with the design record.
+  //     The switch is added next to the theme switch.
+  function store(v) {
+    try { if (v === undefined) return localStorage.getItem("bembel-brand"); if (v) localStorage.setItem("bembel-brand", v); else localStorage.removeItem("bembel-brand"); } catch (_) {}
+    return null;
+  }
+  var q = new URLSearchParams(location.search).get("brand");
+  if (q === "gsi") store("gsi"); else if (q === "bembel") store(null);
+  function setBrand(gsi, btn) {
+    if (gsi) root.dataset.brand = "gsi"; else delete root.dataset.brand;
+    if (btn) {
+      btn.setAttribute("aria-pressed", String(gsi));
+      btn.title = gsi ? "Design system: GSI. Select for bembel." : "Design system: bembel. Select for GSI (try-out).";
+    }
+  }
+  var themeBtn = doc.querySelector(".topbar [data-theme-toggle]"), brandBtn = null;
+  if (themeBtn) {
+    brandBtn = doc.createElement("button");
+    brandBtn.type = "button";
+    brandBtn.className = "icon-btn brand-btn";
+    brandBtn.setAttribute("data-brand-toggle", "");
+    brandBtn.innerHTML = '<span class="sq" aria-hidden="true"></span>GSI';
+    themeBtn.parentNode.insertBefore(brandBtn, themeBtn);
+    brandBtn.addEventListener("click", function () {
+      var gsi = root.dataset.brand !== "gsi";
+      setBrand(gsi, brandBtn);
+      store(gsi ? "gsi" : null);
+    });
+  }
+  setBrand(q === "gsi" || (q !== "bembel" && store() === "gsi"), brandBtn);
+
   // 2. Copy: <button class="copy" data-copy="full text">. The full id goes to the clipboard.
   doc.addEventListener("click", function (e) {
     var b = e.target.closest("[data-copy]");

@@ -110,6 +110,30 @@
 </table>
 <p>The utilisation meter uses <code>ok</code> up to 80 %, <code>warn</code> from 80 % and <code>failed</code> from 95 %. The thresholds are settings per prefix pool. The rack views use their own tokens (<code>--rk-*</code>) and the condensed Barlow font, in the style of rackplanner.</p>
 
+<h3 id="gsi-theme">The GSI theme (try-out)</h3>
+<p>A second theme applies the GSI design system to the same pages. Indigo stays the default. The theme changes only tokens and a small set of shapes, so each page, state and domain keeps its meaning. The files are <code>docs/design/mockups/assets/gsi.css</code> for the UI and <code>docs/assets/site-gsi.css</code> for the design record.</p>
+<p>To see it, select <b>GSI</b> in the top bar of the design record or of a mockup, or add <code>?brand=gsi</code> to the address. The choice stays in the browser (<code>localStorage</code> key <code>bembel-brand</code>), and the design record and the mockups share it. <code>?brand=bembel</code> goes back to indigo.</p>
+<table>
+<thead><tr><th>Part</th><th>Indigo (default)</th><th>GSI</th></tr></thead>
+<tbody>
+<tr><td>Brand colour</td><td>Indigo <code>#5b46c9</code> for buttons, links and the brand mark.</td><td>House orange <code>#FABE5D</code> for decoration only: the line under the top bar, the brand mark, the primary button fill (with black text, 10.4:1), the active item rule, square bullets.</td></tr>
+<tr><td>Links, focus, selection</td><td>Indigo.</td><td>Dark blue <code>#005ea8</code> (6.6:1). On dark surfaces <code>#7fb6e8</code>.</td></tr>
+<tr><td>Orange text</td><td>Not used.</td><td><code>#9a6304</code> (5.1:1), never the house orange on a light surface.</td></tr>
+<tr><td>Domains</td><td>Indigo, teal, blue, slate, plum, copper.</td><td>The GSI harmonizing colours at AA values: dark blue <code>#005ea8</code>, teal <code>#00806a</code>, light blue <code>#0d7c9b</code>, grey <code>#4d4d4d</code>, ruby <code>#b10057</code>, orange <code>#9a6304</code>.</td></tr>
+<tr><td>States</td><td>Green, amber, red, blue, grey, indigo.</td><td>Green <code>#3f7e28</code>, orange <code>#9a6304</code>, red <code>#c92a1b</code>, blue <code>#005ea8</code>, grey <code>#6e6e6e</code>; <code>pending</code> is light blue <code>#0d7c9b</code>.</td></tr>
+<tr><td>Surfaces</td><td>Cool lavender grey.</td><td>White and neutral greys (<code>#f6f6f6</code>, <code>#ededed</code>). Dark theme: the navy of the GSI master (<code>#131519</code>, <code>#20242b</code>, <code>#292d35</code>).</td></tr>
+<tr><td>Type</td><td>IBM Plex Sans in the UI, Inter and Source Serif 4 in the record.</td><td>Helvetica, then Arial. Bold headings. Monospace stays for addresses and code, because GSI has no monospaced font.</td></tr>
+<tr><td>Shape</td><td>Radii 4, 6 and 10 px in the UI, up to 18 px in the record.</td><td>Radii 2, 4 and 6 px, 1 px hairlines, flat cards, no gradients. Page heads use the GSI pattern: eyebrow, orange line, heading.</td></tr>
+</tbody>
+</table>
+<p>The rack views keep the <code>--rk-*</code> tokens and the Barlow font. Only the tape labels change to the house orange. The team colours of the device faces do not change, because they come from the data.</p>
+<figure class="shot"><a href="mockups/ui/overview.html?brand=gsi"><img src="img/ui-overview-gsi.webp" alt="The overview page in the GSI theme: white top bar with an orange line, Helvetica, orange primary buttons with black text, dark blue links" loading="lazy"></a><figcaption>The overview in the GSI theme. Compare with the <a href="mockups/ui/overview.html?brand=bembel">indigo overview</a> at the top of this chapter.</figcaption></figure>
+<figure class="shot"><a href="mockups/ui/prefix.html?brand=gsi"><img src="img/ui-prefix-gsi.webp" alt="The prefix page of 10.20.4.0/22 in the GSI theme with the address map in the state colours" loading="lazy"></a><figcaption>Prefix kestrel-compute. The state colours of the address map come from the GSI web palette.</figcaption></figure>
+<figure class="shot"><a href="mockups/ui/zone.html?brand=gsi"><img src="img/ui-zone-gsi.webp" alt="The zone page of kestrel.example.org in the GSI theme" loading="lazy"></a><figcaption>Zone kestrel.example.org. The DNS domain colour is the GSI teal.</figcaption></figure>
+<figure class="shot"><a href="mockups/ui/rack.html?brand=gsi"><img src="img/ui-rack-gsi.webp" alt="The rack elevation of Row A in the GSI theme with orange tape labels" loading="lazy"></a><figcaption>Row A. The drawing sheet keeps its own tokens. The tape labels use the house orange.</figcaption></figure>
+<figure class="shot"><a href="mockups/ui/assistant-chat.html?brand=gsi"><img src="img/ui-assistant-chat-gsi.webp" alt="The assistant chat in the GSI theme with a draft card and an orange Open draft button" loading="lazy"></a><figcaption>The assistant pane. The user message uses the dark blue, the draft action uses the orange button.</figcaption></figure>
+<div class="callout note"><p>The GSI theme is a try-out for review. If it is accepted, it can become the default, and the indigo theme can stay as the option or go away. The tokens are the only contract, so the change is one file.</p></div>
+
 <h2 id="keys">Keys</h2>
 <table>
 <thead><tr><th>Key</th><th>Action</th><th>Where</th></tr></thead>

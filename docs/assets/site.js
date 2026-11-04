@@ -48,6 +48,26 @@
     });
   }
 
+  /* ---------- design system: bembel (default) or GSI (try-out) ----------
+     The head script sets <html data-brand="gsi"> before the first paint. The choice is
+     kept in localStorage "bembel-brand", so the mockups on the same site follow it. */
+  var brandButton = $("[data-brand-toggle]");
+  function applyBrand(gsi) {
+    if (gsi) root.setAttribute("data-brand", "gsi"); else root.removeAttribute("data-brand");
+    if (brandButton) {
+      brandButton.setAttribute("aria-pressed", gsi ? "true" : "false");
+      brandButton.setAttribute("title", gsi ? "Design system: GSI. Select for bembel." : "Design system: bembel. Select for GSI (try-out).");
+    }
+  }
+  applyBrand(root.getAttribute("data-brand") === "gsi");
+  if (brandButton) {
+    brandButton.addEventListener("click", function () {
+      var gsi = root.getAttribute("data-brand") !== "gsi";
+      applyBrand(gsi);
+      store("bembel-brand", gsi ? "gsi" : null);
+    });
+  }
+
   /* ---------- sidebar drawer ---------- */
   var body = doc.body;
   var toggle = $(".nav-toggle");
