@@ -3,6 +3,7 @@
    Area stylesheets never restyle the classes of this file; they add page classes only.
    Colours come only from the tokens below. Indigo primary on cool lavender grey, light and dark. */
 @import url('fonts/fonts.css');
+@import url('gsi.css');
 
 /* ---------- tokens: light ---------- */
 :root,[data-theme="light"]{
