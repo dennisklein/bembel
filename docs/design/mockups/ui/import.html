@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ONA migration · bembel</title>
+<link rel="stylesheet" href="../assets/bembel.css">
+<link rel="stylesheet" href="../assets/shell.css">
+<link rel="stylesheet" href="../assets/access.css">
+</head>
+<body data-page="import">
+<a class="skip" href="#main">Skip to content</a>
+<div class="app">
+<!-- SHELL: top bar. Copy it unchanged to each page; change only aria-current in the sidebar and the VRF in the switcher. -->
+<header class="topbar">
+  <a class="icon-btn nav-toggle" href="#nav" aria-controls="nav" aria-expanded="false" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></a>
+  <a class="brand" href="overview.html" aria-label="bembel: overview"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M12.6 7h6.8M13.6 7v2.6C9.9 11 8.4 13.6 8.4 16.8c0 3.2 1.4 5.7 3.1 7.2h9c1.7-1.5 3.1-4 3.1-7.2 0-3.2-1.5-5.8-5.2-7.2V7M19.4 8.3c4.4-.3 6.9 1.4 6.9 4.4 0 2.3-1.1 3.9-2.5 4.8M9.4 15.6h13.2"/></svg></span><span class="brand-name">bembel</span></a>
+  <details class="set-menu vrf-menu">
+    <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+    <div class="set-pop">
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+    </div>
+  </details>
+  <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
+    <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
+  <span class="spacer"></span>
+  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
+  <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
+  <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
+    <div class="more-pop" role="menu">
+      <div class="um-head"><b>Dennis Klein</b><span class="mono">d.klein · id.example.org</span><span class="muted small">groups netops, hpc-ops</span></div>
+      <a href="#" role="menuitem">My access</a><a href="#" role="menuitem">Tokens</a><a href="#" role="menuitem">Sign out</a></div></details>
+  <button class="icon-btn" type="button" data-help aria-label="Help (?)">?</button>
+  <button class="icon-btn" type="button" data-theme-toggle aria-label="Theme: auto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/></svg></button>
+</header>
+<!-- SHELL: sidebar. Groups and icons follow the glossary domains (docs/assets/glossary-data.js). -->
+<nav class="sidebar" id="nav" aria-label="Navigation">
+  <a class="nav-item" href="overview.html" data-key="o"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview<span class="count attn">6</span></a>
+  <div class="nav-label" data-domain="addr"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 1.8h3v3h-3Z M2 11.2h3v3H2Z M11 11.2h3v3h-3Z M8 4.8v3.2 M3.5 11.2V8h9v3.2"/></svg>Addressing</div>
+  <a class="nav-item" data-domain="addr" href="prefixes.html" data-key="p"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v4H4zM4 16h6v4H4zM14 10h6v4h-6z"/><path d="M7 8v8M10 12h4"/></svg>Prefixes</a>
+  <a class="nav-item" data-domain="addr" href="hosts.html" data-key="h"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>Hosts</a>
+  <a class="nav-item" data-domain="addr" href="vlans.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/><path d="M8 3v18"/></svg>VLANs and partitions</a>
+  <a class="nav-item" data-domain="addr" href="fabrics.html" data-key="f"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8M7.5 7.5l9 9"/></svg>Fabrics</a>
+  <a class="nav-item" data-domain="addr" href="routing.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h4a4 4 0 004-4V8"/></svg>Routing and groups</a>
+  <div class="nav-label" data-domain="dns"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 1 0 0 12.4A6.2 6.2 0 0 0 8 1.8Z M1.8 8h12.4 M8 1.8C6 3.8 5.4 5.8 5.4 8S6 12.2 8 14.2 M8 1.8c2 2 2.6 4 2.6 6.2S10 12.2 8 14.2"/></svg>DNS and DHCP</div>
+  <a class="nav-item" data-domain="dns" href="zones.html" data-key="z"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-2.5 2.6-3.5 5.6-3.5 9s1 6.4 3.5 9M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9"/></svg>Zones</a>
+  <a class="nav-item" data-domain="dhcp" href="dhcp.html" data-key="d"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12l4 5-4 5H3z"/><path d="M7 12h5"/></svg>DHCP scopes</a>
+  <a class="nav-item" data-domain="integ" href="exports.html" data-key="e"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Exports<span class="count attn">1 diff</span></a>
+  <div class="nav-label" data-domain="assets"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 1.8h8.8v12.4H3.6Z M3.6 5h8.8 M3.6 8.2h8.8 M3.6 11.4h8.8 M5.6 3.4h1.2 M5.6 6.6h1.2 M5.6 9.8h1.2"/></svg>Assets</div>
+  <a class="nav-item" data-domain="assets" href="floor.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 3v16M15 5v16"/></svg>Floor map</a>
+  <a class="nav-item" data-domain="assets" href="rack.html" data-key="r"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="1.5"/><path d="M5 8h14M5 13.5h14M8 5.3h2M8 10.8h2M8 16.5h2"/></svg>Racks</a>
+  <a class="nav-item" data-domain="assets" href="sync-review.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0114-5.3L20 9M20 12a8 8 0 01-14 5.3L4 15"/><path d="M20 4v5h-5M4 20v-5h5"/></svg>Sync review<span class="count attn">4</span></a>
+  <div class="nav-label" data-domain="access"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 3.6v4.1c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.6Z M5.9 8l1.5 1.5 2.8-3"/></svg>Access</div>
+  <a class="nav-item" data-domain="access" href="bindings.html" data-key="b"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.4c1.8.9 3 2.9 3 5.6"/></svg>Roles and bindings</a>
+  <a class="nav-item" data-domain="access" href="changes.html" data-key="c"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg>Change requests<span class="count attn">2</span></a>
+  <a class="nav-item" data-domain="access" href="audit.html" data-key="a"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Audit log</a>
+  <div class="nav-label" data-domain="integ"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h9 M8.6 2.6 11 5 8.6 7.4 M14 11H5 M7.4 8.6 5 11l2.4 2.4"/></svg>Integrations</div>
+  <a class="nav-item" data-domain="integ" href="integrations.html" data-key="i"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0z"/><path d="M12 16v5"/></svg>Sources and syncs</a>
+  <a class="nav-item" data-domain="integ" href="import.html" data-key="m" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6M9 15l2.5 2.5L16 13"/></svg>ONA migration<span class="count attn">214</span></a>
+  <div class="side-foot">bembel v0.1.0 · api v1</div>
+</nav>
+<!-- /SHELL -->
+
+<main class="main" id="main">
+<div class="banner err offline" role="alert"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M2 8.5a15 15 0 0120 0M5 12a10 10 0 0114 0M8.5 15.5a5 5 0 017 0M12 19h.01M3 3l18 18"/></svg>
+  <div class="grow"><b>Offline.</b> <span data-why>The event stream of bembel stopped. The page shows old data.</span> The page tries again every 5 s.</div>
+  <button class="btn btn-sm" type="button" onclick="location.reload()">Reload</button></div>
+
+<div class="page-head">
+  <div><h1>ONA migration</h1>
+    <div class="sub"><span>Import run <b class="mono">imp-20261104-0912</b></span><span class="sep">·</span><span>Started today 09:12 by d.klein, 6 min 41 s</span><span class="sep">·</span><span>Source OpenNetAdmin 19.0.x on MariaDB <span class="mono">ona-db.example.org</span></span></div></div>
+  <div class="actions">
+    <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
+      <div class="cli-pop">bembel import ona --dsn mysql://ona@ona-db.example.org/ona --dry-run
+bembel import show imp-20261104-0912
+bembel import findings --state open --code ona.overlap
+bembel export diff --against ona --night 12</div></details>
+    <button class="btn" type="button">Run again…</button>
+    <a class="btn btn-primary" href="export-diff.html">Export diff</a>
+  </div>
+</div>
+
+<div class="ov">
+<div class="ov-main">
+<section class="card" id="summary" aria-labelledby="sum-t">
+  <div class="card-head"><h2 id="sum-t">What the run imported</h2><span class="right"><span class="pill st-ok">finished</span></span></div>
+  <div class="sumgrid">
+    <div class="table-wrap"><table class="table kinds">
+      <thead><tr><th>ONA table</th><th>bembel kind</th><th class="num">Rows</th><th class="num">Imported</th><th class="num">Findings</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">hosts</td><td>host</td><td class="num">41 038</td><td class="num">41 038</td><td class="num">38</td></tr>
+        <tr><td class="mono">interfaces</td><td>interface, address</td><td class="num">44 706</td><td class="num">44 512</td><td class="num">67</td></tr>
+        <tr><td class="mono">subnets</td><td>prefix (subnet)</td><td class="num">1 912</td><td class="num">1 900</td><td class="num">52</td></tr>
+        <tr><td class="mono">blocks</td><td>prefix (container)</td><td class="num">86</td><td class="num">86</td><td class="num">0</td></tr>
+        <tr><td class="mono">dns</td><td>record, derived or manual</td><td class="num">62 104</td><td class="num">62 008</td><td class="num">96</td></tr>
+        <tr><td class="mono">vlans, vlan_campuses</td><td>VLAN, VLAN domain</td><td class="num">412</td><td class="num">412</td><td class="num">0</td></tr>
+        <tr><td class="mono">dhcp_pools, dhcp_failover_groups</td><td>range, failover pair</td><td class="num">231</td><td class="num">231</td><td class="num">0</td></tr>
+        <tr><td class="mono">locations, custom_attributes</td><td>site, tag, attribute</td><td class="num">1 044</td><td class="num">1 044</td><td class="num">0</td></tr>
+      </tbody></table></div>
+    <div class="fsum">
+      <div class="big"><b>214</b><span>findings</span></div>
+      <div class="progress lg" aria-hidden="true"><i class="p-ok" style="width:80%"></i><i class="p-waiting" style="width:20%"></i></div>
+      <p class="statline"><span><b>171</b> fixed</span><span><b>43</b> open</span><span><b>0</b> accepted</span></p>
+      <ul class="bycode">
+        <li><span class="mono">ona.orphan-dns</span><b>96</b></li>
+        <li><span class="mono">ona.dup-mac</span><b>38</b></li>
+        <li><span class="mono">ona.ipv6-ambiguous</span><b>31</b></li>
+        <li><span class="mono">ona.stale-subnet-id</span><b>28</b></li>
+        <li><span class="mono">ona.overlap</span><b>21</b></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="card" id="findings" aria-labelledby="fi-t">
+  <div class="card-head"><h2 id="fi-t">Findings</h2><span class="right">10 of 43 open</span></div>
+  <div class="filterbar">
+    <span class="seg" role="group" aria-label="State"><button type="button" aria-pressed="true">open <span class="n">43</span></button><button type="button">fixed <span class="n">171</span></button><button type="button">all <span class="n">214</span></button></span>
+    <select class="select" aria-label="Code"><option>Any code</option><option>ona.orphan-dns</option><option>ona.dup-mac</option><option>ona.overlap</option><option>ona.ipv6-ambiguous</option><option>ona.stale-subnet-id</option></select>
+    <select class="select" aria-label="Severity"><option>Any severity</option><option>error</option><option>warn</option><option>info</option></select>
+    <span class="grow"></span>
+    <button class="btn btn-sm" type="button">Apply all suggested fixes…</button>
+  </div>
+  <div class="table-wrap"><table class="table finds">
+    <thead><tr><th>Code</th><th>Severity</th><th>Object</th><th>Suggested fix</th><th>State</th><th><span class="sr-only">Actions</span></th></tr></thead>
+    <tbody>
+      <tr class="sel"><td class="code"><span class="mono">ona.overlap</span></td><td><span class="pill st-failed">error</span></td>
+        <td><span class="pfx">10.20.4.0<span class="len">/22</span></span> and <span class="pfx">10.20.6.0<span class="len">/24</span></span><span class="s">Subnets kestrel-compute and old-test-6 overlap in one address space.</span><button class="btn btn-sm btn-agent expl" type="button" data-assistant="explain-finding" title="Runs the assistant with the advisory explain-finding. Tools: read only. It changes nothing.">Explain this finding</button></td>
+        <td>Move old-test-6 to VRF <span class="mono">lab</span>, or delete it. It has 0 addresses.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Fix…</button></td></tr>
+      <tr><td class="code"><span class="mono">ona.dup-mac</span></td><td><span class="pill st-warn">warn</span></td>
+        <td><span class="mac">3c:ec:ef:12:0a:51</span><span class="s">On hosts gpu-014 and gpu-014-old, interface eno1.</span></td>
+        <td>Keep it on gpu-014. Clear the MAC on gpu-014-old.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Fix…</button></td></tr>
+      <tr><td class="code"><span class="mono">ona.orphan-dns</span></td><td><span class="pill st-warn">warn</span></td>
+        <td><span class="fqdn">lic02<span class="dom">.kestrel.example.org</span></span> A <span class="ip">10.20.4.9</span><span class="s">The record has no host. ONA kept it after the host was deleted.</span></td>
+        <td>Import as a manual A record, owner hpc-ops.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Fix…</button></td></tr>
+      <tr><td class="code"><span class="mono">ona.ipv6-ambiguous</span></td><td><span class="pill st-warn">warn</span></td>
+        <td><span class="mono">ip_addr = 4254076641…6564</span><span class="s">Decimal in a column that holds IPv4 as a 32 bit number.</span></td>
+        <td>Read as <span class="ip">2001:db8:4200:204::4</span>. The subnet is dual stack.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Fix…</button></td></tr>
+      <tr><td class="code"><span class="mono">ona.stale-subnet-id</span></td><td><span class="pill st-neutral">info</span></td>
+        <td><span class="mono">interfaces.id 20931</span><span class="s">Points at subnet id 77, which no longer exists.</span></td>
+        <td>Find the subnet by the address: <span class="pfx">10.20.8.0<span class="len">/24</span></span>.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Fix…</button></td></tr>
+      <tr><td class="code"><span class="mono">ona.orphan-dns</span></td><td><span class="pill st-warn">warn</span></td>
+        <td><span class="fqdn">oss-03<span class="dom">.kestrel.example.org</span></span> A <span class="ip">10.20.4.73</span><span class="s">No host oss-03. The rack plan has oss-01 and oss-02.</span></td>
+        <td>Delete the record. No address uses it.</td><td><span class="pill st-ok">fixed</span></td>
+        <td class="ra"><button class="btn btn-sm btn-ghost" type="button">Undo</button></td></tr>
+      <tr><td class="code"><span class="mono">ona.overlap</span></td><td><span class="pill st-failed">error</span></td>
+        <td><span class="pfx">172.16.4.0<span class="len">/22</span></span> and <span class="pfx">172.16.4.0<span class="len">/24</span></span><span class="s">The same network twice. Both are in the ONA default space.</span></td>
+        <td>Delete the /24. It holds 3 addresses. Move them to the /22.</td><td><span class="pill st-warn">open</span></td>
+        <td class="ra"><button class="btn btn-sm" type="button">Fix…</button></td></tr>
+      <tr><td class="code"><span class="mono">ona.dup-mac</span></td><td><span class="pill st-warn">warn</span></td>
+        <td><span class="mac">3c:ec:ef:12:0a:45</span><span class="s">On cn-004 interface bmc and on the host cn-004-bmc.</span></td>
+        <td>Merge the two hosts. The BMC address is in VRF oob.</td><td><span class="pill st-ok">fixed</span></td>
+        <td class="ra"><button class="btn btn-sm btn-ghost" type="button">Undo</button></td></tr>
+    </tbody></table></div>
+  <div class="card-foot"><span>A fix is a normal change with the origin <span class="org web">web</span> and the source <span class="src">ona-import</span>. It goes in the audit log.</span><span class="right"><button class="btn btn-sm" type="button">Show 35 more</button></span></div>
+</section>
+</div>
+
+<div class="ov-side">
+<section class="card" id="parallel" aria-labelledby="par-t">
+  <div class="card-head"><h2 id="par-t">Parallel run</h2><span class="right">night 12 of 14</span></div>
+  <div class="card-body par">
+    <div class="nights" role="img" aria-label="Diff per night: 5 118 lines on night 1, 3 lines on night 12. Nights 13 and 14 are still to come.">
+      <i class="n-bad" title="Night 1: 5 118 lines">1</i><i class="n-bad" title="Night 2: 904 lines">2</i><i class="n-bad" title="Night 3: 311 lines">3</i><i class="n-warn" title="Night 4: 86 lines">4</i><i class="n-warn" title="Night 5: 40 lines">5</i><i class="n-warn" title="Night 6: 21 lines">6</i><i class="n-warn" title="Night 7: 12 lines">7</i><i class="n-ok" title="Night 8: 4 lines, explained">8</i><i class="n-ok" title="Night 9: 0 lines">9</i><i class="n-ok" title="Night 10: 0 lines">10</i><i class="n-ok" title="Night 11: 2 lines, explained">11</i><i class="n-warn cur" title="Night 12: 3 lines">12</i><i class="n-todo" title="Night 13">13</i><i class="n-todo" title="Night 14">14</i></div>
+    <p class="small muted">Each night bembel builds the BIND and dhcpd <a class="gl" href="../../glossary.html#export" data-gl="export" data-domain="integ">exports</a> and diffs them against the files that ONA makes.</p>
+  </div>
+  <ul class="rows mini tg">
+    <li><span class="t"><span class="dot" style="color:var(--s-warn)" aria-hidden="true"></span><b class="mono">ns1</b> BIND <span class="pill st-warn">diff 3 lines</span></span><span class="s">kestrel.example.org: 2 <a class="gl" href="../../glossary.html#record" data-gl="record" data-domain="dns">records</a> only in bembel, 1 TXT with other quoting</span></li>
+    <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">ns2</b> BIND <span class="qs ok">equal</span></span><span class="s">Same <a class="gl" href="../../glossary.html#zone" data-gl="zone" data-domain="dns">zone</a> serials as ns1 after the transfer</span></li>
+    <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">dhcp1</b> ISC dhcpd <span class="qs ok">equal</span></span><span class="s">dhcpd -t ok · 1 912 <a class="gl" href="../../glossary.html#subnet" data-gl="subnet" data-domain="addr">subnets</a> · 2 140 <a class="gl" href="../../glossary.html#reservation" data-gl="reservation" data-domain="dhcp">reservations</a></span></li>
+    <li><span class="t"><span class="dot" style="color:var(--s-ok)" aria-hidden="true"></span><b class="mono">dhcp2</b> ISC dhcpd <span class="qs ok">equal</span></span><span class="s"><a class="gl" href="../../glossary.html#failover-pair" data-gl="failover-pair" data-domain="dhcp">Failover pair</a> dhcp-a</span></li>
+  </ul>
+  <div class="card-foot"><a href="export-diff.html">Show the diff of night 12</a><span class="right"><button class="btn btn-sm btn-agent" type="button" data-assistant="explain-diff" title="Runs the assistant with the advisory explain-diff. Tools: read only. It changes nothing.">Explain diff</button></span></div>
+</section>
+
+<section class="card" id="state" aria-labelledby="st-t">
+  <div class="card-head"><h2 id="st-t">ONA today</h2></div>
+  <ul class="rows mini">
+    <li><span class="t">ONA is the source until the cutover</span><span class="s">Users still edit ONA. The import <span class="src">ona-import</span> reads it each night at 01:31.</span></li>
+    <li><span class="t"><b>2 nights</b> to the end of the parallel run</span><span class="s">The <a class="gl" href="../../glossary.html#cutover" data-gl="cutover" data-domain="integ">cutover</a> needs 14 nights with an empty or explained diff. Window A is on 2026-11-09.</span></li>
+  </ul>
+</section>
+</div>
+</div>
+</main>
+
+</div>
+
+
+<dialog id="help" class="dlg" aria-labelledby="help-t">
+  <header><h2 id="help-t">Keyboard shortcuts</h2><span class="step-n">Esc closes</span></header>
+  <div class="body"><table class="keys">
+    <tr><td><kbd>g</kbd> <kbd>o</kbd></td><td>Overview</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>p</kbd></td><td>Prefixes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>h</kbd></td><td>Hosts</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>z</kbd></td><td>Zones</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>d</kbd></td><td>DHCP scopes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>e</kbd></td><td>Exports</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>r</kbd></td><td>Racks</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>c</kbd></td><td>Change requests</td></tr>
+    <tr><td><kbd>/</kbd></td><td>Jump to an IP, prefix, MAC, host, zone or page</td></tr>
+    <tr><td><kbd>Shift</kbd> <kbd>A</kbd></td><td>Open the assistant</td></tr>
+    <tr><td><kbd>?</kbd></td><td>Help for the element under the pointer, else for this page</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Close a dialog, a menu or a pane</td></tr>
+  </table><p class="muted">No key <a class="gl" href="../../glossary.html#allocate" data-gl="allocate" data-domain="addr">allocates</a>, deletes or <a class="gl" href="../../glossary.html#approve" data-gl="approve" data-domain="access">approves</a>.</p></div>
+  <footer><form method="dialog"><button class="btn">Close</button></form></footer>
+</dialog>
+<script src="../assets/shell.js"></script>
+<script src="../../../assets/glossary-data.js"></script>
+<script src="../../../assets/glossary.js"></script>
+</body>
+</html>

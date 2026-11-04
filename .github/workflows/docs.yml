@@ -1,0 +1,69 @@
+# Builds the design record (docs/) and publishes it on GitHub Pages.
+# A pull request only builds; a push to main or a manual run also deploys.
+name: docs
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "tools/site/**"
+      - "mise.toml"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "tools/site/**"
+      - "mise.toml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The versions come from mise.toml, as on a developer machine.
+      - uses: jdx/mise-action@v2
+        with:
+          install_args: python
+
+      # Fails on a broken link, a missing page or a missing anchor.
+      - name: Build the site
+        run: mise run docs
+
+      # Fails when a mockup misses the glossary links of the current glossary.
+      - name: Check the glossary links of the mockups
+        run: mise run docs:check
+
+      # Only for a deploy: the artifact that deploy-pages publishes.
+      - if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    # One deploy at a time; a running deploy completes.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

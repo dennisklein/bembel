@@ -1,0 +1,557 @@
+{
+  "site": {
+    "title": "bembel",
+    "label": "Design",
+    "record": "bembel design record",
+    "tagline": "The source of truth for addresses, names and networks.",
+    "repo": "https://github.com/dennisklein/bembel",
+    "branch": "main",
+    "pages_url": "https://dennisklein.github.io/bembel/",
+    "home": "index.html"
+  },
+  "header_links": [
+    {
+      "title": "Design",
+      "path": "index.html",
+      "anchor": "chapters",
+      "section": "design"
+    },
+    {
+      "title": "Mockups",
+      "path": "design/mockups/index.html",
+      "section": "mockups"
+    },
+    {
+      "title": "API",
+      "path": "design/api.html",
+      "section": "api"
+    },
+    {
+      "title": "Glossary",
+      "path": "design/glossary.html",
+      "section": "glossary"
+    }
+  ],
+  "check_verbatim": [
+    "design/mockups/ui/",
+    "design/mockups/assets/"
+  ],
+  "parts": [
+    {
+      "number": "I",
+      "title": "Foundations",
+      "pages": [
+        {
+          "number": 1,
+          "path": "design/decision.html",
+          "title": "Why a new IPAM",
+          "short": "Why a new IPAM",
+          "description": "OpenNetAdmin today, its limits, the requirements, the options and why bembel is a new tool.",
+          "anchors": [
+            "today",
+            "problems",
+            "requirements",
+            "options",
+            "scores",
+            "choice",
+            "name",
+            "license",
+            "sources"
+          ]
+        },
+        {
+          "number": 2,
+          "path": "design/architecture.html",
+          "title": "Architecture and stack",
+          "short": "Architecture and stack",
+          "description": "The components, Go or Rust, PostgreSQL, SvelteKit, mise and the deployment.",
+          "anchors": [
+            "overview",
+            "components",
+            "api-first",
+            "backend",
+            "database",
+            "frontend",
+            "toolchain",
+            "deployment",
+            "scale",
+            "repo"
+          ]
+        },
+        {
+          "number": 3,
+          "path": "design/model.html",
+          "title": "Core model",
+          "short": "Core model",
+          "description": "All object kinds and their relations: addressing, fabrics, hosts, DNS, DHCP, assets, routing, access.",
+          "anchors": [
+            "principles",
+            "overview",
+            "common",
+            "addressing",
+            "fabrics",
+            "hosts",
+            "vms",
+            "dns",
+            "dhcp",
+            "assets",
+            "routing",
+            "firewall",
+            "access",
+            "history",
+            "ownership",
+            "schema"
+          ]
+        },
+        {
+          "path": "design/glossary.html",
+          "title": "Glossary",
+          "short": "Glossary",
+          "description": "The project words in six domains, with the chapter that explains each word.",
+          "icon": "glossary",
+          "anchors": [
+            "d-addr",
+            "d-dns",
+            "d-dhcp",
+            "d-assets",
+            "d-access",
+            "d-integ"
+          ]
+        }
+      ]
+    },
+    {
+      "number": "II",
+      "title": "Model mappings",
+      "pages": [
+        {
+          "number": 4,
+          "path": "design/map-ona.html",
+          "title": "Mapping from OpenNetAdmin",
+          "short": "Mapping from OpenNetAdmin",
+          "description": "Each ONA table and column, its bembel object, the transform and the data problems.",
+          "anchors": [
+            "summary",
+            "tables",
+            "subnets",
+            "hosts",
+            "interfaces",
+            "dns",
+            "domains",
+            "dhcp",
+            "vlans",
+            "blocks",
+            "locations",
+            "attributes",
+            "auth",
+            "not-mapped",
+            "problems"
+          ]
+        },
+        {
+          "number": 5,
+          "path": "design/map-netbox.html",
+          "title": "Mapping to NetBox",
+          "short": "Mapping to NetBox",
+          "description": "Each bembel object and its NetBox model, the differences and the NetBox import and export.",
+          "anchors": [
+            "summary",
+            "ipam",
+            "dcim",
+            "tenancy",
+            "dns-dhcp",
+            "extras",
+            "auth",
+            "api",
+            "differences",
+            "exchange"
+          ]
+        }
+      ]
+    },
+    {
+      "number": "III",
+      "title": "How it works",
+      "pages": [
+        {
+          "number": 6,
+          "path": "design/allocation.html",
+          "title": "Allocation and lifecycle",
+          "short": "Allocation and lifecycle",
+          "description": "Next free address and prefix, claims, idempotency, concurrency and the states of an address.",
+          "anchors": [
+            "states",
+            "allocate",
+            "prefix-allocate",
+            "claims",
+            "idempotency",
+            "concurrency",
+            "constraints",
+            "reaper",
+            "bulk",
+            "explainer"
+          ]
+        },
+        {
+          "number": 7,
+          "path": "design/dns.html",
+          "title": "DNS and BIND export",
+          "short": "DNS and BIND export",
+          "description": "Zones, views, derived records, reverse zones and the BIND export with serials, checks and delivery.",
+          "anchors": [
+            "zones",
+            "views",
+            "records",
+            "derived",
+            "reverse",
+            "classless",
+            "export",
+            "files",
+            "serial",
+            "checks",
+            "delivery",
+            "compat",
+            "later"
+          ]
+        },
+        {
+          "number": 8,
+          "path": "design/dhcp.html",
+          "title": "DHCP and ISC dhcpd export",
+          "short": "DHCP and ISC dhcpd export",
+          "description": "Scopes, pools, reservations, options, failover and the dhcpd.conf export, leases and Kea later.",
+          "anchors": [
+            "scopes",
+            "pools",
+            "reservations",
+            "options",
+            "failover",
+            "ipoib",
+            "export",
+            "checks",
+            "delivery",
+            "leases",
+            "compat",
+            "kea"
+          ]
+        },
+        {
+          "number": 9,
+          "path": "design/fabrics.html",
+          "title": "Fabrics",
+          "short": "Fabrics",
+          "description": "Ethernet, Ethernet with RoCEv2 and InfiniBand: VLANs, partitions, GUIDs, QoS profiles and the OpenSM export.",
+          "anchors": [
+            "kinds",
+            "dual-stack",
+            "ethernet",
+            "roce",
+            "infiniband",
+            "partitions",
+            "guids",
+            "opensm",
+            "example"
+          ]
+        },
+        {
+          "number": 10,
+          "path": "design/routing.html",
+          "title": "Routing and firewall",
+          "short": "Routing and firewall",
+          "description": "ASNs, route targets, static routes, prefix lists and address groups as feeds for routers and firewalls.",
+          "anchors": [
+            "scope",
+            "asn",
+            "vrf-rt",
+            "routes",
+            "prefix-lists",
+            "address-groups",
+            "feeds",
+            "example"
+          ]
+        },
+        {
+          "number": 11,
+          "path": "design/access.html",
+          "title": "Access control",
+          "short": "Access control",
+          "description": "OIDC login, subjects, roles, bindings with scopes, tokens, change requests and the audit log.",
+          "anchors": [
+            "principles",
+            "login",
+            "issuers",
+            "subjects",
+            "permissions",
+            "roles",
+            "bindings",
+            "scopes",
+            "evaluation",
+            "tokens",
+            "changes",
+            "audit",
+            "api",
+            "examples"
+          ]
+        },
+        {
+          "number": 12,
+          "path": "design/assets.html",
+          "title": "Assets from FNT Command",
+          "short": "Assets from FNT Command",
+          "description": "The read-only asset mirror, the sync, the match of hosts to devices and the rack views.",
+          "anchors": [
+            "scope",
+            "fnt",
+            "entities",
+            "sync",
+            "matching",
+            "conflicts",
+            "views",
+            "rack",
+            "limits"
+          ]
+        }
+      ]
+    },
+    {
+      "number": "IV",
+      "title": "Interfaces",
+      "pages": [
+        {
+          "number": 13,
+          "path": "design/api.html",
+          "title": "REST API",
+          "short": "REST API",
+          "description": "Conventions, resources, allocation calls, errors, pagination, events and the OpenAPI document.",
+          "anchors": [
+            "principles",
+            "conventions",
+            "resources",
+            "examples",
+            "errors",
+            "pagination",
+            "concurrency",
+            "events",
+            "webhooks",
+            "cli",
+            "versioning",
+            "openapi"
+          ]
+        },
+        {
+          "number": 14,
+          "path": "design/ui.html",
+          "title": "Web UI",
+          "short": "Web UI",
+          "description": "Principles, layout, colours, keys and the page list of the web UI.",
+          "anchors": [
+            "principles",
+            "layout",
+            "colours",
+            "keys",
+            "permissions",
+            "pages",
+            "mobile"
+          ]
+        },
+        {
+          "number": 15,
+          "path": "design/assistant.html",
+          "title": "Assistant and help",
+          "short": "Assistant and help",
+          "description": "The help system of the web UI and the CLI, and the assistant on a local LLM: advisory buttons, free chat, tools and limits.",
+          "anchors": [
+            "help",
+            "topics",
+            "hints",
+            "assistant",
+            "llm",
+            "tools",
+            "advisories",
+            "chat",
+            "drafts",
+            "safety",
+            "privacy"
+          ]
+        },
+        {
+          "number": 16,
+          "path": "design/ui-addr.html",
+          "title": "UI: addressing",
+          "short": "UI: addressing",
+          "description": "Overview, prefixes, prefix detail with the address map, allocation and address details.",
+          "anchors": [
+            "overview",
+            "prefixes",
+            "prefix",
+            "allocate",
+            "address",
+            "search"
+          ]
+        },
+        {
+          "number": 17,
+          "path": "design/ui-dns.html",
+          "title": "UI: DNS and DHCP",
+          "short": "UI: DNS and DHCP",
+          "description": "Zones, records, DHCP scopes and the export page with diff and checks.",
+          "anchors": [
+            "zones",
+            "zone",
+            "record",
+            "dhcp",
+            "exports"
+          ]
+        },
+        {
+          "number": 18,
+          "path": "design/ui-assets.html",
+          "title": "UI: assets and fabrics",
+          "short": "UI: assets and fabrics",
+          "description": "Floor map, rack elevation, device, sync review and fabrics.",
+          "anchors": [
+            "floor",
+            "rack",
+            "device",
+            "review",
+            "fabrics"
+          ]
+        },
+        {
+          "number": 19,
+          "path": "design/ui-access.html",
+          "title": "UI: access and migration",
+          "short": "UI: access and migration",
+          "description": "Bindings, tokens, audit, change requests, the ONA import and the parallel run.",
+          "anchors": [
+            "access",
+            "tokens",
+            "audit",
+            "changes",
+            "import",
+            "parallel",
+            "integrations"
+          ]
+        },
+        {
+          "path": "design/mockups/index.html",
+          "title": "Mockup gallery",
+          "short": "Mockup gallery",
+          "description": "All web UI pages of the bembel design as static HTML mockups.",
+          "anchors": []
+        }
+      ]
+    },
+    {
+      "number": "V",
+      "title": "Integrations",
+      "pages": [
+        {
+          "number": 20,
+          "path": "design/vms.html",
+          "title": "Virtual machines",
+          "short": "Virtual machines",
+          "description": "One VM model for libvirt and OpenStack: the hypervisor agent, the libvirt hook and cloud-init.",
+          "anchors": [
+            "model",
+            "libvirt",
+            "agent",
+            "hook",
+            "cloud-init",
+            "lifecycle",
+            "openstack"
+          ]
+        },
+        {
+          "number": 21,
+          "path": "design/openstack.html",
+          "title": "OpenStack",
+          "short": "OpenStack",
+          "description": "Read-only sync, the Neutron IPAM driver, Keystone, Designate and Ironic.",
+          "anchors": [
+            "summary",
+            "sync",
+            "driver",
+            "keystone",
+            "designate",
+            "ironic",
+            "phases",
+            "risks"
+          ]
+        },
+        {
+          "number": 22,
+          "path": "design/kubernetes.html",
+          "title": "Kubernetes",
+          "short": "Kubernetes",
+          "description": "Cluster API IPAM provider, LB pool sync, external-dns webhook and service account identities.",
+          "anchors": [
+            "summary",
+            "capi",
+            "pools",
+            "external-dns",
+            "cni",
+            "identity",
+            "terraform",
+            "phases",
+            "risks"
+          ]
+        }
+      ]
+    },
+    {
+      "number": "VI",
+      "title": "Operations",
+      "pages": [
+        {
+          "number": 23,
+          "path": "design/migration.html",
+          "title": "Migration from OpenNetAdmin",
+          "short": "Migration from OpenNetAdmin",
+          "description": "The import, the findings, the parallel run of the exports and the cutover.",
+          "anchors": [
+            "plan",
+            "phases",
+            "extract",
+            "import",
+            "findings",
+            "parallel",
+            "cutover",
+            "rollback",
+            "explainer"
+          ]
+        },
+        {
+          "number": 24,
+          "path": "design/operations.html",
+          "title": "Deployment and operations",
+          "short": "Deployment and operations",
+          "description": "Packages, configuration, high availability, backup, monitoring and upgrades.",
+          "anchors": [
+            "deploy",
+            "config",
+            "ha",
+            "backup",
+            "observability",
+            "upgrades",
+            "security"
+          ]
+        },
+        {
+          "number": 25,
+          "path": "design/roadmap.html",
+          "title": "Roadmap",
+          "short": "Roadmap",
+          "description": "The releases, their scope and the open questions.",
+          "anchors": [
+            "v1",
+            "v1-1",
+            "v2",
+            "open",
+            "sources"
+          ]
+        }
+      ]
+    }
+  ]
+}

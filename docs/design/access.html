@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Access control</title>
+<meta name="description" content="OIDC login for users and services, subjects, permissions, roles, scoped bindings, the SQL predicate, tokens, change requests, audit and the access API.">
+</head><body>
+<h1>Access control</h1>
+
+<p class="lede">bembel is API first, so every client passes the same gate: an OpenID Connect identity, a set of scoped bindings and one SQL predicate. This chapter shows how a user or a service logs in, what a binding grants, how the database decides, and how dangerous changes get a second pair of eyes.</p>
+<ul class="keypoints">
+<li>Authentication is outside: Keycloak for users, trusted issuers for services (Kubernetes, GitLab, GitHub). bembel stores no password.</li>
+<li>Authorization is inside the database: roles are sets of <code>kind:verb</code> permissions, bindings give a role to a subject in a scope. Allow only in v1.</li>
+<li>One predicate filters lists and checks single objects. It uses GiST containment on <code>inet</code> and <code>ltree</code>, so counts and pages are right.</li>
+<li>A hidden object gives 404. A visible object without the permission gives 403 with the missing permission.</li>
+<li>Four-eyes: a change request holds deleting a prefix tree, deleting a zone, bulk changes over 50 objects and changing an <code>admin</code> binding.</li>
+<li>The audit log is append-only and records denies and the assistant as origin.</li>
+</ul>
+
+<h2 id="principles">Principles</h2>
+<p>The rules below are binding for the design. Each one removes a class of error.</p>
+<ol class="steps">
+<li><strong>One gate.</strong> The web UI, the CLI, the Neutron driver, the Kubernetes controllers and the assistant call the public REST API. There is no second path to the data.</li>
+<li><strong>Identity from the IdP.</strong> bembel trusts a fixed list of issuers. It checks signature, issuer, audience and expiry. It keeps no password and no user directory.</li>
+<li><strong>Permission is data.</strong> Roles, bindings and scopes are rows in PostgreSQL. A history table keeps every version. "Who could do what on this day" has an answer.</li>
+<li><strong>Allow only.</strong> A request is allowed when at least one binding allows it. There is no deny rule in v1. A narrower binding is the way to limit access.</li>
+<li><strong>The scope is a closed list.</strong> Seven scope types, each one a typed column with an index. There are no free expressions.</li>
+<li><strong>Least surprise for lists.</strong> A list shows only what the user may read. Totals and pages are correct. Nothing leaks through counts, search or vectors.</li>
+<li><strong>Grant only what you hold.</strong> A user can give a role only if the user holds it, and only inside the own scope.</li>
+</ol>
+<figure class="diagram wide"><svg viewBox="0 0 920 270" role="img" aria-labelledby="f-model-t"><title id="f-model-t">Subject, binding, role, scope and the resource</title>
+<rect class="box" x="16" y="70" width="196" height="120" rx="8"/>
+<text class="t-title" x="28" y="92">subject</text>
+<text class="t-small t-mono" x="28" y="112">user     kc:a.berger</text>
+<text class="t-small t-mono" x="28" y="129">group    kc:hpc-ops</text>
+<text class="t-small t-mono" x="28" y="146">service  k8s:prod-1:...</text>
+<rect class="box-accent" x="276" y="70" width="176" height="120" rx="8"/>
+<text class="t-title t-on" x="288" y="92">binding</text>
+<text class="t-small t-on" x="288" y="112">subject</text>
+<text class="t-small t-on" x="288" y="129">+ role</text>
+<text class="t-small t-on" x="288" y="146">+ scope (terms AND)</text>
+<text class="t-small t-on" x="288" y="163">+ expiry</text>
+<rect class="box" x="516" y="16" width="196" height="96" rx="8"/>
+<text class="t-title" x="528" y="38">role</text>
+<text class="t-small" x="528" y="58">allocator</text>
+<text class="t-small" x="528" y="75">prefix:read</text>
+<text class="t-small" x="528" y="92">address:allocate ...</text>
+<rect class="box" x="516" y="150" width="196" height="100" rx="8"/>
+<text class="t-title" x="528" y="172">scope</text>
+<text class="t-small" x="528" y="192">vrf, prefix, zone,</text>
+<text class="t-small" x="528" y="209">site, team, tag</text>
+<text class="t-small" x="528" y="226">NULL = no limit</text>
+<rect class="box-ok" x="776" y="70" width="130" height="120" rx="8"/>
+<text class="t-title" x="788" y="92">resource</text>
+<text class="t-small" x="788" y="112">row in</text>
+<text class="t-small" x="788" y="129">the database</text>
+<text class="t-small" x="788" y="146">e.g. a prefix</text>
+<path class="edge-accent" d="M212,130 L274,130" marker-end="url(#arrow-accent)"/>
+<text class="t-small t-muted" x="243" y="122" text-anchor="middle">has</text>
+<path class="edge-accent" d="M452,100 L514,70" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M452,160 L514,190" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M712,64 L810,68" marker-end="url(#arrow)"/>
+<path class="edge" d="M712,200 L810,192" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="760" y="52" text-anchor="middle">may do</text>
+<text class="t-small t-muted" x="760" y="224" text-anchor="middle">where</text>
+</svg><figcaption>A binding joins a subject to a role inside a scope. A request is allowed when one binding gives the permission and the scope matches the resource.</figcaption></figure>
+
+<div class="callout why"><p class="callout-title">Why not OpenFGA, SpiceDB, Cedar or OPA</p>
+<p>The hard part of an IPAM is list filtering over a CIDR tree. Relationship services return lists of ids (OpenFGA caps them at 1 000 by default) and cannot test CIDR containment. Cedar has no partial evaluation in Go, and OPA compiles only a part of Rego to a filter. In the database the filter is a join. The code stays behind an <code>Authorizer</code> interface, so Cedar can add conditional rules later (v2).</p></div>
+
+<table>
+<thead><tr><th>Option</th><th>Hierarchy</th><th>List filter</th><th>Operations</th><th>Decision</th></tr></thead>
+<tbody>
+<tr><td>Scoped RBAC in PostgreSQL</td><td>GiST on <code>inet</code>, <code>ltree</code></td><td>one SQL predicate</td><td>none extra</td><td>v1</td></tr>
+<tr><td>OpenFGA / SpiceDB</td><td>tuples that must follow every prefix move</td><td>id lists, caps</td><td>second service and database</td><td>no</td></tr>
+<tr><td>Cedar</td><td>entity <code>in</code></td><td>experimental, Rust only</td><td>embedded</td><td>maybe v2</td></tr>
+<tr><td>OPA / Rego</td><td>free</td><td>partial subset</td><td>bundles</td><td>no</td></tr>
+</tbody></table>
+
+<h2 id="login">Login: users, CLI and services</h2>
+<p>All paths end in the same thing: a verified token with an issuer, a subject id and (for users) groups. The API accepts <code>Authorization: Bearer</code> with a JWT of a trusted issuer or with a personal access token (<a href="#tokens">tokens</a>). Browser sessions are the exception: the cookie leads to a token in the server.</p>
+
+<h3 id="login-browser">Browser: BFF session</h3>
+<p>The SvelteKit UI is static files. The Go binary serves it and acts as the backend for frontend (BFF). It is a confidential OIDC client of Keycloak (<code>bembel-ui</code>). It does the code exchange, keeps the tokens server side and gives the browser one cookie.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 920 444" role="img" aria-labelledby="f-browser-t"><title id="f-browser-t">Browser login with authorization code, PKCE and a BFF session</title>
+<line class="edge-muted" x1="90" y1="56" x2="90" y2="434"/>
+<line class="edge-muted" x1="460" y1="56" x2="460" y2="434"/>
+<line class="edge-muted" x1="830" y1="56" x2="830" y2="434"/>
+<rect class="box" x="10" y="14" width="160" height="42" rx="8"/>
+<text class="t-title" x="90" y="32" text-anchor="middle">Browser</text>
+<text class="t-small" x="90" y="48" text-anchor="middle">user</text>
+<rect class="box-accent" x="380" y="14" width="160" height="42" rx="8"/>
+<text class="t-title t-on" x="460" y="32" text-anchor="middle">bembel</text>
+<text class="t-small t-on" x="460" y="48" text-anchor="middle">BFF + API</text>
+<rect class="box" x="750" y="14" width="160" height="42" rx="8"/>
+<text class="t-title" x="830" y="32" text-anchor="middle">Keycloak</text>
+<text class="t-small" x="830" y="48" text-anchor="middle">id.example.org</text>
+<path class="edge" d="M94,82 L456,82" marker-end="url(#arrow)"/>
+<text class="t-small" x="275" y="76" text-anchor="middle">GET /  (no session cookie)</text>
+<path class="edge-accent" d="M456,118 L94,118" marker-end="url(#arrow-accent)"/>
+<text class="t-small" x="275" y="112" text-anchor="middle">302 to Keycloak: code_challenge S256, state, nonce</text>
+<path class="edge" d="M94,154 L826,154" marker-end="url(#arrow)"/>
+<text class="t-small" x="460" y="148" text-anchor="middle">log in: password and second factor</text>
+<path class="edge-muted" d="M826,190 L94,190" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="460" y="184" text-anchor="middle">302 /auth/callback?code=...&amp;state=...</text>
+<path class="edge" d="M94,226 L456,226" marker-end="url(#arrow)"/>
+<text class="t-small" x="275" y="220" text-anchor="middle">GET /auth/callback?code=...</text>
+<path class="edge-accent" d="M464,262 L826,262" marker-end="url(#arrow-accent)"/>
+<text class="t-small" x="645" y="256" text-anchor="middle">POST /token: code + code_verifier + client secret</text>
+<path class="edge-muted" d="M826,298 L464,298" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="645" y="292" text-anchor="middle">id_token, access_token, refresh_token</text>
+<rect class="box-soft" x="230" y="317" width="460" height="26" rx="6"/>
+<text class="t-small" x="460" y="334" text-anchor="middle">bembel keeps the tokens in the session store and reads the groups claim</text>
+<path class="edge-accent" d="M456,370 L94,370" marker-end="url(#arrow-accent)"/>
+<text class="t-small" x="275" y="364" text-anchor="middle">Set-Cookie bembel_session (HttpOnly, Secure, SameSite=Lax)</text>
+<path class="edge" d="M94,406 L456,406" marker-end="url(#arrow)"/>
+<text class="t-small" x="275" y="400" text-anchor="middle">GET /v1/prefixes + cookie + X-Bembel-Csrf header</text>
+</svg>
+<figcaption>The browser never sees a token. It holds one HttpOnly cookie. The API reads the access token from the session store.</figcaption></figure>
+<ul>
+<li>The cookie is <code>HttpOnly</code>, <code>Secure</code> and <code>SameSite=Lax</code>. JavaScript cannot read it.</li>
+<li>Each write call needs the header <code>X-Bembel-Csrf</code> with a value from <code>GET /v1/me</code>. The server also checks <code>Origin</code>.</li>
+<li>The session lasts 8 hours idle and 24 hours absolute. bembel refreshes the access token with the refresh token. At each refresh it reads the groups again, so a removed group works at once after the refresh (at most 5 minutes).</li>
+<li>Logout ends the session and calls the end-session endpoint of Keycloak.</li>
+</ul>
+
+<h3 id="login-cli">CLI: device authorization grant</h3>
+<p><code>bembel login</code> uses the device grant (RFC 8628). It works on a server without a browser: the user opens the URL on any device. A loopback code flow with PKCE (RFC 8252) is the fallback with <code>--browser</code>.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 980 408" role="img" aria-labelledby="f-cli-t"><title id="f-cli-t">CLI login with the device authorization grant</title>
+<line class="edge-muted" x1="90" y1="56" x2="90" y2="398"/>
+<line class="edge-muted" x1="357" y1="56" x2="357" y2="398"/>
+<line class="edge-muted" x1="623" y1="56" x2="623" y2="398"/>
+<line class="edge-muted" x1="890" y1="56" x2="890" y2="398"/>
+<rect class="box" x="10" y="14" width="160" height="42" rx="8"/>
+<text class="t-title" x="90" y="32" text-anchor="middle">bembel CLI</text>
+<text class="t-small" x="90" y="48" text-anchor="middle">terminal</text>
+<rect class="box-accent" x="277" y="14" width="160" height="42" rx="8"/>
+<text class="t-title t-on" x="357" y="32" text-anchor="middle">bembel</text>
+<text class="t-small t-on" x="357" y="48" text-anchor="middle">API</text>
+<rect class="box" x="543" y="14" width="160" height="42" rx="8"/>
+<text class="t-title" x="623" y="32" text-anchor="middle">Keycloak</text>
+<text class="t-small" x="623" y="48" text-anchor="middle">id.example.org</text>
+<rect class="box-soft" x="810" y="14" width="160" height="42" rx="8"/>
+<text class="t-title" x="890" y="32" text-anchor="middle">Browser</text>
+<text class="t-small" x="890" y="48" text-anchor="middle">any device</text>
+<path class="edge" d="M94,82 L353,82" marker-end="url(#arrow)"/>
+<text class="t-small" x="223" y="76" text-anchor="middle">GET /v1/auth/config</text>
+<path class="edge-muted" d="M353,118 L94,118" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="223" y="112" text-anchor="middle">issuer, client_id bembel-cli</text>
+<path class="edge-accent" d="M94,154 L619,154" marker-end="url(#arrow-accent)"/>
+<text class="t-small" x="357" y="148" text-anchor="middle">POST /device: scope openid bembel offline_access</text>
+<path class="edge-muted" d="M619,190 L94,190" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="357" y="184" text-anchor="middle">device_code, user_code WXYZ-1234, verification_uri</text>
+<rect class="box-soft" x="6" y="209" width="230" height="26" rx="6"/>
+<text class="t-small" x="121" y="226" text-anchor="middle">CLI prints the URL and the code</text>
+<path class="edge-muted" d="M886,262 L627,262" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="757" y="256" text-anchor="middle">open the URL, enter the code, log in</text>
+<path class="edge-accent" d="M94,298 L619,298" marker-end="url(#arrow-accent)"/>
+<text class="t-small" x="357" y="292" text-anchor="middle">POST /token (device_code), repeat every 5 s</text>
+<path class="edge-muted" d="M619,334 L94,334" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="357" y="328" text-anchor="middle">access_token + refresh_token</text>
+<path class="edge" d="M94,370 L353,370" marker-end="url(#arrow)"/>
+<text class="t-small" x="223" y="364" text-anchor="middle">GET /v1/me  Authorization: Bearer ...</text>
+</svg>
+<figcaption>The CLI never handles the password. It stores the refresh token in the user config directory with mode 0600.</figcaption></figure>
+<p>The CLI is a public client (<code>bembel-cli</code>), so it holds no secret. For scripts the user makes a personal access token and sets <code>BEMBEL_TOKEN</code>.</p>
+
+<h3 id="login-machine">Services: trusted issuers</h3>
+<p>A service sends a JWT that its own platform issued. bembel validates it directly with the keys of the issuer (JWKS). There is no token exchange and no secret in the pod. The same code serves four cases.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 920 300" role="img" aria-labelledby="f-machine-t"><title id="f-machine-t">A Kubernetes service calls the API with a projected service account token</title>
+<line class="edge-muted" x1="90" y1="56" x2="90" y2="290"/>
+<line class="edge-muted" x1="460" y1="56" x2="460" y2="290"/>
+<line class="edge-muted" x1="830" y1="56" x2="830" y2="290"/>
+<rect class="box" x="10" y="14" width="160" height="42" rx="8"/>
+<text class="t-title" x="90" y="32" text-anchor="middle">capi-ipam pod</text>
+<text class="t-small" x="90" y="48" text-anchor="middle">prod-1</text>
+<rect class="box-accent" x="380" y="14" width="160" height="42" rx="8"/>
+<text class="t-title t-on" x="460" y="32" text-anchor="middle">bembel</text>
+<text class="t-small t-on" x="460" y="48" text-anchor="middle">API</text>
+<rect class="box" x="750" y="14" width="160" height="42" rx="8"/>
+<text class="t-title" x="830" y="32" text-anchor="middle">prod-1 API server</text>
+<text class="t-small" x="830" y="48" text-anchor="middle">issuer</text>
+<rect class="box-soft" x="6" y="65" width="380" height="26" rx="6"/>
+<text class="t-small" x="196" y="82" text-anchor="middle">kubelet projects a token: aud bembel, 1 h, rotated</text>
+<path class="edge-accent" d="M94,118 L456,118" marker-end="url(#arrow-accent)"/>
+<text class="t-small" x="275" y="112" text-anchor="middle">POST /v1/claims  Bearer eyJ...</text>
+<path class="edge" d="M464,154 L826,154" marker-end="url(#arrow)"/>
+<text class="t-small" x="645" y="148" text-anchor="middle">GET /openid/v1/jwks (first use, or unknown kid)</text>
+<path class="edge-muted" d="M826,190 L464,190" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="645" y="184" text-anchor="middle">public keys (cached)</text>
+<rect class="box-soft" x="180" y="209" width="560" height="26" rx="6"/>
+<text class="t-small" x="460" y="226" text-anchor="middle">check iss, aud, exp, signature; subject = k8s:prod-1:capi-system:capi-ipam</text>
+<path class="edge-muted" d="M456,262 L94,262" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="275" y="256" text-anchor="middle">201 Created (claim)</text>
+</svg>
+<figcaption>bembel trusts each cluster directly. It needs no secret of the pod and no call to Keycloak.</figcaption></figure>
+<table>
+<thead><tr><th>Service</th><th>Issuer</th><th>Audience</th><th>Subject</th></tr></thead>
+<tbody>
+<tr><td>Cluster API IPAM provider</td><td>Kubernetes <code>prod-1</code></td><td><code>bembel</code></td><td><code>k8s:prod-1:capi-system:capi-ipam</code></td></tr>
+<tr><td>external-dns webhook (dev)</td><td>Kubernetes <code>dev-2</code></td><td><code>bembel</code></td><td><code>k8s:dev-2:external-dns:bembel-webhook</code></td></tr>
+<tr><td>bembel-agent on <code>hv-03</code></td><td>Keycloak (client credentials)</td><td><code>bembel</code></td><td><code>kc:bembel-agent-hv-03</code></td></tr>
+<tr><td>DNS sync job in CI</td><td>GitLab <code>gitlab.example.org</code></td><td><code>bembel</code></td><td><code>gl:project_path:infra/dns-sync:ref_type:branch:ref:main</code></td></tr>
+<tr><td>Docs or Ansible job</td><td>GitHub Actions</td><td><code>bembel</code></td><td><code>gh:repo:dennisklein/bembel:ref:refs/heads/main</code></td></tr>
+</tbody></table>
+<div class="callout note"><p class="callout-title">Prefer federation to long tokens</p>
+<p>A projected service account token lives one hour and rotates. A CI token lives for one job. A personal access token lives for months. Use OIDC federation when the platform offers it.</p></div>
+
+<h2 id="issuers">Trusted issuers</h2>
+<p>The list of issuers is static configuration in <code>config.yaml</code>. bembel reloads it on <code>SIGHUP</code> and at each pod start. An unknown issuer gives 401. Trust is per issuer, so the same service account name in two clusters gives two different subjects.</p>
+<pre><code class="language-yaml">auth:
+  session:
+    cookie: bembel_session
+    idle_timeout: 8h
+    absolute_timeout: 24h
+  issuers:
+    - name: kc                       # short id, used as subject prefix
+      issuer: https://id.example.org/realms/main
+      audiences: [bembel]
+      jwks: discovery                # fetch .well-known, cache, refresh on unknown kid
+      algorithms: [RS256, ES256]
+      clock_skew: 30s
+      claims:
+        subject: sub
+        username: preferred_username
+        groups: groups               # Keycloak group mapper
+      group_prefix: "kc:"            # group "netops" becomes kc:netops
+      subject_prefix: "kc:"
+      clients:
+        ui:  {client_id: bembel-ui,  secret_file: /run/secrets/oidc-ui}
+        cli: {client_id: bembel-cli}
+
+    - name: k8s-prod-1
+      issuer: https://k8s-prod-1.example.org
+      audiences: [bembel]           # never the default API server audience
+      jwks: {file: /etc/bembel/jwks/prod-1.json}   # for a cluster without public discovery
+      kind: service
+      claims: {subject: sub}
+      strip_prefix: "system:serviceaccount:"
+      subject_prefix: "k8s:prod-1:"  # k8s:prod-1:capi-system:capi-ipam
+
+    - name: k8s-dev-2
+      issuer: https://k8s-dev-2.example.org
+      audiences: [bembel]
+      jwks: discovery
+      kind: service
+      strip_prefix: "system:serviceaccount:"
+      subject_prefix: "k8s:dev-2:"
+
+    - name: gitlab
+      issuer: https://gitlab.example.org
+      audiences: [bembel]
+      jwks: discovery
+      kind: service
+      subject_prefix: "gl:"
+      allow_subjects:                # glob list; other tokens are refused
+        - "project_path:infra/dns-sync:ref_type:branch:ref:main"
+
+    - name: github
+      issuer: https://token.actions.githubusercontent.com
+      audiences: [bembel]
+      jwks: discovery
+      kind: service
+      subject_prefix: "gh:"
+      allow_subjects: ["repo:dennisklein/bembel:ref:refs/heads/main"]</code></pre>
+<p>For each bearer token bembel runs these checks in this order. The first failure gives 401 with the problem type <code>auth.invalid-token</code> and a short reason in the audit log (not in the answer).</p>
+<table>
+<thead><tr><th>#</th><th>Check</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Format</td><td>Three parts, <code>alg</code> in the allow list of the issuer (never <code>none</code>)</td></tr>
+<tr><td>2</td><td>Issuer</td><td><code>iss</code> equals a configured issuer, exact string</td></tr>
+<tr><td>3</td><td>Signature</td><td>Key from the JWKS by <code>kid</code>. An unknown <code>kid</code> refreshes the JWKS, at most once per minute per issuer</td></tr>
+<tr><td>4</td><td>Audience</td><td><code>aud</code> contains one of <code>audiences</code></td></tr>
+<tr><td>5</td><td>Time</td><td><code>exp</code>, <code>nbf</code>, <code>iat</code> with the clock skew</td></tr>
+<tr><td>6</td><td>Subject</td><td><code>sub</code> exists; for <code>allow_subjects</code> it matches a glob</td></tr>
+<tr><td>7</td><td>Map</td><td>Build the subject key and the group list (with prefixes)</td></tr>
+</tbody></table>
+<div class="callout why"><p class="callout-title">Why the audience is mandatory</p>
+<p>A Kubernetes token for the default audience is valid for the API server of the cluster. Any pod could pass it to bembel if bembel accepted it. A dedicated audience <code>bembel</code> limits the token to this one use.</p></div>
+<p>The libraries are <code>coreos/go-oidc</code> and <code>lestrrat-go/jwx</code>. The validator interface can accept <code>cnf</code> claims (DPoP, mTLS) later. v1 does not need them, because tokens are short and the BFF hides them from the browser.</p>
+
+<h2 id="subjects">Subjects</h2>
+<p>A subject is who acts. Bindings point at subjects. A request has several effective subjects: the user and each group of the token.</p>
+<table>
+<thead><tr><th>Kind</th><th>Key</th><th>Made from</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>user</td><td><code>&lt;prefix&gt;&lt;username&gt;</code></td><td>issuer + <code>sub</code>; the key shows <code>preferred_username</code></td><td><code>kc:d.klein</code></td></tr>
+<tr><td>group</td><td><code>&lt;group_prefix&gt;&lt;name&gt;</code></td><td>entry of the groups claim at each request</td><td><code>kc:netops</code></td></tr>
+<tr><td>service</td><td><code>&lt;prefix&gt;&lt;sub&gt;</code></td><td>issuer + <code>sub</code> of a machine token, or the owner of a personal access token</td><td><code>k8s:prod-1:capi-system:capi-ipam</code></td></tr>
+</tbody></table>
+<pre><code class="language-sql">CREATE TABLE subject (
+  id          uuid PRIMARY KEY DEFAULT uuidv7(),
+  kind        text NOT NULL CHECK (kind IN ('user','group','service')),
+  issuer      text NOT NULL,            -- name from auth.issuers
+  external_id text NOT NULL,            -- sub, or the group name
+  key         text NOT NULL UNIQUE,     -- kc:d.klein, kc:netops, k8s:prod-1:...
+  display     text,
+  last_seen   timestamptz,
+  UNIQUE (issuer, kind, external_id)
+);</code></pre>
+<ul>
+<li>A user row appears at the first login. A group row appears when a binding names it. bembel does not copy group members. It reads the groups from each token, so the IdP stays the one owner of membership.</li>
+<li>A binding for a service may end in <code>*</code> for the last segments, for example <code>k8s:prod-1:capi-system:*</code>. Users and groups take no wildcard.</li>
+<li>Each team (<code>hpc-ops</code>) is also a group in the IdP. The team owns objects. The group <code>kc:hpc-ops</code> holds bindings. Both use the same name by convention, and the link is only the name.</li>
+<li>Human users get their rights through groups where possible (<code>kc:netops</code>). A direct user binding is for exceptions.</li>
+</ul>
+
+<h2 id="permissions">Permissions</h2>
+<p>A permission is <code>&lt;kind&gt;:&lt;verb&gt;</code>. The kinds are the object kinds of the model. The verb list is closed and fixed in code. A role may use <code>*</code> as kind (<code>*:read</code>), never as verb pair.</p>
+<table>
+<thead><tr><th>Kind</th><th>Verbs</th><th>Scope is tested on</th></tr></thead>
+<tbody>
+<tr><td><code>vrf</code></td><td>read create update delete</td><td>the VRF</td></tr>
+<tr><td><code>prefix</code></td><td>read create update delete <strong>allocate</strong> traverse</td><td>VRF, cidr, owner, site, tags of the prefix</td></tr>
+<tr><td><code>range</code></td><td>read create update delete</td><td>the subnet that holds the range</td></tr>
+<tr><td><code>address</code></td><td>read create update delete <strong>allocate</strong> <strong>release</strong></td><td>the subnet of the address (and its owner and tags)</td></tr>
+<tr><td><code>claim</code></td><td>read create confirm release</td><td>the subnet of the claim</td></tr>
+<tr><td><code>vlan</code>, <code>vlan-domain</code></td><td>read create update delete</td><td>site, owner, tags</td></tr>
+<tr><td><code>fabric</code>, <code>ib-partition</code></td><td>read create update delete</td><td>owner, tags</td></tr>
+<tr><td><code>host</code></td><td>read create update delete</td><td>site, owner, tags</td></tr>
+<tr><td><code>interface</code></td><td>read create update delete</td><td>the host</td></tr>
+<tr><td><code>zone</code></td><td>read create update delete</td><td>zone path, owner</td></tr>
+<tr><td><code>record</code></td><td>read create update delete</td><td>the zone of the record</td></tr>
+<tr><td><code>view</code></td><td>read create update delete</td><td>global only</td></tr>
+<tr><td><code>dhcp-scope</code></td><td>read create update delete</td><td>the subnet</td></tr>
+<tr><td><code>dhcp-server</code></td><td>read create update delete</td><td>global only</td></tr>
+<tr><td><code>export</code></td><td>read build</td><td>global only (the export target)</td></tr>
+<tr><td><code>asn</code>, <code>static-route</code>, <code>address-group</code></td><td>read create update delete</td><td>VRF, owner, tags</td></tr>
+<tr><td><code>asset</code> (site, rack, device, port, link)</td><td>read link</td><td>site subtree</td></tr>
+<tr><td><code>team</code>, <code>tag</code>, <code>attribute</code></td><td>read create update delete</td><td>global only</td></tr>
+<tr><td><code>source</code></td><td>read update sync</td><td>global only</td></tr>
+<tr><td><code>event</code>, <code>webhook</code></td><td>read; webhook also create update delete</td><td>event: visibility of the object</td></tr>
+<tr><td><code>draft</code></td><td>read create apply</td><td>own drafts</td></tr>
+<tr><td><code>role</code></td><td>read create update delete</td><td>global only</td></tr>
+<tr><td><code>binding</code></td><td>read create delete</td><td>the scope of the new binding (<a href="#bindings">delegation</a>)</td></tr>
+<tr><td><code>token</code></td><td>read create revoke; <code>admin</code> for tokens of others</td><td>own tokens</td></tr>
+<tr><td><code>change-request</code></td><td>read create approve</td><td>the target of the request</td></tr>
+<tr><td><code>audit</code></td><td>read</td><td>global only</td></tr>
+</tbody></table>
+<ul>
+<li><strong>traverse</strong> is an implied permission. Any binding that reaches a descendant gives <code>traverse</code> on its ancestors. The user then sees the parent as a stub (id, cidr, name) so the tree has a path. A stub shows no tags, no owner and no counts.</li>
+<li><strong>global only</strong> means that a narrower scope never matches. A binding with a vrf term gives nothing for <code>view:read</code>. The rule is safe by default: a term that does not apply to a kind makes the binding silent for that kind.</li>
+<li>A permission string is stable API. The UI reads the list from <code>GET /v1/roles</code> to draw the role editor.</li>
+</ul>
+
+<h2 id="roles">Roles</h2>
+<p>A role is a named set of permissions. Seven roles are built in and cannot change. An admin can add custom roles with the same permission strings.</p>
+<table>
+<thead><tr><th>Role</th><th>Permissions</th><th>Use</th></tr></thead>
+<tbody>
+<tr><td><code>viewer</code></td><td><code>*:read</code> for all data kinds, <code>prefix:traverse</code>. Not <code>audit</code>, <code>binding</code>, <code>token</code> (own only) and <code>change-request</code> of others</td><td>Read the part of the space in scope</td></tr>
+<tr><td><code>allocator</code></td><td>viewer + <code>prefix:allocate</code>, <code>address:create update allocate release</code>, <code>claim:create confirm release</code>, <code>host:create update</code>, <code>interface:create update</code>, <code>draft:read create</code></td><td>Take and give back addresses and make hosts</td></tr>
+<tr><td><code>dns-editor</code></td><td>viewer + <code>zone:update</code>, <code>record:create update delete</code>, <code>export:read</code></td><td>Manual records in zones</td></tr>
+<tr><td><code>dhcp-editor</code></td><td>viewer + <code>dhcp-scope:create update delete</code>, <code>range:create update delete</code>, <code>export:read</code></td><td>Scopes, pools and options</td></tr>
+<tr><td><code>network-admin</code></td><td>All create, update, delete, allocate, release, build, sync of data kinds; <code>draft:*</code>; <code>token:create</code>; <code>change-request:create</code></td><td>Run the network data</td></tr>
+<tr><td><code>approver</code></td><td>viewer + <code>change-request:read approve</code></td><td>Second pair of eyes</td></tr>
+<tr><td><code>admin</code></td><td>Everything, including <code>role:*</code>, <code>binding:*</code>, <code>token:admin</code>, <code>source:*</code>, <code>audit:read</code></td><td>Run bembel itself</td></tr>
+</tbody></table>
+<div class="callout note"><p class="callout-title">Admin is not a bypass</p>
+<p><code>admin</code> still has a scope, and it does not skip change requests. Delete of a zone needs a second subject also for an admin. The first bootstrap admin comes from the config key <code>auth.bootstrap_admins</code> and is audited.</p></div>
+<p>A custom role is a row set. The libvirt agent of a hypervisor uses one. It may take addresses and make VM hosts, and nothing else.</p>
+<pre><code class="language-yaml"># bembel role apply -f vm-provisioner.yaml
+name: vm-provisioner
+description: Claims addresses and makes VM hosts for the VMs of one hypervisor
+permissions:
+  - prefix:read
+  - address:read
+  - address:allocate
+  - address:release
+  - claim:create
+  - claim:confirm
+  - claim:release
+  - host:read
+  - host:create
+  - host:update
+  - interface:create
+  - interface:update
+  - record:read</code></pre>
+
+<h2 id="bindings">Bindings</h2>
+<p>A binding says: this subject has this role in this scope. It may have a start time and an expiry. The list of bindings of a subject is its rights.</p>
+<pre><code class="language-sql">CREATE TABLE binding (
+  id            uuid PRIMARY KEY DEFAULT uuidv7(),
+  subject_id    uuid NOT NULL REFERENCES subject(id),
+  role_id       uuid NOT NULL REFERENCES role(id),
+  -- scope terms: NULL means "no limit on this axis"; all NULL = global
+  scope_vrf_id  uuid REFERENCES vrf(id),
+  scope_cidr    cidr,
+  scope_zone    ltree,            -- reversed labels: example.org = org.example
+  scope_site    ltree,            -- site.building.floor.room...
+  scope_team_id uuid REFERENCES team(id),
+  scope_tag     jsonb,            -- {"role":"login"}
+  not_before    timestamptz NOT NULL DEFAULT now(),
+  expires_at    timestamptz,
+  reason        text,
+  created_by    uuid NOT NULL REFERENCES subject(id),
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  revision      bigint NOT NULL DEFAULT 1
+);</code></pre>
+<p>The API shows the scope as a list of typed terms. Here is the binding of a.berger.</p>
+<pre><code class="language-json">POST /v1/bindings
+{
+  "subject": "kc:a.berger",
+  "role": "allocator",
+  "scope": [
+    {"type": "prefix", "value": "10.20.0.0/16", "vrf": "global"},
+    {"type": "team",   "value": "hpc-ops"}
+  ],
+  "expires_at": "2027-11-04T00:00:00Z",
+  "reason": "HPC operations of Hall 2"
+}</code></pre>
+<p>The terms of one binding are joined by AND. Many bindings are joined by OR. At most one term of each type is allowed in one binding.</p>
+
+<h3 id="delegation">Delegation: grant only what you hold</h3>
+<p>The permission <code>binding:create</code> is not enough. bembel tests three more rules on each new binding. This stops privilege escalation by a person who manages bindings.</p>
+<ol class="steps">
+<li>The creator holds every permission of the role. The test uses the grants of the creator in the scope of the new binding.</li>
+<li>The new scope lies inside one grant of the creator for those permissions. A scope S' lies inside S when each term of S has a term in S' that is equal or narrower (a longer cidr, a deeper zone, the same team).</li>
+<li>The creator does not bind the own subject, and the expiry is not longer than the grant of the creator.</li>
+</ol>
+<p>A team lead can therefore give <code>allocator</code> on <code>10.20.8.0/24</code> to a colleague, if the lead holds <code>allocator</code> on <code>10.20.0.0/16</code> with a <code>binding:create</code> role. The lead cannot give <code>allocator</code> on <code>10.30.0.0/16</code>. A binding with the role <code>admin</code> always needs a <a href="#changes">change request</a>.</p>
+
+<h2 id="scopes">Scopes</h2>
+<p>The scope types are a closed list. Each term maps to one column and one index.</p>
+<table>
+<thead><tr><th>Term</th><th>Matches a resource when</th><th>SQL test</th><th>Index</th></tr></thead>
+<tbody>
+<tr><td><code>global</code></td><td>always (all columns NULL)</td><td>none</td><td>none</td></tr>
+<tr><td><code>vrf</code></td><td>the object is in the VRF</td><td><code>p.vrf_id = $vrf</code></td><td>btree / GiST (vrf_id, cidr)</td></tr>
+<tr><td><code>prefix</code> (subtree)</td><td>the cidr lies inside the given cidr, in the given VRF</td><td><code>p.cidr &lt;&lt;= $cidr</code></td><td>GiST <code>inet_ops</code></td></tr>
+<tr><td><code>zone</code> (subtree)</td><td>the zone path lies under the given path</td><td><code>z.path &lt;@ $zone</code></td><td>GiST on <code>ltree</code></td></tr>
+<tr><td><code>site</code> (subtree)</td><td>the site path lies under the given path</td><td><code>x.site_path &lt;@ $site</code></td><td>GiST on <code>ltree</code></td></tr>
+<tr><td><code>team</code></td><td>the owner is the team</td><td><code>x.owner_team_id = $team</code></td><td>btree</td></tr>
+<tr><td><code>tag</code></td><td>the object has the tag key=value</td><td><code>x.tags @&gt; $tag</code></td><td>GIN <code>jsonb_path_ops</code></td></tr>
+</tbody></table>
+<p>Not every term applies to every kind. A term that does not apply makes the binding silent for that kind.</p>
+<table>
+<thead><tr><th>Term</th><th>Addressing (prefix, address, range, claim)</th><th>DNS (zone, record)</th><th>DHCP</th><th>Hosts</th><th>Assets</th></tr></thead>
+<tbody>
+<tr><td>vrf</td><td>yes</td><td>no</td><td>yes (via subnet)</td><td>no</td><td>no</td></tr>
+<tr><td>prefix</td><td>yes</td><td>no</td><td>yes (via subnet)</td><td>yes (any address of the host inside)</td><td>no</td></tr>
+<tr><td>zone</td><td>no</td><td>yes</td><td>no</td><td>no</td><td>no</td></tr>
+<tr><td>site</td><td>yes (prefix site)</td><td>no</td><td>yes</td><td>yes</td><td>yes</td></tr>
+<tr><td>team</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>no (mirror)</td></tr>
+<tr><td>tag</td><td>yes</td><td>no</td><td>no</td><td>yes</td><td>no</td></tr>
+</tbody></table>
+<ul>
+<li>An address or a claim takes the owner of its subnet when the request gives no owner. The server writes the value, so the <code>team</code> term works on each row without a join.</li>
+<li>A record takes its scope from its zone. A derived record (A, AAAA, PTR) is also under the scope of the address that made it. Only manual records are writable.</li>
+<li>A <code>prefix</code> term has a VRF. The same cidr in two VRFs is two different scopes.</li>
+<li>Examples: <code>vrf=hpc-fabric AND team=hpc-ops</code> (allocate in the cluster fabric, own subnets only); <code>zone=example.org</code> (all zones under it); <code>tag=role:login</code> (login nodes in every VRF).</li>
+</ul>
+
+<h2 id="evaluation">Evaluation</h2>
+<p>The check for one object and the check for a list use the same function. The function takes the permission and the effective subjects and returns an SQL fragment.</p>
+<ol class="steps">
+<li>Read the grants: the bindings of the effective subjects that include the permission and are active.</li>
+<li>If one grant is global, the fragment is <code>TRUE</code>.</li>
+<li>Else, drop the grants whose terms do not apply to the kind, and join the rest by OR. Each grant becomes an AND of its terms.</li>
+<li>The caller adds the fragment to the query: <code>WHERE ... AND (fragment)</code>. For one object it adds <code>AND p.id = $id</code>.</li>
+</ol>
+<pre><code class="language-sql">-- step 1: grants of the effective subjects for one permission
+SELECT b.id, b.scope_vrf_id, b.scope_cidr, b.scope_zone, b.scope_site,
+       b.scope_team_id, b.scope_tag
+FROM binding b
+JOIN role_permission rp ON rp.role_id = b.role_id
+WHERE b.subject_id = ANY ($1::uuid[])
+  AND rp.permission IN ('prefix:read', '*:read')
+  AND b.not_before &lt;= now()
+  AND (b.expires_at IS NULL OR b.expires_at &gt; now());</code></pre>
+<p>The next query shows the result for a user with three bindings: <code>vrf=os-provider</code>; <code>prefix=10.20.0.0/16 AND team=hpc-ops</code>; <code>tag=role:login</code>. Go builds the text from typed values. It passes every value as a parameter.</p>
+<pre><code class="language-sql">SELECT p.*
+FROM prefix p
+WHERE p.vrf_id = $1                                     -- b1 vrf os-provider
+   OR (p.vrf_id = $2 AND p.cidr &lt;&lt;= $3 AND p.owner_team_id = $4)  -- b2
+   OR p.tags @&gt; '{"role":"login"}'                      -- b3
+ORDER BY p.cidr, p.id
+LIMIT 101;
+
+-- supporting indexes
+CREATE INDEX prefix_vrf_cidr  ON prefix USING gist (vrf_id, cidr inet_ops);  -- btree_gist
+CREATE INDEX prefix_tags      ON prefix USING gin  (tags jsonb_path_ops);
+CREATE INDEX prefix_owner     ON prefix (owner_team_id);
+CREATE INDEX zone_path        ON zone   USING gist (path);                    -- ltree
+CREATE INDEX host_site_path   ON host   USING gist (site_path);</code></pre>
+<p>PostgreSQL combines the three branches with a BitmapOr over the indexes. A record query joins the zone: <code>JOIN zone z ON z.id = r.zone_id WHERE z.path &lt;@ 'org.example'</code>. The cursor, the sort and the search filter stay in the same statement, so a page has no holes and the count is right. A guard caps the number of grants in one predicate (default 64). Above the cap, the grants go in a CTE with a lateral join.</p>
+
+<h3 id="allowed-actions">allowed_actions</h3>
+<p>Each object in an answer has <code>allowed_actions</code>, for example <code>["read","update","allocate"]</code>. The UI uses it to show buttons. The server checks again for each call. The list is made by one query per page with the grants as a table. A NULL term means no limit.</p>
+<pre><code class="language-sql">WITH g(verb, vrf_id, cidr, team_id, tag) AS (
+  SELECT split_part(rp.permission, ':', 2), b.scope_vrf_id, b.scope_cidr,
+         b.scope_team_id, b.scope_tag
+  FROM binding b JOIN role_permission rp ON rp.role_id = b.role_id
+  WHERE b.subject_id = ANY ($1) AND rp.permission LIKE 'prefix:%' AND (b.expires_at IS NULL OR b.expires_at &gt; now())
+)
+SELECT p.id,
+       (SELECT array_agg(DISTINCT g.verb) FROM g
+         WHERE (g.vrf_id  IS NULL OR g.vrf_id  = p.vrf_id)
+           AND (g.cidr    IS NULL OR p.cidr    &lt;&lt;= g.cidr)
+           AND (g.team_id IS NULL OR g.team_id = p.owner_team_id)
+           AND (g.tag     IS NULL OR p.tags    @&gt; g.tag)) AS allowed_actions
+FROM prefix p
+WHERE p.id = ANY ($2);</code></pre>
+
+<h3 id="hidden">Hidden objects: 404 and 403</h3>
+<table>
+<thead><tr><th>Situation</th><th>Answer</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>No <code>read</code> on the object</td><td><code>404 resource.not-found</code></td><td>The answer does not reveal that the object exists</td></tr>
+<tr><td><code>read</code> yes, other permission no</td><td><code>403 permission.denied</code> with <code>required_permission</code></td><td>The user sees the object, so a clear reason helps</td></tr>
+<tr><td>List without any match</td><td><code>200</code> with an empty list</td><td>A list never fails because of rights</td></tr>
+<tr><td>Search and vector hits</td><td>Only rows that pass the predicate</td><td>The predicate is in the same SQL, so no hit leaks</td></tr>
+<tr><td>No token or a bad token</td><td><code>401 auth.required</code> / <code>auth.invalid-token</code></td><td>The caller is unknown</td></tr>
+</tbody></table>
+
+<h3 id="cache">Caching</h3>
+<ul>
+<li><strong>Grants</strong> are cached per replica, keyed by the set of subject ids and the <strong>binding epoch</strong>. The epoch is a counter that a trigger increments in the transaction of each binding or role change. The trigger sends <code>NOTIFY binding_changed</code>. Each replica listens and drops its cache. A replica that loses the connection reads the epoch every 30 seconds.</li>
+<li><strong>Decisions</strong> are not cached. The predicate runs in the same transaction and snapshot as the data it protects.</li>
+<li><strong>JWKS</strong> keys are cached until an unknown <code>kid</code> appears.</li>
+<li>An IdP group change takes effect at the next token refresh (at most 5 minutes). A deleted binding takes effect in milliseconds.</li>
+</ul>
+<p>A differential test runs the predicate builder against a plain Go function <code>check(grants, object)</code> on random data. A property test also runs the delegation rule. The explainer below shows the whole path for one request.</p>
+<h3 id="explain">Explain a decision</h3>
+<figure class="diagram wide explainer"><svg viewBox="0 0 940 440" role="img" aria-labelledby="f-ex-t"><title id="f-ex-t">One request from the token to allow or deny</title>
+<rect class="zone" data-f="0" x="12" y="42" width="216" height="168" rx="12"/>
+<rect class="zone" data-f="1" x="242" y="42" width="216" height="168" rx="12"/>
+<rect class="zone" data-f="2" x="472" y="42" width="216" height="168" rx="12"/>
+<rect class="zone" data-f="3" x="702" y="42" width="216" height="168" rx="12"/>
+<rect class="zone" data-f="4" x="702" y="252" width="216" height="168" rx="12"/>
+<rect class="zone" data-f="5" x="472" y="252" width="216" height="168" rx="12"/>
+<rect class="zone" data-f="6" x="242" y="252" width="216" height="168" rx="12"/>
+<rect class="box" x="20" y="50" width="200" height="152" rx="8"/>
+<text class="t-title" x="32" y="74">1 request</text>
+<text class="t-small t-mono" data-f="0-6" x="32" y="98">POST /v1/prefixes/{id}/</text>
+<text class="t-small t-mono" data-f="0-6" x="32" y="118">  addresses:allocate</text>
+<text class="t-small t-mono" data-f="0-6" x="32" y="138">{id} = 10.20.4.0/22</text>
+<text class="t-small t-mono" data-f="0-6" x="32" y="158">Bearer eyJhbGciOi...</text>
+<rect class="box" x="250" y="50" width="200" height="152" rx="8"/>
+<text class="t-title" x="262" y="74">2 check the token</text>
+<text class="t-small t-mono" data-f="1-6" x="262" y="98">iss  id.example.org</text>
+<text class="t-small t-mono" data-f="1-6" x="262" y="118">aud  bembel</text>
+<text class="t-small t-mono" data-f="1-6" x="262" y="138">alg  RS256, sig ok</text>
+<text class="t-small t-mono" data-f="1-6" x="262" y="158">exp  in 4 min</text>
+<rect class="box" x="480" y="50" width="200" height="152" rx="8"/>
+<text class="t-title" x="492" y="74">3 effective subjects</text>
+<text class="t-small t-mono" data-f="2-6" x="492" y="98">user  kc:a.berger</text>
+<text class="t-small t-mono" data-f="2-6" x="492" y="118">group kc:hpc-ops</text>
+<text class="t-small t-mono" data-f="2-6" x="492" y="138">from the groups claim</text>
+<text class="t-small t-mono" data-f="2-6" x="492" y="158">(not stored per user)</text>
+<rect class="box" x="710" y="50" width="200" height="152" rx="8"/>
+<text class="t-title" x="722" y="74">4 grants</text>
+<text class="t-small t-mono" data-f="3-6" x="722" y="98">binding 0197...a1</text>
+<text class="t-small t-mono" data-f="3-6" x="722" y="118">role allocator</text>
+<text class="t-small t-mono" data-f="3-6" x="722" y="138">address:allocate  yes</text>
+<text class="t-small t-mono" data-f="3-6" x="722" y="158">scope prefix AND team</text>
+<rect class="box" x="710" y="260" width="200" height="152" rx="8"/>
+<text class="t-title" x="722" y="284">5 predicate</text>
+<text class="t-small t-mono" data-f="4-6" x="722" y="308">vrf   = global</text>
+<text class="t-small t-mono" data-f="4-6" x="722" y="328">cidr  &lt;&lt;= 10.20.0.0/16</text>
+<text class="t-small t-mono" data-f="4-6" x="722" y="348">owner = hpc-ops</text>
+<text class="t-small t-mono" data-f="4-6" x="722" y="368">AND id = target</text>
+<rect class="box" x="480" y="260" width="200" height="152" rx="8"/>
+<text class="t-title" x="492" y="284">6 database</text>
+<text class="t-small t-mono" data-f="5-6" x="492" y="308">1 row: 10.20.4.0/22</text>
+<text class="t-small t-mono" data-f="5-6" x="492" y="328">owner hpc-ops</text>
+<text class="t-small t-mono" data-f="5-6" x="492" y="348">predicate true</text>
+<text class="t-small t-mono" data-f="5-6" x="492" y="368">same SQL as a list</text>
+<rect class="box-accent" x="250" y="260" width="200" height="152" rx="8"/>
+<text class="t-title t-on" x="262" y="284">7 answer</text>
+<text class="t-small t-mono t-on" data-f="6-6" x="262" y="308">allow: run, 201</text>
+<text class="t-small t-mono t-on" data-f="6-6" x="262" y="328">audit event: allow</text>
+<text class="t-small t-mono t-on" data-f="6-6" x="262" y="348">else 404 (hidden)</text>
+<text class="t-small t-mono t-on" data-f="6-6" x="262" y="368">or 403 (can read)</text>
+<path class="edge" d="M220,126 L248,126" marker-end="url(#arrow)"/>
+<path class="edge-accent" data-f="1" d="M220,126 L248,126" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M450,126 L478,126" marker-end="url(#arrow)"/>
+<path class="edge-accent" data-f="2" d="M450,126 L478,126" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M680,126 L708,126" marker-end="url(#arrow)"/>
+<path class="edge-accent" data-f="3" d="M680,126 L708,126" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M810,202 L810,256" marker-end="url(#arrow)"/>
+<path class="edge-accent" data-f="4" d="M810,202 L810,256" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M710,336 L682,336" marker-end="url(#arrow)"/>
+<path class="edge-accent" data-f="5" d="M710,336 L682,336" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M480,336 L452,336" marker-end="url(#arrow)"/>
+<path class="edge-accent" data-f="6" d="M480,336 L452,336" marker-end="url(#arrow-accent)"/>
+<text class="t-small t-muted" x="810" y="238" data-f="4-6">build</text>
+<rect class="box-muted" x="20" y="260" width="200" height="152" rx="8"/><text class="t-title" x="32" y="284">story</text>
+<text class="t-small" x="32" y="308">a.berger asks for the</text>
+<text class="t-small" x="32" y="328">next free address in</text>
+<text class="t-small" x="32" y="348">kestrel-compute.</text>
+<text class="t-small" x="32" y="368">Her group is kc:hpc-ops.</text>
+</svg>
+<script type="application/json" class="steps">["A request arrives. a.berger allocates the next free address in the prefix 10.20.4.0/22 (kestrel-compute). The bearer token comes from the session store or from the CLI.", "bembel checks the token: the signature against the JWKS of the issuer, iss, aud, exp and the algorithm. A token with a wrong audience fails here with 401. No grant is read yet.", "bembel makes the effective subjects: the user kc:a.berger and each group in the groups claim, with the prefix kc:. Groups are not stored per user.", "bembel loads the grants for the permission address:allocate. Binding 0197...a1 gives role allocator. Its scope is prefix 10.20.0.0/16 AND team hpc-ops.", "bembel turns the grant into one SQL predicate: same VRF, cidr inside 10.20.0.0/16, owner hpc-ops. For a point check it adds the id of the target.", "The database tests the predicate on the target row in the same transaction as the write. The row 10.20.4.0/22 has owner hpc-ops, so the predicate is true. A list query uses the same predicate.", "The answer: allow runs the allocation and writes an audit event. No match gives 404 when the user cannot read the object, or 403 with the missing permission when the user can read it."]</script>
+<figcaption>One request, seven steps. The check for a list and the check for one object use the same predicate.</figcaption></figure>
+<p><code>POST /v1/me/permissions:check</code> with <code>"explain": true</code> returns the grants that matched and, for the first failed grant, the first term that failed. A user can explain the own identity. An <code>admin</code> can pass <code>"subject"</code>. The UI "Explain my access" button and the assistant use it.</p>
+
+<h2 id="tokens">Personal access tokens</h2>
+<p>A personal access token (PAT) is for scripts and for services that cannot use OIDC. It is a restriction of its owner, never an extension.</p>
+<pre><code class="language-text">bem_pat_8Kd2mQvX_5kQ0wYh3J7b9Zr1nLx4TgPc6AuVsEoDfMi
+|       |        |
+|       |        +-- secret: 32 random bytes, base64url (256 bit)
+|       +----------- id: 8 characters, public, shown in lists and audit
++------------------- prefix: fixed, for secret scanners (gitleaks, GitHub, GitLab)</code></pre>
+<table>
+<thead><tr><th>Field</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td>Storage</td><td>Only <code>sha256(secret)</code>. The secret is high-entropy, so a slow hash is not needed. The full token shows once, in the answer to the create call.</td></tr>
+<tr><td>Owner</td><td>A user or a service subject. The token acts as the owner.</td></tr>
+<tr><td>Expiry</td><td>Required. Default 90 days, maximum 365 days. A longer life needs the role <code>admin</code>.</td></tr>
+<tr><td>Narrowing</td><td>A list of permissions and optional scope terms. The effective right is the owner's grants <strong>intersected</strong> with the token. Missing means the owner's full right, except the denied list below.</td></tr>
+<tr><td>Denied list</td><td>A PAT never has <code>token:*</code>, <code>binding:*</code>, <code>role:*</code> or <code>change-request:approve</code>, even if the owner has them. Approval is for a person with a session.</td></tr>
+<tr><td>Tracking</td><td><code>last_used_at</code>, <code>last_used_ip</code>, use count. Revoke at once with <code>DELETE</code>. Both are audit events.</td></tr>
+</tbody></table>
+<pre><code class="language-json">POST /v1/me/tokens
+{
+  "name": "grafana-readonly",
+  "expires_at": "2027-02-01T00:00:00Z",
+  "permissions": ["prefix:read", "address:read"],
+  "scope": [{"type": "vrf", "value": "global"}]
+}
+
+201 Created
+{
+  "id": "8Kd2mQvX",
+  "name": "grafana-readonly",
+  "token": "bem_pat_8Kd2mQvX_5kQ0wYh3J7b9Zr1nLx4TgPc6AuVsEoDfMi",
+  "expires_at": "2027-02-01T00:00:00Z"
+}</code></pre>
+<p>The intersection works on grant rows. For each grant of the owner, bembel keeps the verbs that the token lists. For each scope axis, it takes the narrower term. When the two terms do not overlap (cidr 10.20.0.0/16 and a token cidr 10.30.0.0/16), the grant drops out.</p>
+
+<h2 id="changes">Change requests (four-eyes)</h2>
+<p>Some actions are hard to undo. bembel holds them in a change request until a second subject approves. The check at proposal needs the normal permission. The check at approval needs <code>change-request:approve</code> on the target.</p>
+<table>
+<thead><tr><th>Action</th><th>Holds when</th><th>Impact shown to the approver</th></tr></thead>
+<tbody>
+<tr><td>Delete a prefix</td><td>The prefix has child prefixes or addresses</td><td>Count of prefixes, addresses, records and reservations that go</td></tr>
+<tr><td>Delete a zone</td><td>Always</td><td>Count of records, the servers that serve it</td></tr>
+<tr><td>Bulk change</td><td>More than 50 objects in one call (<code>access.change_request.bulk_threshold</code>)</td><td>Counts per kind, a diff of the first 20</td></tr>
+<tr><td>Change a binding with role <code>admin</code></td><td>Create, change or delete</td><td>Subject, scope, expiry</td></tr>
+</tbody></table>
+<p>The admin can add rules in the config (for example "delete a VRF"). The four rules above are the default and cannot be switched off.</p>
+<figure class="diagram wide"><svg viewBox="0 0 920 360" role="img" aria-labelledby="f-cr-t"><title id="f-cr-t">States of a change request</title>
+<rect class="box-muted" x="16" y="130" width="150" height="70" rx="8"/>
+<text class="t-title" x="28" y="152">held action</text>
+<text class="t-small" x="28" y="172">API answers 202</text>
+<rect class="box-warn" x="226" y="120" width="170" height="90" rx="8"/>
+<text class="t-title" x="238" y="142">pending</text>
+<text class="t-small" x="238" y="162">waits for a second</text>
+<text class="t-small" x="238" y="179">subject (7 days)</text>
+<rect class="box-info" x="470" y="30" width="170" height="70" rx="8"/>
+<text class="t-title" x="482" y="52">approved</text>
+<text class="t-small" x="482" y="72">approver is not</text>
+<text class="t-small" x="482" y="89">the proposer</text>
+<rect class="box-ok" x="720" y="30" width="180" height="70" rx="8"/>
+<text class="t-title" x="732" y="52">executed</text>
+<text class="t-small" x="732" y="72">one transaction,</text>
+<text class="t-small" x="732" y="89">both names in audit</text>
+<rect class="box-err" x="720" y="126" width="180" height="70" rx="8"/>
+<text class="t-title" x="732" y="148">failed</text>
+<text class="t-small" x="732" y="168">stale revision or</text>
+<text class="t-small" x="732" y="185">new conflict</text>
+<rect class="box-err" x="470" y="150" width="170" height="56" rx="8"/>
+<text class="t-title" x="482" y="172">rejected</text>
+<text class="t-small" x="482" y="192">approver says no</text>
+<rect class="box-muted" x="470" y="232" width="170" height="56" rx="8"/>
+<text class="t-title" x="482" y="254">withdrawn</text>
+<text class="t-small" x="482" y="274">proposer cancels</text>
+<rect class="box-muted" x="470" y="300" width="170" height="50" rx="8"/>
+<text class="t-title" x="482" y="322">expired</text>
+<text class="t-small" x="482" y="342">no decision in 7 days</text>
+<path class="edge-accent" d="M166,165 L224,165" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M396,140 L468,80" marker-end="url(#arrow-accent)"/>
+<text class="t-small t-muted" x="436" y="100" text-anchor="middle">approve</text>
+<path class="edge-accent" d="M640,65 L718,65" marker-end="url(#arrow-accent)"/>
+<path class="edge-muted" d="M640,85 L718,150" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M396,175 L468,178" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="432" y="166" text-anchor="middle">reject</text>
+<path class="edge-muted" d="M396,195 L468,250" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M396,205 L468,322" marker-end="url(#arrow-muted)"/>
+</svg><figcaption>Only a second subject moves a request from pending to approved. A stale request fails and the proposer starts again.</figcaption></figure>
+<ol class="steps">
+<li>A user sends the call, for example <code>DELETE /v1/zones/{id}</code>. bembel sees that the action is held.</li>
+<li>bembel stores the request (method, path, body, the revision of the target) and answers <code>202 Accepted</code> with the change request and a <code>Location</code> header.</li>
+<li>An event <code>change-request.created</code> goes to the approvers (UI badge, webhook, mail).</li>
+<li>An approver reads the impact and calls <code>POST /v1/change-requests/{id}:approve</code>. A SQL check rejects the same subject: <code>CHECK (approver_id IS DISTINCT FROM proposer_id)</code>.</li>
+<li>bembel runs the stored call in one transaction. If the target revision changed since the proposal, the state becomes <code>failed</code> and nothing changes.</li>
+<li>The audit event names the proposer, the approver and the change request.</li>
+</ol>
+<p>A client that cannot handle 202 sends <code>Bembel-Change-Request: never</code>. It then gets <code>409 change-request.required</code>. A request waits 7 days (<code>expired</code>). The proposer can withdraw it. The assistant never approves, and a PAT never approves.</p>
+
+<h2 id="audit">Audit log</h2>
+<p>An audit event is an append-only record. bembel writes it in the transaction of the change, so a change without an event cannot exist. It also records each deny.</p>
+<pre><code class="language-sql">CREATE TABLE audit_event (
+  id                   uuid DEFAULT uuidv7(),
+  ts                   timestamptz NOT NULL DEFAULT now(),
+  request_id           text NOT NULL,
+  actor_id             uuid NOT NULL,          -- subject
+  actor_key            text NOT NULL,          -- kc:a.berger
+  on_behalf_of         text,                   -- user for whom a service acts
+  token_kind           text NOT NULL,          -- session | oidc | pat
+  token_id             text,                   -- PAT id, never the secret
+  origin               text NOT NULL,          -- ui | cli | api | assistant | agent | sync
+  assistant_session_id uuid,
+  draft_id             uuid,
+  source_ip            inet,
+  action               text NOT NULL,          -- address:allocate
+  resource_kind        text,
+  resource_id          uuid,
+  decision             text NOT NULL,          -- allow | deny | pending
+  via_binding_id       uuid,
+  change_request_id    uuid,
+  before               jsonb,
+  after                jsonb,
+  PRIMARY KEY (ts, id)
+) PARTITION BY RANGE (ts);                    -- one partition per month</code></pre>
+<table>
+<thead><tr><th>What</th><th>Recorded</th></tr></thead>
+<tbody>
+<tr><td>Each create, update, delete, allocate, release</td><td><code>allow</code> with <code>before</code>, <code>after</code> and the binding</td></tr>
+<tr><td>Each deny (403, held, wrong role)</td><td><code>deny</code> or <code>pending</code>. The same actor, action and object count once per minute.</td></tr>
+<tr><td>Login, logout, token create and revoke</td><td>Events with the issuer and the IP</td></tr>
+<tr><td>Binding and role changes</td><td>Event and a row in the history table, so rights at time T can be rebuilt</td></tr>
+<tr><td>Change request steps</td><td>One event per state change</td></tr>
+<tr><td>Assistant</td><td><code>origin=assistant</code>. A chat turn writes one <code>assistant:turn</code> event with the tool names and counts. A draft applied by a user writes the normal event with <code>draft_id</code> and the assistant session.</td></tr>
+<tr><td>Reads</td><td>Not recorded one by one. Export pulls, large exports and denied reads are.</td></tr>
+</tbody></table>
+<ul>
+<li>The application role has <code>INSERT</code> only. A trigger blocks <code>UPDATE</code> and <code>DELETE</code>. A second role reads.</li>
+<li>Partitions are monthly. The default keeps 13 months online. Older partitions detach and go to cold storage.</li>
+<li>An optional hash chain per partition proves that no row went missing. An optional stream sends each event as JSON to Loki or a SIEM. The audit events are not application logs.</li>
+</ul>
+<pre><code class="language-json">{
+  "ts": "2026-11-04T09:12:41.208Z",
+  "actor_key": "kc:a.berger",
+  "origin": "assistant",
+  "assistant_session_id": "0197c3a2-1111-7c1d-9a40-3f6e2d81b5c4",
+  "draft_id": "0197c3a2-2222-7c1d-9a40-3f6e2d81b5c4",
+  "action": "address:allocate",
+  "resource_kind": "address",
+  "decision": "allow",
+  "via_binding_id": "0197b000-5a10-7e3a-8c11-0d2c4b6a91a1",
+  "after": {"address": "10.20.4.44", "fqdn": "cn-004.kestrel.example.org"}
+}</code></pre>
+
+<h2 id="api">Access API</h2>
+<p>The endpoints below use the conventions of the <a href="api.html#conventions">REST API</a>. The UI chapter shows the pages in <a href="ui-access.html">access, tokens, audit and changes</a>.</p>
+<table>
+<thead><tr><th>Method and path</th><th>Needs</th><th>Use</th></tr></thead>
+<tbody>
+<tr><td><code>GET /v1/me</code></td><td>any identity</td><td>Subject, kind, groups, token kind and expiry, CSRF value</td></tr>
+<tr><td><code>GET /v1/me/permissions</code></td><td>any identity</td><td>Effective grants (role, scope, binding, carrier subject)</td></tr>
+<tr><td><code>POST /v1/me/permissions:check</code></td><td>any identity</td><td>Batch check, up to 100 actions; <code>explain</code> option</td></tr>
+<tr><td><code>GET /v1/me/tokens</code>, <code>POST</code>, <code>DELETE /v1/me/tokens/{id}</code></td><td><code>token:*</code> own</td><td>Personal access tokens</td></tr>
+<tr><td><code>GET /v1/roles</code>, <code>POST</code>, <code>PUT /v1/roles/{name}</code></td><td><code>role:read</code> / <code>role:create update</code></td><td>Roles with permission lists</td></tr>
+<tr><td><code>GET /v1/bindings</code>, <code>POST</code>, <code>DELETE /v1/bindings/{id}</code></td><td><code>binding:read</code> / <code>create</code> / <code>delete</code> + delegation</td><td>Bindings, filter by <code>subject</code>, <code>role</code></td></tr>
+<tr><td><code>GET /v1/change-requests</code>, <code>POST …/{id}:approve</code>, <code>:reject</code>, <code>:withdraw</code></td><td><code>change-request:read</code> / <code>approve</code></td><td>Held changes</td></tr>
+<tr><td><code>GET /v1/audit-events</code></td><td><code>audit:read</code></td><td>Query by actor, action, decision, origin, time</td></tr>
+</tbody></table>
+<pre><code class="language-json">GET /v1/me
+{
+  "subject": "kc:a.berger",
+  "kind": "user",
+  "issuer": "https://id.example.org/realms/main",
+  "display_name": "Anna Berger",
+  "groups": ["kc:hpc-ops"],
+  "token_kind": "session",
+  "token_expires_at": "2026-11-04T09:17:00Z"
+}
+
+GET /v1/me/permissions
+{
+  "grants": [{
+    "binding_id": "0197b000-5a10-7e3a-8c11-0d2c4b6a91a1",
+    "via": "kc:a.berger",
+    "role": "allocator",
+    "scope": [{"type":"prefix","value":"10.20.0.0/16","vrf":"global"},
+              {"type":"team","value":"hpc-ops"}],
+    "permissions": ["prefix:read","prefix:allocate","address:allocate","address:release", "..."]
+  }]
+}
+
+POST /v1/me/permissions:check
+{"checks": [
+  {"permission": "address:allocate", "resource": {"kind": "prefix", "id": "0197c0de-0001-7a00-8000-0000000420e4"}},
+  {"permission": "prefix:delete",    "resource": {"kind": "prefix", "id": "0197c0de-0001-7a00-8000-0000000420e4"}}
+]}
+200 OK
+{"results": [
+  {"allowed": true,  "via_binding": "0197b000-5a10-7e3a-8c11-0d2c4b6a91a1"},
+  {"allowed": false, "via_binding": null}
+]}</code></pre>
+
+<h2 id="examples">Worked examples</h2>
+<p>The story has six subjects. All use the same models and the same predicate.</p>
+<table>
+<thead><tr><th>Subject</th><th>Kind and key</th><th>Role</th><th>Scope</th><th>Can</th><th>Cannot</th></tr></thead>
+<tbody>
+<tr><td>d.klein</td><td>user, via group <code>kc:netops</code></td><td><code>network-admin</code></td><td>global</td><td>All data. Proposes deletes.</td><td>Approve his own request. Edit bindings (no <code>admin</code>).</td></tr>
+<tr><td>a.berger</td><td>user <code>kc:a.berger</code></td><td><code>allocator</code></td><td><code>prefix 10.20.0.0/16</code> AND <code>team hpc-ops</code></td><td>Allocate in kestrel-compute and in other hpc-ops subnets of Hall 2</td><td>See or allocate in osprey-gpu (team gpu-ops). Touch DNS records.</td></tr>
+<tr><td>m.huber</td><td>user <code>kc:m.huber</code></td><td><code>dns-editor</code> and <code>approver</code></td><td><code>zone example.org</code> (subtree)</td><td>Edit manual records in all zones under example.org. Approve zone deletes.</td><td>Allocate addresses. Approve prefix deletes.</td></tr>
+<tr><td>s.yildiz</td><td>user <code>kc:s.yildiz</code></td><td><code>allocator</code></td><td><code>vrf os-provider</code></td><td>Allocate in the provider networks of OpenStack</td><td>See the VRF <code>global</code>.</td></tr>
+<tr><td>capi-ipam</td><td>service <code>k8s:prod-1:capi-system:capi-ipam</code></td><td><code>allocator</code></td><td><code>prefix 10.30.0.0/16</code> (VRF global)</td><td>Claim and confirm addresses in the OpenStack and cluster ranges</td><td>See 10.20.0.0/16. Delete a prefix.</td></tr>
+<tr><td>agent of hv-03</td><td>service <code>kc:bembel-agent-hv-03</code></td><td><code>vm-provisioner</code> (custom)</td><td><code>prefix 10.20.20.0/24</code> (VRF global)</td><td>Claim addresses for the VMs of hv-03 and make VM hosts</td><td>Any other subnet. Zone or DHCP edits.</td></tr>
+</tbody></table>
+
+<h3 id="walk-1">Walk-through 1: a.berger allocates, and one request is hidden</h3>
+<ol class="steps">
+<li>a.berger runs <code>bembel address allocate --prefix 10.20.4.0/22</code>. The call is <code>POST /v1/prefixes/{id}/addresses:allocate</code>.</li>
+<li>The token passes. The effective subjects are <code>kc:a.berger</code> and <code>kc:hpc-ops</code>.</li>
+<li>The grants for <code>address:allocate</code>: binding <code>…a1</code>, role allocator, scope prefix 10.20.0.0/16 AND team hpc-ops.</li>
+<li>The predicate on the prefix row 10.20.4.0/22 is true: the VRF is global, the cidr lies inside 10.20.0.0/16, the owner is hpc-ops. The allocation runs. The address is 10.20.4.44.</li>
+<li>Now she tries the subnet <code>10.20.8.0/24</code> (osprey-gpu, owner gpu-ops). The cidr term is true, the team term is false. No grant allows <code>prefix:read</code> on the row, so the answer is <code>404</code>. The audit log records a deny.</li>
+</ol>
+
+<h3 id="walk-2">Walk-through 2: capi-ipam in the wrong place</h3>
+<ol class="steps">
+<li>The controller sends <code>POST /v1/claims</code> for the prefix 10.30.4.0/24 with a service token. The scope is prefix 10.30.0.0/16: allowed, <code>201</code>.</li>
+<li>A fault in a cluster object makes it ask for a claim in 10.20.4.0/22. The cidr is outside 10.30.0.0/16, so the service cannot read the prefix. The answer is <code>404</code> and the problem type is <code>resource.not-found</code>.</li>
+<li>The controller then sends <code>DELETE /v1/prefixes/{id}</code> for 10.30.4.0/24. It can read the prefix (allocator has <code>prefix:read</code>) but not <code>prefix:delete</code>. The answer is <code>403 permission.denied</code> with <code>"required_permission": "prefix:delete"</code>.</li>
+</ol>
+
+<h3 id="walk-3">Walk-through 3: delete a zone with four eyes</h3>
+<ol class="steps">
+<li>d.klein sends <code>DELETE /v1/zones/{id}</code> for <code>kestrel.example.org</code>. He holds <code>zone:delete</code> through network-admin.</li>
+<li>The zone has 1 204 records, so the action is held. bembel answers <code>202</code> with change request <code>cr-0412</code> and the impact.</li>
+<li>d.klein opens <code>POST /v1/change-requests/cr-0412:approve</code>. The answer is <code>403</code>: the approver must differ from the proposer, and he has no <code>approver</code> role.</li>
+<li>m.huber holds <code>approver</code> on <code>zone example.org</code>. The zone <code>kestrel.example.org</code> lies under that path. He reads the impact and approves.</li>
+<li>bembel checks the revision of the zone, deletes it and its records in one transaction, and removes the zone from the next BIND export. The audit event names d.klein as proposer, m.huber as approver and <code>cr-0412</code>.</li>
+</ol>
+<div class="callout tip"><p class="callout-title">Test the rights before you grant them</p>
+<p>Run <code>bembel access check --as kc:a.berger address:allocate prefix/10.20.8.0/24</code> (needs <code>audit:read</code>). The answer lists the grants and the first term that failed.</p></div>
+</body></html>

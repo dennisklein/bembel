@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fabrics · bembel</title>
+<link rel="stylesheet" href="../assets/bembel.css">
+<link rel="stylesheet" href="../assets/shell.css">
+<link rel="stylesheet" href="../assets/assets.css">
+</head>
+<body data-page="fabrics">
+<a class="skip" href="#main">Skip to content</a>
+<div class="app">
+<!-- SHELL: top bar. Copy it unchanged to each page; change only aria-current in the sidebar and the VRF in the switcher. -->
+<header class="topbar">
+  <a class="icon-btn nav-toggle" href="#nav" aria-controls="nav" aria-expanded="false" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></a>
+  <a class="brand" href="overview.html" aria-label="bembel: overview"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M12.6 7h6.8M13.6 7v2.6C9.9 11 8.4 13.6 8.4 16.8c0 3.2 1.4 5.7 3.1 7.2h9c1.7-1.5 3.1-4 3.1-7.2 0-3.2-1.5-5.8-5.2-7.2V7M19.4 8.3c4.4-.3 6.9 1.4 6.9 4.4 0 2.3-1.1 3.9-2.5 4.8M9.4 15.6h13.2"/></svg></span><span class="brand-name">bembel</span></a>
+  <details class="set-menu vrf-menu">
+    <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+    <div class="set-pop">
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+    </div>
+  </details>
+  <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
+    <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
+  <span class="spacer"></span>
+  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
+  <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
+  <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
+    <div class="more-pop" role="menu">
+      <div class="um-head"><b>Dennis Klein</b><span class="mono">d.klein · id.example.org</span><span class="muted small">groups netops, hpc-ops</span></div>
+      <a href="#" role="menuitem">My access</a><a href="#" role="menuitem">Tokens</a><a href="#" role="menuitem">Sign out</a></div></details>
+  <button class="icon-btn" type="button" data-help aria-label="Help (?)">?</button>
+  <button class="icon-btn" type="button" data-theme-toggle aria-label="Theme: auto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/></svg></button>
+</header>
+<!-- SHELL: sidebar. Groups and icons follow the glossary domains (docs/assets/glossary-data.js). -->
+<nav class="sidebar" id="nav" aria-label="Navigation">
+  <a class="nav-item" href="overview.html" data-key="o"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview<span class="count attn">6</span></a>
+  <div class="nav-label" data-domain="addr"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 1.8h3v3h-3Z M2 11.2h3v3H2Z M11 11.2h3v3h-3Z M8 4.8v3.2 M3.5 11.2V8h9v3.2"/></svg>Addressing</div>
+  <a class="nav-item" data-domain="addr" href="prefixes.html" data-key="p"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v4H4zM4 16h6v4H4zM14 10h6v4h-6z"/><path d="M7 8v8M10 12h4"/></svg>Prefixes</a>
+  <a class="nav-item" data-domain="addr" href="hosts.html" data-key="h"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>Hosts</a>
+  <a class="nav-item" data-domain="addr" href="vlans.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/><path d="M8 3v18"/></svg>VLANs and partitions</a>
+  <a class="nav-item" data-domain="addr" href="fabrics.html" data-key="f" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8M7.5 7.5l9 9"/></svg>Fabrics</a>
+  <a class="nav-item" data-domain="addr" href="routing.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h4a4 4 0 004-4V8"/></svg>Routing and groups</a>
+  <div class="nav-label" data-domain="dns"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 1 0 0 12.4A6.2 6.2 0 0 0 8 1.8Z M1.8 8h12.4 M8 1.8C6 3.8 5.4 5.8 5.4 8S6 12.2 8 14.2 M8 1.8c2 2 2.6 4 2.6 6.2S10 12.2 8 14.2"/></svg>DNS and DHCP</div>
+  <a class="nav-item" data-domain="dns" href="zones.html" data-key="z"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-2.5 2.6-3.5 5.6-3.5 9s1 6.4 3.5 9M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9"/></svg>Zones</a>
+  <a class="nav-item" data-domain="dhcp" href="dhcp.html" data-key="d"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12l4 5-4 5H3z"/><path d="M7 12h5"/></svg>DHCP scopes</a>
+  <a class="nav-item" data-domain="integ" href="exports.html" data-key="e"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Exports<span class="count attn">1 diff</span></a>
+  <div class="nav-label" data-domain="assets"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 1.8h8.8v12.4H3.6Z M3.6 5h8.8 M3.6 8.2h8.8 M3.6 11.4h8.8 M5.6 3.4h1.2 M5.6 6.6h1.2 M5.6 9.8h1.2"/></svg>Assets</div>
+  <a class="nav-item" data-domain="assets" href="floor.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 3v16M15 5v16"/></svg>Floor map</a>
+  <a class="nav-item" data-domain="assets" href="rack.html" data-key="r"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="1.5"/><path d="M5 8h14M5 13.5h14M8 5.3h2M8 10.8h2M8 16.5h2"/></svg>Racks</a>
+  <a class="nav-item" data-domain="assets" href="sync-review.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0114-5.3L20 9M20 12a8 8 0 01-14 5.3L4 15"/><path d="M20 4v5h-5M4 20v-5h5"/></svg>Sync review<span class="count attn">4</span></a>
+  <div class="nav-label" data-domain="access"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 3.6v4.1c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.6Z M5.9 8l1.5 1.5 2.8-3"/></svg>Access</div>
+  <a class="nav-item" data-domain="access" href="bindings.html" data-key="b"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.4c1.8.9 3 2.9 3 5.6"/></svg>Roles and bindings</a>
+  <a class="nav-item" data-domain="access" href="changes.html" data-key="c"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg>Change requests<span class="count attn">2</span></a>
+  <a class="nav-item" data-domain="access" href="audit.html" data-key="a"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Audit log</a>
+  <div class="nav-label" data-domain="integ"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h9 M8.6 2.6 11 5 8.6 7.4 M14 11H5 M7.4 8.6 5 11l2.4 2.4"/></svg>Integrations</div>
+  <a class="nav-item" data-domain="integ" href="integrations.html" data-key="i"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0z"/><path d="M12 16v5"/></svg>Sources and syncs</a>
+  <a class="nav-item" data-domain="integ" href="import.html" data-key="m"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6M9 15l2.5 2.5L16 13"/></svg>ONA migration<span class="count attn">214</span></a>
+  <div class="side-foot">bembel v0.1.0 · api v1</div>
+</nav>
+<!-- /SHELL -->
+
+<main class="main" id="main">
+<div class="banner err offline" role="alert"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M2 8.5a15 15 0 0120 0M5 12a10 10 0 0114 0M8.5 15.5a5 5 0 017 0M12 19h.01M3 3l18 18"/></svg>
+  <div class="grow"><b>Offline.</b> <span data-why>The event stream of bembel stopped. The page shows old data.</span> The page tries again every 5 s.</div>
+  <button class="btn btn-sm" type="button" onclick="location.reload()">Reload</button></div>
+
+<div class="crumbs"><a href="prefixes.html">Addressing</a><span class="sep">›</span><span>Fabrics</span></div>
+<div class="page-head">
+  <div><h1>Fabrics</h1>
+    <div class="sub"><span>3 fabrics · 1 InfiniBand, 1 RoCEv2, 1 campus Ethernet</span></div></div>
+  <div class="actions">
+    <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
+      <div class="cli-pop">bembel fabric ls
+bembel fabric show osprey-roce --qos
+bembel export opensm --fabric kestrel-ib</div></details>
+    <button class="btn btn-agent" type="button" data-assistant="check-fabric" title="Runs the assistant with the advisory check-fabric. Tools: read only. It changes nothing.">Check QoS and VLANs</button>
+    <button class="btn btn-primary" type="button">Add fabric…</button>
+  </div>
+</div>
+<div class="stack">
+<div class="fabs">
+<section class="card fab-card" aria-labelledby="f1-t">
+  <div class="card-head"><h2 id="f1-t" class="mono">kestrel-ib</h2><span class="right"><span class="fab ib">infiniband</span></span></div>
+  <div class="card-body">
+    <p class="fab-d">NDR InfiniBand, 400 Gb/s. Compute nodes and the Lustre servers.</p>
+    <dl class="kv">
+      <dt>Subnet manager</dt><dd><span class="mono">sm-kestrel</span> <span class="muted">OpenSM on mgmt-01</span></dd>
+      <dt>Ports</dt><dd><b>412</b> · 398 nodes, 14 switch links</dd>
+      <dt>Partitions</dt><dd>4 <span class="muted">· 2 with IPoIB</span></dd>
+      <dt>Subnet</dt><dd><a class="pfx" href="prefix.html">10.100.0.0<span class="len">/16</span></a> <span class="dchip" data-domain="addr">hpc-fabric</span></dd>
+      <dt>Team</dt><dd><span class="team t-hpc-ops"><i></i>hpc-ops</span></dd>
+      <dt>Export</dt><dd><span class="pill st-warn">not pulled for 26 h</span></dd>
+    </dl>
+  </div>
+  <div class="card-foot"><a class="btn btn-sm" href="#parts">Partitions</a><a class="btn btn-sm" href="#opensm">OpenSM export</a></div>
+</section>
+<section class="card fab-card" aria-labelledby="f2-t">
+  <div class="card-head"><h2 id="f2-t" class="mono">osprey-roce</h2><span class="right"><span class="fab roce">ethernet-roce</span></span></div>
+  <div class="card-body">
+    <p class="fab-d">400G Ethernet with RoCEv2. GPU nodes, 8 <a class="gl" href="../../glossary.html#rail" data-gl="rail" data-domain="addr">rails</a>, 1 <a class="gl" href="../../glossary.html#vlan" data-gl="vlan" data-domain="addr">VLAN</a> per rail.</p>
+    <dl class="kv">
+      <dt>Rails</dt><dd>1–8 · VLAN <span class="vid">3101</span>–<span class="vid">3108</span></dd>
+      <dt>Ports</dt><dd><b>80</b> · 10 GPU nodes × 8 rails</dd>
+      <dt>Subnets</dt><dd><a class="pfx" href="prefix.html">10.110.1.0<span class="len">/24</span></a> … <a class="pfx" href="prefix.html">10.110.8.0<span class="len">/24</span></a></dd>
+      <dt>VRF</dt><dd><span class="dchip" data-domain="addr">hpc-fabric</span></dd>
+      <dt>QoS profile</dt><dd><b class="mono">osprey-roce</b></dd>
+    </dl>
+    <div class="qos" role="group" aria-label="QoS profile osprey-roce">
+      <span><i>DSCP</i><b>26</b></span><span><i>PFC</i><b>3</b></span><span><i>ECN</i><b>on</b></span><span><i>CNP DSCP</i><b>48</b></span>
+    </div>
+  </div>
+  <div class="card-foot"><a class="btn btn-sm" href="#rails">Rail diagram</a><a class="btn btn-sm" href="vlans.html">VLANs</a></div>
+</section>
+<section class="card fab-card" aria-labelledby="f3-t">
+  <div class="card-head"><h2 id="f3-t" class="mono">campus</h2><span class="right"><span class="fab eth">ethernet</span></span></div>
+  <div class="card-body">
+    <p class="fab-d">Campus Ethernet of Hall 2. Services, BMC and management.</p>
+    <dl class="kv">
+      <dt>VLAN domain</dt><dd><span class="mono">campus-hall2</span></dd>
+      <dt>VLANs</dt><dd><b>14</b> · 3 with IPv6</dd>
+      <dt>Ports</dt><dd><b>1 842</b> · from FNT Command</dd>
+      <dt>Subnets</dt><dd><a class="pfx" href="prefix.html">10.20.4.0<span class="len">/22</span></a> and 12 more</dd>
+      <dt>VRF</dt><dd><span class="dchip" data-domain="addr">global</span> <span class="dchip" data-domain="addr">oob</span></dd>
+      <dt>QoS profile</dt><dd class="muted">none</dd>
+    </dl>
+  </div>
+  <div class="card-foot"><a class="btn btn-sm" href="vlans.html">VLANs</a></div>
+</section>
+</div>
+<section class="card" id="parts" aria-labelledby="parts-t">
+  <div class="card-head"><h2 id="parts-t">Partitions of kestrel-ib</h2><span class="right">P_Key as in partitions.conf: base key 0x0001–0x7ffe plus the full bit · <a href="vlans.html">All VLANs and partitions</a></span></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>P_Key</th><th>Name</th><th>Default member</th><th>IPoIB</th><th>Subnet</th><th class="num">MTU</th><th class="num">Full / limited</th><th></th></tr></thead>
+    <tbody><tr><td><span class="mono"><b>0x7fff</b></span></td><td><b>Default</b></td><td><span class="qs ok">full</span></td><td><span class="qs ok">ipoib</span></td><td>–</td><td class="num">4096</td><td class="num">412 / 0</td><td><a href="#">Members</a></td></tr><tr><td><span class="mono"><b>0x8001</b></span></td><td><b>kestrel-ipoib</b></td><td><span class="qs warn">limited</span></td><td><span class="qs ok">ipoib</span></td><td><a class="pfx" href="prefix.html">10.100.0.0<span class="len">/16</span></a></td><td class="num">4096</td><td class="num">398 / 0</td><td><a href="#">Members</a></td></tr><tr><td><span class="mono"><b>0x8002</b></span></td><td><b>kestrel-lustre</b></td><td><span class="qs warn">limited</span></td><td><span class="qs none muted">no</span></td><td>–</td><td class="num">4096</td><td class="num">2 / 396</td><td><a href="#">Members</a></td></tr><tr><td><span class="mono"><b>0x8003</b></span></td><td><b>kestrel-admin</b></td><td><span class="qs warn">limited</span></td><td><span class="qs none muted">no</span></td><td>–</td><td class="num">2048</td><td class="num">4 / 12</td><td><a href="#">Members</a></td></tr></tbody></table></div>
+  <div class="card-foot"><span class="muted">A full member talks to all members. A limited member talks only to full members. In kestrel-lustre the clients are limited, so they cannot reach each other. The default partition 0x7fff is not editable.</span></div>
+</section>
+<section class="card" id="rails" aria-labelledby="rails-t">
+  <div class="card-head"><h2 id="rails-t">Rails of osprey-roce</h2><span class="right">rail = one leaf, one VLAN, one /24</span></div>
+  <div class="rail-wrap"><svg class="railfig" viewBox="0 0 980 350" role="img" aria-labelledby="rf-t rf-d" xmlns="http://www.w3.org/2000/svg"><title id="rf-t">Rail diagram of osprey-roce</title><desc id="rf-d">Eight leaf switches, one per rail, each with its VLAN. Eight GPU nodes connect with one 400G port to each leaf. The links of gpu-001 are highlighted.</desc>
+<g class="sw spine"><rect x="250" y="14" width="150" height="34" rx="7"/><text x="325" y="35" text-anchor="middle">osp-spine-1</text></g>
+<g class="sw spine"><rect x="650" y="14" width="150" height="34" rx="7"/><text x="725" y="35" text-anchor="middle">osp-spine-2</text></g>
+<path class="lk up" d="M325 48C325 80 101.0 70 101.0 100"/>
+<path class="lk up" d="M725 48C725 80 101.0 70 101.0 100"/>
+<path class="lk up" d="M325 48C325 80 215.0 70 215.0 100"/>
+<path class="lk up" d="M725 48C725 80 215.0 70 215.0 100"/>
+<path class="lk up" d="M325 48C325 80 329.0 70 329.0 100"/>
+<path class="lk up" d="M725 48C725 80 329.0 70 329.0 100"/>
+<path class="lk up" d="M325 48C325 80 443.0 70 443.0 100"/>
+<path class="lk up" d="M725 48C725 80 443.0 70 443.0 100"/>
+<path class="lk up" d="M325 48C325 80 557.0 70 557.0 100"/>
+<path class="lk up" d="M725 48C725 80 557.0 70 557.0 100"/>
+<path class="lk up" d="M325 48C325 80 671.0 70 671.0 100"/>
+<path class="lk up" d="M725 48C725 80 671.0 70 671.0 100"/>
+<path class="lk up" d="M325 48C325 80 785.0 70 785.0 100"/>
+<path class="lk up" d="M725 48C725 80 785.0 70 785.0 100"/>
+<path class="lk up" d="M325 48C325 80 899.0 70 899.0 100"/>
+<path class="lk up" d="M725 48C725 80 899.0 70 899.0 100"/>
+<g class="sw leaf"><rect x="50" y="100" width="102" height="62" rx="7"/><text class="n" x="101.0" y="119" text-anchor="middle">osp-leaf-1</text><text class="s" x="101.0" y="135" text-anchor="middle">rail 1 · VLAN 3101</text><text class="sub" x="101.0" y="152" text-anchor="middle">10.110.1.0/24</text></g>
+<g class="sw leaf"><rect x="164" y="100" width="102" height="62" rx="7"/><text class="n" x="215.0" y="119" text-anchor="middle">osp-leaf-2</text><text class="s" x="215.0" y="135" text-anchor="middle">rail 2 · VLAN 3102</text><text class="sub" x="215.0" y="152" text-anchor="middle">10.110.2.0/24</text></g>
+<g class="sw leaf"><rect x="278" y="100" width="102" height="62" rx="7"/><text class="n" x="329.0" y="119" text-anchor="middle">osp-leaf-3</text><text class="s" x="329.0" y="135" text-anchor="middle">rail 3 · VLAN 3103</text><text class="sub" x="329.0" y="152" text-anchor="middle">10.110.3.0/24</text></g>
+<g class="sw leaf"><rect x="392" y="100" width="102" height="62" rx="7"/><text class="n" x="443.0" y="119" text-anchor="middle">osp-leaf-4</text><text class="s" x="443.0" y="135" text-anchor="middle">rail 4 · VLAN 3104</text><text class="sub" x="443.0" y="152" text-anchor="middle">10.110.4.0/24</text></g>
+<g class="sw leaf"><rect x="506" y="100" width="102" height="62" rx="7"/><text class="n" x="557.0" y="119" text-anchor="middle">osp-leaf-5</text><text class="s" x="557.0" y="135" text-anchor="middle">rail 5 · VLAN 3105</text><text class="sub" x="557.0" y="152" text-anchor="middle">10.110.5.0/24</text></g>
+<g class="sw leaf"><rect x="620" y="100" width="102" height="62" rx="7"/><text class="n" x="671.0" y="119" text-anchor="middle">osp-leaf-6</text><text class="s" x="671.0" y="135" text-anchor="middle">rail 6 · VLAN 3106</text><text class="sub" x="671.0" y="152" text-anchor="middle">10.110.6.0/24</text></g>
+<g class="sw leaf"><rect x="734" y="100" width="102" height="62" rx="7"/><text class="n" x="785.0" y="119" text-anchor="middle">osp-leaf-7</text><text class="s" x="785.0" y="135" text-anchor="middle">rail 7 · VLAN 3107</text><text class="sub" x="785.0" y="152" text-anchor="middle">10.110.7.0/24</text></g>
+<g class="sw leaf"><rect x="848" y="100" width="102" height="62" rx="7"/><text class="n" x="899.0" y="119" text-anchor="middle">osp-leaf-8</text><text class="s" x="899.0" y="135" text-anchor="middle">rail 8 · VLAN 3108</text><text class="sub" x="899.0" y="152" text-anchor="middle">10.110.8.0/24</text></g>
+<path class="lk" d="M173.0 272C173.0 222 69.5 212 69.5 162"/>
+<path class="lk" d="M183.5 272C183.5 222 183.5 212 183.5 162"/>
+<path class="lk" d="M194.0 272C194.0 222 297.5 212 297.5 162"/>
+<path class="lk" d="M204.5 272C204.5 222 411.5 212 411.5 162"/>
+<path class="lk" d="M215.0 272C215.0 222 525.5 212 525.5 162"/>
+<path class="lk" d="M225.5 272C225.5 222 639.5 212 639.5 162"/>
+<path class="lk" d="M236.0 272C236.0 222 753.5 212 753.5 162"/>
+<path class="lk" d="M246.5 272C246.5 222 867.5 212 867.5 162"/>
+<path class="lk" d="M287.0 272C287.0 222 80.0 212 80.0 162"/>
+<path class="lk" d="M297.5 272C297.5 222 194.0 212 194.0 162"/>
+<path class="lk" d="M308.0 272C308.0 222 308.0 212 308.0 162"/>
+<path class="lk" d="M318.5 272C318.5 222 422.0 212 422.0 162"/>
+<path class="lk" d="M329.0 272C329.0 222 536.0 212 536.0 162"/>
+<path class="lk" d="M339.5 272C339.5 222 650.0 212 650.0 162"/>
+<path class="lk" d="M350.0 272C350.0 222 764.0 212 764.0 162"/>
+<path class="lk" d="M360.5 272C360.5 222 878.0 212 878.0 162"/>
+<path class="lk" d="M401.0 272C401.0 222 90.5 212 90.5 162"/>
+<path class="lk" d="M411.5 272C411.5 222 204.5 212 204.5 162"/>
+<path class="lk" d="M422.0 272C422.0 222 318.5 212 318.5 162"/>
+<path class="lk" d="M432.5 272C432.5 222 432.5 212 432.5 162"/>
+<path class="lk" d="M443.0 272C443.0 222 546.5 212 546.5 162"/>
+<path class="lk" d="M453.5 272C453.5 222 660.5 212 660.5 162"/>
+<path class="lk" d="M464.0 272C464.0 222 774.5 212 774.5 162"/>
+<path class="lk" d="M474.5 272C474.5 222 888.5 212 888.5 162"/>
+<path class="lk" d="M515.0 272C515.0 222 101.0 212 101.0 162"/>
+<path class="lk" d="M525.5 272C525.5 222 215.0 212 215.0 162"/>
+<path class="lk" d="M536.0 272C536.0 222 329.0 212 329.0 162"/>
+<path class="lk" d="M546.5 272C546.5 222 443.0 212 443.0 162"/>
+<path class="lk" d="M557.0 272C557.0 222 557.0 212 557.0 162"/>
+<path class="lk" d="M567.5 272C567.5 222 671.0 212 671.0 162"/>
+<path class="lk" d="M578.0 272C578.0 222 785.0 212 785.0 162"/>
+<path class="lk" d="M588.5 272C588.5 222 899.0 212 899.0 162"/>
+<path class="lk" d="M629.0 272C629.0 222 111.5 212 111.5 162"/>
+<path class="lk" d="M639.5 272C639.5 222 225.5 212 225.5 162"/>
+<path class="lk" d="M650.0 272C650.0 222 339.5 212 339.5 162"/>
+<path class="lk" d="M660.5 272C660.5 222 453.5 212 453.5 162"/>
+<path class="lk" d="M671.0 272C671.0 222 567.5 212 567.5 162"/>
+<path class="lk" d="M681.5 272C681.5 222 681.5 212 681.5 162"/>
+<path class="lk" d="M692.0 272C692.0 222 795.5 212 795.5 162"/>
+<path class="lk" d="M702.5 272C702.5 222 909.5 212 909.5 162"/>
+<path class="lk" d="M743.0 272C743.0 222 122.0 212 122.0 162"/>
+<path class="lk" d="M753.5 272C753.5 222 236.0 212 236.0 162"/>
+<path class="lk" d="M764.0 272C764.0 222 350.0 212 350.0 162"/>
+<path class="lk" d="M774.5 272C774.5 222 464.0 212 464.0 162"/>
+<path class="lk" d="M785.0 272C785.0 222 578.0 212 578.0 162"/>
+<path class="lk" d="M795.5 272C795.5 222 692.0 212 692.0 162"/>
+<path class="lk" d="M806.0 272C806.0 222 806.0 212 806.0 162"/>
+<path class="lk" d="M816.5 272C816.5 222 920.0 212 920.0 162"/>
+<path class="lk" d="M857.0 272C857.0 222 132.5 212 132.5 162"/>
+<path class="lk" d="M867.5 272C867.5 222 246.5 212 246.5 162"/>
+<path class="lk" d="M878.0 272C878.0 222 360.5 212 360.5 162"/>
+<path class="lk" d="M888.5 272C888.5 222 474.5 212 474.5 162"/>
+<path class="lk" d="M899.0 272C899.0 222 588.5 212 588.5 162"/>
+<path class="lk" d="M909.5 272C909.5 222 702.5 212 702.5 162"/>
+<path class="lk" d="M920.0 272C920.0 222 816.5 212 816.5 162"/>
+<path class="lk" d="M930.5 272C930.5 222 930.5 212 930.5 162"/>
+<path class="lk hot" d="M59.0 272C59.0 222 59.0 212 59.0 162"/>
+<path class="lk hot" d="M69.5 272C69.5 222 173.0 212 173.0 162"/>
+<path class="lk hot" d="M80.0 272C80.0 222 287.0 212 287.0 162"/>
+<path class="lk hot" d="M90.5 272C90.5 222 401.0 212 401.0 162"/>
+<path class="lk hot" d="M101.0 272C101.0 222 515.0 212 515.0 162"/>
+<path class="lk hot" d="M111.5 272C111.5 222 629.0 212 629.0 162"/>
+<path class="lk hot" d="M122.0 272C122.0 222 743.0 212 743.0 162"/>
+<path class="lk hot" d="M132.5 272C132.5 222 857.0 212 857.0 162"/>
+<g class="node sel"><rect x="50" y="272" width="102" height="44" rx="7"/><rect class="pp" x="57.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="67.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="78.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="88.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="99.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="109.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="120.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="130.5" y="269" width="6" height="6" rx="1"/><text class="n" x="101.0" y="297" text-anchor="middle">gpu-001</text><text class="s" x="101.0" y="310" text-anchor="middle">10.110.k.11</text></g>
+<g class="node"><rect x="164" y="272" width="102" height="44" rx="7"/><rect class="pp" x="171.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="181.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="192.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="202.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="213.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="223.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="234.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="244.5" y="269" width="6" height="6" rx="1"/><text class="n" x="215.0" y="297" text-anchor="middle">gpu-002</text><text class="s" x="215.0" y="310" text-anchor="middle">10.110.k.12</text></g>
+<g class="node"><rect x="278" y="272" width="102" height="44" rx="7"/><rect class="pp" x="285.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="295.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="306.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="316.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="327.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="337.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="348.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="358.5" y="269" width="6" height="6" rx="1"/><text class="n" x="329.0" y="297" text-anchor="middle">gpu-003</text><text class="s" x="329.0" y="310" text-anchor="middle">10.110.k.13</text></g>
+<g class="node"><rect x="392" y="272" width="102" height="44" rx="7"/><rect class="pp" x="399.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="409.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="420.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="430.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="441.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="451.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="462.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="472.5" y="269" width="6" height="6" rx="1"/><text class="n" x="443.0" y="297" text-anchor="middle">gpu-004</text><text class="s" x="443.0" y="310" text-anchor="middle">10.110.k.14</text></g>
+<g class="node"><rect x="506" y="272" width="102" height="44" rx="7"/><rect class="pp" x="513.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="523.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="534.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="544.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="555.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="565.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="576.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="586.5" y="269" width="6" height="6" rx="1"/><text class="n" x="557.0" y="297" text-anchor="middle">gpu-005</text><text class="s" x="557.0" y="310" text-anchor="middle">10.110.k.15</text></g>
+<g class="node"><rect x="620" y="272" width="102" height="44" rx="7"/><rect class="pp" x="627.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="637.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="648.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="658.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="669.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="679.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="690.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="700.5" y="269" width="6" height="6" rx="1"/><text class="n" x="671.0" y="297" text-anchor="middle">gpu-006</text><text class="s" x="671.0" y="310" text-anchor="middle">10.110.k.16</text></g>
+<g class="node"><rect x="734" y="272" width="102" height="44" rx="7"/><rect class="pp" x="741.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="751.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="762.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="772.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="783.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="793.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="804.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="814.5" y="269" width="6" height="6" rx="1"/><text class="n" x="785.0" y="297" text-anchor="middle">gpu-007</text><text class="s" x="785.0" y="310" text-anchor="middle">10.110.k.17</text></g>
+<g class="node"><rect x="848" y="272" width="102" height="44" rx="7"/><rect class="pp" x="855.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="865.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="876.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="886.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="897.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="907.5" y="269" width="6" height="6" rx="1"/><rect class="pp" x="918.0" y="269" width="6" height="6" rx="1"/><rect class="pp" x="928.5" y="269" width="6" height="6" rx="1"/><text class="n" x="899.0" y="297" text-anchor="middle">gpu-008</text><text class="s" x="899.0" y="310" text-anchor="middle">10.110.k.18</text></g>
+<text class="cap" x="70" y="344">8 RAILS · 1 LEAF PER RAIL · 8 GPU NODES SHOWN OF 10 · 400G PER LINK · GPU-001 HIGHLIGHTED</text>
+</svg></div>
+  <div class="card-foot"><span class="muted">Port k of every GPU node goes to leaf k. NCCL and RoCEv2 traffic of a rail stays in its VLAN. The links come from FNT Command. The VLAN and the subnet come from bembel.</span></div>
+</section>
+<section class="card" id="opensm" aria-labelledby="osm-t">
+  <div class="card-head"><h2 id="osm-t">OpenSM export</h2><span class="right"><span class="pill st-warn">sm-kestrel pulled 26 h ago</span></span></div>
+  <div class="osm-bar"><span class="seg" role="group" aria-label="File"><button type="button" aria-pressed="true">partitions.conf</button><button type="button" aria-pressed="false">Diff to the pulled copy</button></span><span class="muted small">preview · 21 lines of 408</span>
+    <span class="grow"></span><button class="btn btn-sm" type="button">Copy</button><button class="btn btn-sm" type="button">Download</button></div>
+  <pre class="log osm"><span class="dim"># partitions.conf for fabric kestrel-ib, generated by bembel</span>
+<span class="dim"># bundle o-20261104-1431-b3c. Do not edit.</span>
+
+<span class="p">Default</span>=0x7fff, ipoib, rate=16, mtu=5, defmember=full : ALL=full ;
+
+<span class="dim"># kestrel-ipoib: IPoIB network 10.100.0.0/16</span>
+<span class="p">kestrel-ipoib</span>=0x8001, ipoib, rate=16, mtu=5, defmember=limited :
+    0x0c42a1030071a2b4=full,    <span class="dim"># cn-004 ib0</span>
+    0x0c42a1030071a2c8=full,    <span class="dim"># cn-005 ib0</span>
+    <span class="dim"># ... 394 more members</span>
+    0x0c42a10300a3f160=full,    <span class="dim"># oss-01 ib0</span>
+    0x0c42a10300a3f1a0=full ;   <span class="dim"># oss-02 ib0</span>
+
+<span class="dim"># kestrel-lustre: RDMA only, clients cannot reach each other</span>
+<span class="p">kestrel-lustre</span>=0x8002, rate=16, mtu=5, defmember=limited :
+    0x0c42a10300a3f160=full,    <span class="dim"># oss-01 ib0</span>
+    0x0c42a10300a3f1a0=full,    <span class="dim"># oss-02 ib0</span>
+    0x0c42a1030071a2b4=limited, <span class="dim"># cn-004 ib0</span>
+    0x0c42a1030071a2c8=limited ;<span class="dim"># cn-005 ib0</span></pre>
+  <div class="card-foot"><span class="mono small">bembel export opensm --fabric kestrel-ib --out /etc/opensm/partitions.conf</span><span class="right"><span class="muted">sm-kestrel pulls over HTTPS with an ETag, then sends SIGHUP to OpenSM.</span></span></div>
+</section>
+</div>
+</main>
+</div>
+
+<dialog id="help" class="dlg" aria-labelledby="help-t">
+  <header><h2 id="help-t">Keyboard shortcuts</h2><span class="step-n">Esc closes</span></header>
+  <div class="body"><table class="keys">
+    <tr><td><kbd>g</kbd> <kbd>o</kbd></td><td>Overview</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>p</kbd></td><td>Prefixes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>h</kbd></td><td>Hosts</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>z</kbd></td><td>Zones</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>d</kbd></td><td>DHCP scopes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>e</kbd></td><td>Exports</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>r</kbd></td><td>Racks</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>c</kbd></td><td>Change requests</td></tr>
+    <tr><td><kbd>/</kbd></td><td>Jump to an IP, prefix, MAC, host, zone or page</td></tr>
+    <tr><td><kbd>Shift</kbd> <kbd>A</kbd></td><td>Open the assistant</td></tr>
+    <tr><td><kbd>?</kbd></td><td>Help for the element under the pointer, else for this page</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Close a dialog, a menu or a pane</td></tr>
+  </table><p class="muted">No key <a class="gl" href="../../glossary.html#allocate" data-gl="allocate" data-domain="addr">allocates</a>, deletes or <a class="gl" href="../../glossary.html#approve" data-gl="approve" data-domain="access">approves</a>.</p></div>
+  <footer><form method="dialog"><button class="btn">Close</button></form></footer>
+</dialog>
+<script src="../assets/shell.js"></script>
+<script src="../../../assets/glossary-data.js"></script>
+<script src="../../../assets/glossary.js"></script>
+</body>
+</html>

@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UI: assets and fabrics</title>
+<meta name="description" content="Floor map, rack elevation, device page, sync review, fabrics and VLANs of the bembel web UI: purpose, layout, parts, states, URL, API and CLI of each page.">
+</head>
+<body>
+<h1>UI: assets and fabrics</h1>
+<p class="lede">This chapter specifies the pages of the bembel web UI for the physical side and the network types: the floor map, the rack elevation, the device page, the sync review, the fabrics page and the VLANs page. Each page gets a screenshot, its purpose, layout, parts, states and its URL, API and CLI. The data model is in <a href="assets.html">Assets and FNT Command</a> and <a href="fabrics.html">Fabrics</a>.</p>
+<ul class="keypoints">
+  <li>The screenshots show one moment of the story: Wednesday 4 November 2026, 18:02. The last FNT delta ran at 17:45. The hall is Hall 2, the floor is the ground floor, the row is Row A with racks A01, A02 and A03.</li>
+  <li>The rack and floor views copy the look of <code>dennisklein/rackplanner</code>: a drawing sheet with graph paper, 20 px per U, yellow tape labels, device faces with coloured ears and a title block.</li>
+  <li>FNT Command owns the physical data. The pages show it read only, with a lock and the source badge <code>fnt</code>. bembel adds the IP, DNS and DHCP state on top, as a small dot and a chip on each device face.</li>
+  <li>The sync review is a work list. It shows the devices without a host, the matching rule that fired and one button per decision. No sync makes a guess.</li>
+  <li>The fabrics page shows the network types: kestrel-ib (InfiniBand), osprey-roce (RoCEv2 with its QoS profile) and the campus Ethernet. It also shows the OpenSM export before an agent pulls it.</li>
+  <li>All data comes from the public REST API. The pages work in light and dark mode.</li>
+</ul>
+
+<h2 id="common">What comes from FNT and what from bembel</h2>
+<p>All six pages follow one rule. A field has one owner. The page shows the owner with a badge and a lock. The user never edits a field of FNT Command in bembel.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 330" role="img" aria-labelledby="own-t">
+<title id="own-t">Who owns which data: FNT Command owns the physical objects, bembel owns hosts, addresses, DNS and DHCP, and the asset link joins them</title>
+<rect class="zone" x="16" y="16" width="270" height="298" rx="12"/>
+<text class="t-small t-muted" x="30" y="38">FNT Command (source of truth)</text>
+<rect class="box" x="36" y="52" width="230" height="56" rx="10"/>
+<text class="t-title" x="151" y="76" text-anchor="middle">Floor, row, rack</text>
+<text class="t-small t-muted" x="151" y="95" text-anchor="middle">name, U count, position</text>
+<rect class="box" x="36" y="122" width="230" height="56" rx="10"/>
+<text class="t-title" x="151" y="146" text-anchor="middle">Device</text>
+<text class="t-small t-muted" x="151" y="165" text-anchor="middle">model, serial, tag, U, face</text>
+<rect class="box" x="36" y="192" width="230" height="56" rx="10"/>
+<text class="t-title" x="151" y="216" text-anchor="middle">Port</text>
+<text class="t-small t-muted" x="151" y="235" text-anchor="middle">name, MAC, speed, cable peer</text>
+<text class="t-small" x="151" y="278" text-anchor="middle">badge fnt, lock, read only</text>
+<rect class="zone" x="614" y="16" width="270" height="298" rx="12"/>
+<text class="t-small t-muted" x="628" y="38">bembel (source of truth)</text>
+<rect class="box-accent" x="634" y="52" width="230" height="56" rx="10"/>
+<text class="t-on" x="749" y="76" text-anchor="middle">Host</text>
+<text class="t-small t-on" x="749" y="95" text-anchor="middle">name, team, role</text>
+<rect class="box-accent" x="634" y="122" width="230" height="56" rx="10"/>
+<text class="t-on" x="749" y="146" text-anchor="middle">Interface and address</text>
+<text class="t-small t-on" x="749" y="165" text-anchor="middle">IP, VLAN, VRF, DNS name</text>
+<rect class="box-accent" x="634" y="192" width="230" height="56" rx="10"/>
+<text class="t-on" x="749" y="216" text-anchor="middle">DNS and DHCP</text>
+<text class="t-small t-on" x="749" y="235" text-anchor="middle">records, reservation</text>
+<text class="t-small" x="749" y="278" text-anchor="middle">editable with a binding</text>
+<rect class="box-ok" x="350" y="122" width="200" height="56" rx="10"/>
+<text class="t-title" x="450" y="146" text-anchor="middle">Asset link</text>
+<text class="t-small" x="450" y="165" text-anchor="middle">host to device, interface to port</text>
+<path class="edge" d="M268,150 L346,150" marker-end="url(#arrow)"/>
+<path class="edge" d="M632,150 L554,150" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="450" y="206" text-anchor="middle">serial, tag, MAC, hostname</text>
+<text class="t-small t-muted" x="450" y="224" text-anchor="middle">a user can set it by hand</text>
+</svg>
+<figcaption>FNT owns the left side and bembel owns the right side. The asset link is the only join. The pages show both sides, each with its badge.</figcaption>
+</figure>
+<table>
+<thead><tr><th>Part of a page</th><th>Comes from</th><th>Shown as</th></tr></thead>
+<tbody>
+<tr><td>Floor, row, rack, position, model, serial, asset tag, ELID, port, MAC, cable peer</td><td>FNT Command</td><td>Value with the lock icon, or the badge <code>fnt</code>. No edit button.</td></tr>
+<tr><td>Team, host, interface, address, VLAN, DNS state, DHCP state</td><td>bembel</td><td>Normal value. A link to the object. An edit button if the user has the permission.</td></tr>
+<tr><td>Fabric, QoS profile, VLAN, IB partition</td><td>bembel</td><td>Normal value. The port links of a fabric come from FNT.</td></tr>
+<tr><td>Dot and chip on a device face</td><td>bembel, joined by the asset link</td><td>Dot for the state, chip for the number of addresses.</td></tr>
+</tbody>
+</table>
+<p>Every page has the same head. The crumbs show Assets, hall and floor. The line under the title shows the source badge and the time of the last sync ("fnt · synced 17:45"). The CLI toggle holds the commands of the page. The buttons Open in FNT open the same object in FNT Command in a new tab. bembel never writes to FNT.</p>
+
+<h2 id="floor">Floor map</h2>
+<figure class="shot"><a href="mockups/ui/floor.html"><img src="img/ui-floor.webp" alt="Floor map of Hall 2, ground floor: top view with rows A to D, racks in team colours, the legend, the table of rows and the summary of Row A on the right" loading="lazy"></a><figcaption>The floor map of Hall 2 at 18:02. Row A is selected. The racks have team colours. Row C is planned and not built.</figcaption></figure>
+<p>Purpose: the floor map answers three questions for a hall. Which racks exist? Who uses them? How full are they? A user also finds the rack of a host here, and the free positions for new hardware.</p>
+
+<h3 id="floor-layout">Layout</h3>
+<ul>
+  <li><b>Head.</b> The title, the counts (4 rows, 10 racks) and the source badge. The buttons are Open in FNT and the advisory button "Find space for a 4U box" (read only, it shows the free U ranges, it changes nothing).</li>
+  <li><b>Toolbar.</b> Floor tabs, the previous and next row buttons, the row select, and the switch Elevation | Floor map. The tabs and the row select are the same on the rack page.</li>
+  <li><b>Sheet.</b> One SVG of the floor in top view on graph paper. The side panel and the rows table sit under and beside it.</li>
+  <li><b>Overlay switch.</b> Team | IP status | Power, at the top of the sheet card. The legend under the sheet follows the switch.</li>
+  <li><b>Side panel.</b> The summary of the selected row, the list of its racks, and the source card.</li>
+</ul>
+
+<h3 id="floor-parts">Parts and why</h3>
+<table>
+<thead><tr><th>Part</th><th>Content</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Sheet</td><td>Walls, door, CRAC units, rows as rectangles. One square is 600 mm (one floor tile), a rack is 600 × 1200 mm. A thick strip marks the front of a rack. The cold aisle between two rows is hatched.</td><td>A user thinks in aisles. The top view shows which rows share a cold aisle and which rack is near a CRAC unit.</td></tr>
+<tr><td>Rack</td><td>A rectangle with the name (A01) and the power in kW. The fill is the team colour. A click opens the elevation.</td><td>The team colour answers "whose rack" at a glance. The power shows the heat.</td></tr>
+<tr><td>Free position</td><td>A dashed outline with the name of the position, for example A04.</td><td>FNT knows the positions of a row. A free position is a place for a rack. It is not a rack.</td></tr>
+<tr><td>Planned row</td><td>Row C with a hatched fill and the note "planned in FNT, not built".</td><td>The prefix <code>10.20.16.0/22</code> of the story is planned for this row. The user sees why the prefix exists.</td></tr>
+<tr><td>Overlay: Team</td><td>Fill by the team of the most U in the rack: hpc-ops, openstack, ceph, storage, netops.</td><td>Default view. A rack with devices of two teams shows the larger share.</td></tr>
+<tr><td>Overlay: IP status</td><td>Fill by the worst state of the devices in the rack: ok, stale or drift (amber), conflict (red).</td><td>The user finds the rack of a problem. In the story A01 has 2 stale addresses and A02 has 1 conflict.</td></tr>
+<tr><td>Overlay: Power</td><td>Fill by the share of the rack budget: below 70 % ok, 70 to 90 % amber, above 90 % red. The budget is 12.0 kW per rack.</td><td>The same thresholds as the meter of a prefix. One rule for all fills.</td></tr>
+<tr><td>Title block</td><td>Drawing, location, source and time of the sync, number of racks, view and scale.</td><td>The sheet is a drawing. It prints with its own context. The look is the one of rackplanner.</td></tr>
+<tr><td>Rows table</td><td>One line per row: racks, space, power, teams, IP state.</td><td>The numbers of the whole floor in one place. Row names link to the elevation.</td></tr>
+<tr><td>Row A card</td><td>3 racks, 56 devices, 54 with a host. Space 86 of 141 U (61 %). Power 26.2 of 36.0 kW (73 %). Teams in the row. One line per rack with a bar.</td><td>The next action is in the card: Open elevation (the one filled button) and Open in FNT.</td></tr>
+<tr><td>Source card</td><td>The state of the FNT source, the number of devices and the unmatched count with a link to the sync review.</td><td>A user who sees a rack without a host knows where to go.</td></tr>
+</tbody>
+</table>
+<aside class="callout why"><p class="callout-title">Why</p><p>The floor map is the one place where a rack has a position in space. FNT holds this position. bembel does not move a rack. So the sheet has no drag and no add button. A floor tab with "+" is disabled and says "Floors come from FNT Command".</p></aside>
+
+<h3 id="floor-states">States</h3>
+<ul>
+  <li><b>Never synced.</b> The page shows an empty state with the text "FNT Command is not connected" and a link to Sources and syncs.</li>
+  <li><b>Sync old.</b> If the last delta is older than 45 minutes, a banner shows the age and the last error. The sheet stays visible.</li>
+  <li><b>Row without racks.</b> The row shows its free positions only.</li>
+  <li><b>Narrow screen.</b> The sheet keeps its size and scrolls on its own. The side cards go under the sheet.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/assets/floor/{floor}[?overlay=team|ip|power&amp;row=A]</code></dd>
+  <dt>API</dt><dd><code>GET /v1/sites/{site}/tree?depth=row</code> for the sheet, <code>GET /v1/racks?floor={floor}&amp;include=utilisation</code> for kW and IP state, <code>GET /v1/sources/fnt</code> for the sync badge</dd>
+  <dt>CLI</dt><dd><code>bembel site tree --site hall-2</code>, <code>bembel rack ls --floor ground</code>, <code>bembel sync fnt --status</code></dd>
+  <dt>Live</dt><dd>Event <code>asset.synced</code> refreshes the sheet and the card. The sheet keeps the scroll position.</dd>
+</dl>
+
+<h2 id="rack">Rack elevation</h2>
+<figure class="shot"><a href="mockups/ui/rack.html"><img src="img/ui-rack.webp" alt="Row A elevation: racks A01, A02 and A03 with yellow tape labels, device faces in team colours with state dots and address chips, cn-004 selected, and the datasheet on the right" loading="lazy"></a><figcaption>Row A as one drawing. Device cn-004 (A01, U10–11) is selected. The datasheet on the right has the FNT data and the bembel data.</figcaption></figure>
+<p>Purpose: the elevation shows what stands in a rack and whether its addresses are healthy. A user finds a device, reads its position and serial, and goes to its host. The drawing is the main work surface of the Assets area.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 380" role="img" aria-labelledby="geo-t">
+<title id="geo-t">Geometry of one rack in the elevation: frame, rails, 240 px bay, side channel, 20 px per U, tape label above</title>
+<rect class="box-warn" x="40" y="20" width="110" height="26" rx="4"/>
+<text class="t-small t-mono" x="95" y="38" text-anchor="middle">Rack A01</text>
+<text class="t-small t-muted" x="165" y="38">tape label and the two bars</text>
+<rect class="zone" x="40" y="64" width="344" height="290" rx="4"/>
+<rect class="box-muted" x="50" y="74" width="24" height="270"/>
+<rect class="box" x="74" y="74" width="240" height="270"/>
+<rect class="box-muted" x="314" y="74" width="24" height="270"/>
+<rect class="box-soft" x="338" y="74" width="36" height="270"/>
+<rect class="box-accent" x="74" y="150" width="240" height="40" rx="2"/>
+<text class="t-on" x="194" y="175" text-anchor="middle">cn-004 · 2 U · 40 px</text>
+<path class="edge-muted" d="M74,360 L314,360" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="194" y="376" text-anchor="middle">bay 240 px (19 inch)</text>
+<text class="t-small" x="420" y="100">Frame 10 px</text>
+<text class="t-small" x="420" y="128">Rail 24 px on each side with 3 holes per U</text>
+<text class="t-small" x="420" y="156">Bay 240 px, 1 U = 20 px, 47 U = 940 px</text>
+<text class="t-small" x="420" y="184">Device face: ears 9 px in the team colour</text>
+<text class="t-small" x="420" y="212">Side channel 36 px for 0U devices (PDU, BMC switch)</text>
+<text class="t-small" x="420" y="240">U1 at the top, numbers in the left rail</text>
+<text class="t-small" x="420" y="268">Rack width 344 px, gap 36 px, floor line shared by the row</text>
+<path class="edge-accent" d="M388,156 L416,156" marker-end="url(#arrow-accent)"/>
+</svg>
+<figcaption>The geometry of the elevation. The numbers are the numbers of rackplanner. One SVG holds the racks of a row on one floor line.</figcaption>
+</figure>
+
+<h3 id="rack-layout">Layout</h3>
+<ul>
+  <li><b>Head.</b> The title, "Row A · 3 racks · 86 of 141 U used", the source badge, the advisory button "Find space for a 4U box" and Open in FNT.</li>
+  <li><b>Toolbar.</b> The floor tabs, the row select with previous and next, the switch Elevation | Floor map and the switch Front | Rear.</li>
+  <li><b>Overlay chips.</b> Team colours, IP and DNS state, Power. Two are on by default. The zoom control (minus, 64 %, plus, Fit) sits at the right.</li>
+  <li><b>Sheet.</b> The drawing on graph paper (20 px minor lines, 100 px major lines), the legend at the lower left and the title block at the lower right.</li>
+  <li><b>Datasheet.</b> A drawer of 420 px on the right. It opens when the user selects a device and closes with Esc. The page stays usable.</li>
+</ul>
+
+<h3 id="rack-parts">Parts and why</h3>
+<table>
+<thead><tr><th>Part</th><th>Content</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>Tape label</td><td>The yellow label "Rack A01". At its right: "26/47 U · 9.1/12.0 kW". The text turns red above 90 % of the power budget (A02: 11.4 kW).</td><td>FNT (rack, U count, power); bembel (the budget setting)</td></tr>
+<tr><td>Space bar and power bar</td><td>Two thin bars under the label. Dark is used U. Amber is power.</td><td>FNT</td></tr>
+<tr><td>Device face</td><td>Ears and tint in the team colour. Four screws. The name in mono. The type line, for example "COMPUTE · 2U". Art by type: drive bays (compute, storage), fans (GPU nodes), port blocks (switches), dense bays (JBOD).</td><td>FNT (position, model); bembel (team)</td></tr>
+<tr><td>State dot</td><td>Green: all addresses and DNS records ok. Amber: stale or drift (cn-007, cn-011, ceph-02). Red: conflict (gpu-006). Hollow grey: no host (gpu-009, gpu-010).</td><td>bembel</td></tr>
+<tr><td>Chip</td><td>"3 IPs": the number of IPv4 addresses of the host. A host without an address shows "no IP". A device without a host shows "no host" with a dashed outline.</td><td>bembel</td></tr>
+<tr><td>Side channel</td><td>0U devices, drawn upright with the name turned by 90 degrees: the BMC switch <code>sw-bmc-a01</code> and the PDU <code>pdu-a01-a</code>.</td><td>FNT</td></tr>
+<tr><td>Selection</td><td>A dashed outline with four yellow handles around cn-004. The handles are marks. The drawing is not editable.</td><td>UI</td></tr>
+<tr><td>Legend and title block</td><td>Teams with their U count, the four dot states, and the block "bembel · Hall 2 · Row A · 3 racks · synced from FNT Command 2026-11-04 17:45".</td><td>bembel</td></tr>
+</tbody>
+</table>
+<aside class="callout why"><p class="callout-title">Why</p><p>The state is a dot and a count, not an address text. A face is 240 px wide and 20 px high. A text with three addresses does not fit and nobody reads it. The dot says "look here". The datasheet says what is wrong. The chip counts IPv4 only, so the number is the same as the count of the host page. The datasheet lists all addresses, with IPv6.</p></aside>
+
+<h3 id="rack-drawer">Datasheet</h3>
+<p>The drawer for cn-004 has a head and two sections. The head shows the kind and height ("COMPUTE NODE · 2U"), the name, the badge <code>fnt</code> and the position.</p>
+<ul>
+  <li><b>From FNT Command</b> (lock, "managed by fnt"): model, serial <code>SN7K4-0042</code>, asset tag, position (Rack A01, U10–11, front), face, ELID, status and the time of the sync.</li>
+  <li><b>In bembel</b> (editable): the host <code>cn-004.kestrel.example.org</code>, the asset link ("matched by serial"), team, role, the interfaces with their MACs and addresses (<code>eno1</code> with 10.20.4.44 and 2001:db8:4200:204::44, <code>ib0</code> with 10.100.4.44 in hpc-fabric, <code>bmc</code> with 172.16.4.44 in oob), the DNS state and the DHCP reservation in <code>dhcp-a</code>.</li>
+  <li><b>Foot.</b> Open host (filled), Open device, Open in FNT.</li>
+</ul>
+
+<h3 id="rack-states">States</h3>
+<ul>
+  <li><b>Empty U.</b> A slot with the number only. A click does nothing. A user cannot add a device here.</li>
+  <li><b>Reserved space.</b> A dashed outline with a hatch and the caption "RESERVED · 6U", when FNT marks the space as reserved.</li>
+  <li><b>Overlap.</b> Two devices on the same U get a red hatch and a banner "FNT has 2 devices at A02 U20". The sync keeps both.</li>
+  <li><b>Rear view.</b> The switch Front | Rear shows the devices with face rear or both. A device with only a front face is hidden and the slot is hatched.</li>
+  <li><b>Device removed in FNT.</b> The face turns grey with the caption "gone in FNT since 2026-11-03". The host stays. A user decides in the sync review.</li>
+  <li><b>Print.</b> The sheet prints on A3, landscape. The title block stays at the lower right.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/assets/racks/{rack}</code> for one rack, <code>/assets/rows/{row}</code> for a row, with <code>?device=cn-004&amp;face=front&amp;overlay=ip</code></dd>
+  <dt>API</dt><dd><code>GET /v1/racks?row=A</code>, <code>GET /v1/devices?rack=A01&amp;include=host,state</code>, <code>GET /v1/devices/{id}</code></dd>
+  <dt>CLI</dt><dd><code>bembel rack ls --row A</code>, <code>bembel rack show A01 --devices</code>, <code>bembel device show cn-004</code></dd>
+  <dt>Keys</dt><dd><kbd>g</kbd> <kbd>r</kbd> opens the page, <kbd>Esc</kbd> closes the datasheet, <kbd>+</kbd> and <kbd>-</kbd> zoom</dd>
+</dl>
+
+<h2 id="device">Device page</h2>
+<figure class="shot"><a href="mockups/ui/device.html"><img src="img/ui-device.webp" alt="Device gpu-001: the table of 11 ports with MAC, switch peer, VLAN and address, the FNT data card with a lock, the linked host, the front face and the history of sync changes" loading="lazy"></a><figcaption>Device gpu-001 in Rack A02. The 8 RoCE rails, the 2 Ethernet ports and the BMC port are in one table.</figcaption></figure>
+<p>Purpose: the device page joins the physical device with its host. It answers "which cable and which VLAN is behind this IP?" It is also the record of what the sync changed.</p>
+
+<h3 id="device-layout">Layout</h3>
+<ul>
+  <li><b>Head.</b> The name, the line "GPU node · 2U · Rack A02 · U4–5 · front", the badge <code>fnt</code>, the lock and "managed by fnt". The buttons are Open host (filled), Open in FNT and Show in rack.</li>
+  <li><b>Left column.</b> The Ports card and the History card.</li>
+  <li><b>Right column.</b> The FNT card, the Linked host card and the Front face card.</li>
+</ul>
+
+<h3 id="device-parts">Parts and why</h3>
+<table>
+<thead><tr><th>Part</th><th>Content</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>Ports table</td><td>Three groups with a header line each: 8 × 400G RoCEv2 (rails 1 to 8, QoS profile in the header), 2 × 25G Ethernet (bond0), the BMC port. Columns: rail, port, speed, MAC, peer, VLAN, address, state. Example: rail 1 is <code>nic1</code>, 400G, <code>b8:3f:d2:9a:01:01</code>, peer <code>osp-leaf-1</code> Eth1/1, VLAN 3101, address 10.110.1.11.</td><td>Port, MAC, speed and peer: FNT. VLAN and address: bembel.</td></tr>
+<tr><td>FNT card</td><td>Model, serial <code>SN7K9-0101</code>, asset tag <code>HPC-0101</code>, position, location, ELID, status, sync time and revision. The link "Show FNT payload" opens the raw JSON.</td><td>FNT</td></tr>
+<tr><td>Linked host card</td><td>The FQDN <code>gpu-001.kestrel.example.org</code>, kind, team hpc-ops, the match rule ("matched by serial"), the number of addresses, the DNS state and the DHCP reservation. The buttons are Open host and Change link…</td><td>bembel</td></tr>
+<tr><td>Front face</td><td>The face of the device on a small sheet, with the same dot and chip as in the rack view.</td><td>FNT and bembel</td></tr>
+<tr><td>History</td><td>One line per change that the sync made: asset tag set, NIC replaced (MAC of <code>nic8</code> changed), moved from A03 to A02, first seen. Each line has the run id, the field names and a pill.</td><td>bembel (sync log)</td></tr>
+</tbody>
+</table>
+<aside class="callout why"><p class="callout-title">Why</p><p>One table holds the ports. The user does not need to open two pages to see that a MAC, a switch port and an IP belong together. A column shows the owner of each value in its header and in the card foot. The foot of the table says "The port rows are read only. The address column is edited on the host." A change of an address stays on the host page, where the DNS and DHCP checks run.</p></aside>
+
+<h3 id="device-states">States</h3>
+<ul>
+  <li><b>No host.</b> The Linked host card shows "No host" and the buttons Link… and Create host…. The ports table shows no VLAN and no address.</li>
+  <li><b>Port without interface.</b> The row shows a pill "no interface" and a button Link to interface.</li>
+  <li><b>MAC changed.</b> The history shows an amber pill "MAC". bembel updates the MAC of a linked interface and writes an audit event. It marks the DHCP export as changed.</li>
+  <li><b>Gone in FNT.</b> A banner says that FNT no longer has the device. The page stays and the host stays.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/assets/devices/{device}</code>, for example <code>/assets/devices/gpu-001</code></dd>
+  <dt>API</dt><dd><code>GET /v1/devices/{id}</code>, <code>GET /v1/devices/{id}/ports</code>, <code>GET /v1/devices/{id}/history</code>, <code>GET /v1/asset-links?device={id}</code></dd>
+  <dt>CLI</dt><dd><code>bembel device show gpu-001</code>, <code>bembel device ports gpu-001</code>, <code>bembel asset link show gpu-001</code></dd>
+</dl>
+
+<h2 id="review">Sync review</h2>
+<figure class="shot"><a href="mockups/ui/sync-review.html"><img src="img/ui-sync-review.webp" alt="Sync review: summary of the last run with 2311 devices, 14 changed and 4 unmatched, the list of four unmatched devices with the rule that fired, three conflicts and the table of sync runs" loading="lazy"></a><figcaption>The sync review at 18:02. Run <code>sr-20261104-1745</code> saw 2 311 devices. 14 changed. 4 devices have no host.</figcaption></figure>
+<p>Purpose: the page is the work list of the FNT sync. The sync never links a device when the result is not clear. A user decides here. The page also shows that the sync runs and how long it takes.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 270" role="img" aria-labelledby="mt-t">
+<title id="mt-t">Matching of a device: rule 1 serial, rule 2 asset tag, rule 3 MAC, rule 4 hostname; one host links, two hosts or none go to the review list</title>
+<rect class="box" x="16" y="100" width="120" height="64" rx="10"/>
+<text class="t-title" x="76" y="128" text-anchor="middle">Device</text>
+<text class="t-small t-muted" x="76" y="148" text-anchor="middle">from FNT</text>
+<rect class="box" x="176" y="30" width="120" height="44" rx="10"/>
+<text class="t-title" x="236" y="58" text-anchor="middle">1 serial</text>
+<rect class="box" x="176" y="90" width="120" height="44" rx="10"/>
+<text class="t-title" x="236" y="118" text-anchor="middle">2 asset tag</text>
+<rect class="box" x="176" y="150" width="120" height="44" rx="10"/>
+<text class="t-title" x="236" y="178" text-anchor="middle">3 MAC</text>
+<rect class="box" x="176" y="210" width="120" height="44" rx="10"/>
+<text class="t-title" x="236" y="238" text-anchor="middle">4 hostname</text>
+<path class="edge" d="M138,132 L172,52" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M236,76 L236,86" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M236,136 L236,146" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M236,196 L236,206" marker-end="url(#arrow-muted)"/>
+<rect class="box-ok" x="400" y="30" width="200" height="64" rx="10"/>
+<text class="t-title" x="500" y="56" text-anchor="middle">One host fits</text>
+<text class="t-small" x="500" y="76" text-anchor="middle">link made, audit event</text>
+<rect class="box-warn" x="400" y="110" width="200" height="64" rx="10"/>
+<text class="t-title" x="500" y="136" text-anchor="middle">Two hosts fit</text>
+<text class="t-small" x="500" y="156" text-anchor="middle">review list, no link</text>
+<rect class="box-err" x="400" y="190" width="200" height="64" rx="10"/>
+<text class="t-title" x="500" y="216" text-anchor="middle">No rule fits</text>
+<text class="t-small" x="500" y="236" text-anchor="middle">unmatched list</text>
+<path class="edge-ok" d="M298,52 L396,62" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M298,112 L396,138" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M298,232 L396,222" marker-end="url(#arrow-muted)"/>
+<rect class="box-accent" x="680" y="70" width="200" height="130" rx="10"/>
+<text class="t-on" x="780" y="98" text-anchor="middle">A user decides</text>
+<text class="t-small t-on" x="780" y="124" text-anchor="middle">Link</text>
+<text class="t-small t-on" x="780" y="144" text-anchor="middle">Create host…</text>
+<text class="t-small t-on" x="780" y="164" text-anchor="middle">Ignore</text>
+<text class="t-small t-on" x="780" y="184" text-anchor="middle">Keep bembel name</text>
+<path class="edge-accent" d="M602,142 L676,135" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M602,222 L700,202" marker-end="url(#arrow-accent)"/>
+</svg>
+<figcaption>The first rule that finds one host links it. A rule that finds two hosts, or no rule, sends the device to the page. A link that a user sets always wins.</figcaption>
+</figure>
+
+<h3 id="review-layout">Layout</h3>
+<ul>
+  <li><b>Head.</b> The title, the source line with the next run at 18:00 and the buttons Sync now and "Link 3 matches…" (the filled one). The button opens a dialog that lists the 3 links before it makes them.</li>
+  <li><b>Last run.</b> One line of numbers: 2 311 devices in FNT, 14 changed, 4 unmatched, 3 conflicts, 0 errors. Under it a bar and chips for what changed (5 position, 4 asset tag, 3 port or MAC, 2 status, 0 deleted).</li>
+  <li><b>Tabs.</b> Unmatched 4, Conflicts 3 and Runs. They jump to the cards of the page.</li>
+  <li><b>Side.</b> The four rules in order and the facts of the source: read only, delta every 15 minutes, full at 03:00, 2 307 of 2 311 devices linked.</li>
+</ul>
+
+<h3 id="review-parts">Parts and why</h3>
+<table>
+<thead><tr><th>Part</th><th>Content</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Unmatched row</td><td>At the left the device: name, rack, U, model, serial, tag, ELID. In the middle the four rule chips, the sentence about the rule that fired and the candidate host. At the right the buttons.</td><td>The user sees the cause and the proposal in one row. The rule chips show which rules ran and which one fired.</td></tr>
+<tr><td>Rule: serial</td><td><code>gpu-009</code> and <code>gpu-010</code>: a host has the serial, but another name (<code>gn-009</code>, <code>gn-010</code>). Button Link.</td><td>The serial is the strongest key. The name differs because the ONA import used an old name.</td></tr>
+<tr><td>Rule: MAC</td><td><code>pdu-a02-a</code>: no serial, but the port <code>mgmt</code> has the MAC <code>00:1e:c9:5a:77:21</code> of the interface of <code>pdu-a02a.oob.example.org</code>.</td><td>A MAC is a good key for a device without a serial. The user still confirms.</td></tr>
+<tr><td>No rule</td><td><code>pdu-a02-b</code>: nothing found. The buttons are Create host… and Ignore.</td><td>Some devices need no host. Ignore removes the device from the list and keeps it in the mirror.</td></tr>
+<tr><td>Conflict row</td><td>The FNT name and the bembel host name side by side: <code>oss-02</code> and <code>oss-2.kestrel.example.org</code>. Buttons: Keep bembel name, Rename host…</td><td>FNT wins for physical fields. bembel wins for names, addresses and DNS. A difference is shown and never overwritten.</td></tr>
+<tr><td>Runs table</td><td>Run id, kind (delta, full), start, duration, devices, changed, unmatched, conflicts, result. A retried run shows the pill "retried" and the reason.</td><td>A user sees that the sync is healthy, and sees a slow FNT.</td></tr>
+</tbody>
+</table>
+<aside class="callout why"><p class="callout-title">Why</p><p>The sync could link on a weak match, for example a similar name. The cost of a wrong link is high: a wrong rack under a host, a wrong cable behind an IP. The cost of a click is low. So bembel links without a user only for one exact match of a rule. All other cases wait here. Each action is an API call and an audit event with the origin <code>web</code>.</p></aside>
+<ul>
+  <li><b>Link.</b> Sets the asset link of host and device. The ports link to the interfaces by MAC and name. The button needs the permission <code>asset-link:write</code> in the scope of the host.</li>
+  <li><b>Create host….</b> Opens a dialog with the name, kind, team and subnet. The dialog shows the CLI command. The host starts without an address.</li>
+  <li><b>Ignore.</b> Marks the device as "no host needed", with a reason. The device leaves the list.</li>
+  <li><b>Keep bembel name.</b> Stores an accepted difference. The conflict leaves the list until one of the names changes.</li>
+  <li><b>Rename host….</b> Opens the rename dialog of the host. A rename changes DNS records, so the normal checks and change rules apply.</li>
+</ul>
+
+<h3 id="review-states">States</h3>
+<ul>
+  <li><b>Nothing to review.</b> The lists show "All 2 311 devices are linked" and "No conflicts". The runs table stays.</li>
+  <li><b>Two candidates.</b> The row shows both hosts as radio choices. The button Link stays off until the user picks one.</li>
+  <li><b>Sync failing.</b> A banner at the top of the page names the error (for example "FNT answered 503 five times") and the time of the next try. The lists show the data of the last good run.</li>
+  <li><b>Sync running.</b> The Last run card shows a progress bar and the counts so far. The buttons of the lists stay usable.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/assets/sync</code>, tabs <code>/assets/sync#unmatched</code>, <code>#conflicts</code>, <code>#runs</code></dd>
+  <dt>API</dt><dd><code>GET /v1/sync-runs?source=fnt</code>, <code>GET /v1/devices?unmatched=true</code>, <code>GET /v1/asset-links/conflicts</code>, <code>POST /v1/asset-links</code>, <code>POST /v1/devices/{id}:ignore</code>, <code>POST /v1/sources/fnt:sync</code></dd>
+  <dt>CLI</dt><dd><code>bembel sync fnt --status</code>, <code>bembel sync fnt --now</code>, <code>bembel asset unmatched --source fnt</code>, <code>bembel asset link gpu-009 --host gn-009.kestrel.example.org</code></dd>
+  <dt>Live</dt><dd>Events <code>sync.run.finished</code> and <code>asset.link.changed</code> refresh the numbers and the lists.</dd>
+</dl>
+
+<h2 id="fabrics">Fabrics</h2>
+<figure class="shot"><a href="mockups/ui/fabrics.html"><img src="img/ui-fabrics.webp" alt="Fabrics: cards for kestrel-ib, osprey-roce with its QoS profile and the campus Ethernet, the partitions table, a rail diagram with 8 leaf switches and 8 GPU nodes, and the OpenSM partitions.conf preview" loading="lazy"></a><figcaption>The fabrics page. The rail diagram shows the 8 rails of osprey-roce. The OpenSM preview is the file that sm-kestrel pulls next.</figcaption></figure>
+<p>Purpose: the page shows the network types of the site and the values that tools read from them: the QoS profile of RoCEv2, the IB partitions and the OpenSM file. A network engineer checks here that the intent is right before a tool uses it.</p>
+
+<h3 id="fabrics-layout">Layout</h3>
+<ul>
+  <li><b>Head.</b> The title, the count of fabrics, the advisory button "Check QoS and VLANs" (read only) and Add fabric… (the filled one).</li>
+  <li><b>Fabric cards.</b> Three cards in a row: <code>kestrel-ib</code>, <code>osprey-roce</code>, <code>campus</code>. On a narrow screen they stack.</li>
+  <li><b>Partitions.</b> A table of the partitions of kestrel-ib.</li>
+  <li><b>Rails.</b> A diagram of the rails of osprey-roce.</li>
+  <li><b>OpenSM export.</b> A dark preview of <code>partitions.conf</code> with the state of the pull.</li>
+</ul>
+
+<h3 id="fabrics-parts">Parts and why</h3>
+<table>
+<thead><tr><th>Part</th><th>Content</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>kestrel-ib card</td><td>NDR InfiniBand, 400 Gb/s. Subnet manager <code>sm-kestrel</code> (OpenSM on mgmt-01). 412 ports. 4 partitions, 2 with IPoIB. Subnet <code>10.100.0.0/16</code> in VRF hpc-fabric. Team hpc-ops. The pill "not pulled for 26 h".</td><td>The user sees the size of the fabric and whether the SM has the newest file. The pill is the same warning as on the Overview.</td></tr>
+<tr><td>osprey-roce card</td><td>400G Ethernet with RoCEv2. Rails 1–8 with VLAN 3101 to 3108. 80 ports (10 GPU nodes × 8 rails). The subnets 10.110.1.0/24 to 10.110.8.0/24. The QoS profile as four values: DSCP 26, PFC 3, ECN on, CNP DSCP 48.</td><td>The switch and host config tools read these four values. They must be the same on both sides. The card makes them easy to read.</td></tr>
+<tr><td>campus card</td><td>The VLAN domain <code>campus-hall2</code>, 14 VLANs, 1 842 ports from FNT, VRF global and oob, no QoS profile.</td><td>The page covers all network types. A site with only Ethernet still has a useful card.</td></tr>
+<tr><td>Partitions table</td><td>P_Key, name, default member (full or limited), IPoIB flag, subnet, MTU, members full and limited. Rows: Default 0x7fff, kestrel-ipoib 0x8001, kestrel-lustre 0x8002 (the two OSS servers are full, the 396 clients are limited), kestrel-admin 0x8003.</td><td>It shows who can reach whom. The default partition is shown but not editable.</td></tr>
+<tr><td>Rail diagram</td><td>Two spines, 8 leaf switches (one per rail, with VLAN and subnet), 8 GPU nodes. Every node has one link to each leaf. The links of <code>gpu-001</code> are highlighted.</td><td>A rail design is hard to read in a table. The picture shows that rail k of every node goes to leaf k, and why one rail is one VLAN.</td></tr>
+<tr><td>OpenSM preview</td><td>The first lines of <code>partitions.conf</code> as the export will write them, with the bundle id, the partitions, the GUIDs of the members and a comment per member. Buttons: Copy, Download. A second tab shows the diff to the file that the SM pulled.</td><td>The user reads the file before the agent on <code>sm-kestrel</code> pulls it. A wrong member list can cut off a node from the fabric.</td></tr>
+</tbody>
+</table>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 300" role="img" aria-labelledby="rail-t">
+<title id="rail-t">Rail design in short: node port k goes to leaf k, one VLAN and one subnet per rail</title>
+<rect class="box" x="60" y="20" width="150" height="44" rx="10"/>
+<text class="t-title" x="135" y="48" text-anchor="middle">osp-leaf-1</text>
+<rect class="box" x="375" y="20" width="150" height="44" rx="10"/>
+<text class="t-title" x="450" y="48" text-anchor="middle">osp-leaf-2</text>
+<rect class="box" x="690" y="20" width="150" height="44" rx="10"/>
+<text class="t-title" x="765" y="48" text-anchor="middle">osp-leaf-8</text>
+<text class="t-small t-muted" x="135" y="82" text-anchor="middle">rail 1 · VLAN 3101 · 10.110.1.0/24</text>
+<text class="t-small t-muted" x="450" y="82" text-anchor="middle">rail 2 · VLAN 3102 · 10.110.2.0/24</text>
+<text class="t-small t-muted" x="765" y="82" text-anchor="middle">rail 8 · VLAN 3108 · 10.110.8.0/24</text>
+<rect class="box-accent" x="60" y="200" width="150" height="56" rx="10"/>
+<text class="t-on" x="135" y="224" text-anchor="middle">gpu-001</text>
+<text class="t-small t-on" x="135" y="242" text-anchor="middle">8 × 400G</text>
+<rect class="box" x="375" y="200" width="150" height="56" rx="10"/>
+<text class="t-title" x="450" y="224" text-anchor="middle">gpu-002</text>
+<text class="t-small t-muted" x="450" y="242" text-anchor="middle">8 × 400G</text>
+<rect class="box" x="690" y="200" width="150" height="56" rx="10"/>
+<text class="t-title" x="765" y="224" text-anchor="middle">gpu-008</text>
+<text class="t-small t-muted" x="765" y="242" text-anchor="middle">8 × 400G</text>
+<path class="edge-accent" d="M100,198 L110,102" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M135,198 L400,102" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M170,198 L730,102" marker-end="url(#arrow-accent)"/>
+<path class="edge-muted" d="M420,198 L160,102" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M740,198 L190,102" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="450" y="284" text-anchor="middle">QoS profile osprey-roce: DSCP 26 · PFC 3 · ECN on · CNP DSCP 48</text>
+</svg>
+<figcaption>The rail design of osprey-roce in short. Port k of every GPU node goes to leaf k. The three accent links are the links of <code>gpu-001</code> to rails 1, 2 and 8.</figcaption>
+</figure>
+<aside class="callout why"><p class="callout-title">Why</p><p>The page does not configure a switch. It shows the values and the file. Ansible, Nornir and the vendor tools read the same values with <code>GET /v1/fabrics/{id}/intent</code>. The preview shows the file and the pull state because a stale file is the usual fault: the SM runs with the old partitions and a new node cannot talk.</p></aside>
+
+<h3 id="vlans">VLANs and partitions</h3>
+<figure class="shot"><a href="mockups/ui/vlans.html"><img src="img/ui-vlans.webp" alt="VLANs and partitions: the VLAN domains campus-hall2 and osprey-roce with their VIDs, subnets, fabric, site and team, the free VIDs line, and the IB partitions of kestrel-ib" loading="lazy"></a><figcaption>One list for VLANs and IB partitions. The switch VLANs | IB partitions | All filters it. The grey line under a table shows the free IDs.</figcaption></figure>
+<p>Purpose: the page lists all L2 identifiers in one view. A VLAN and an IB partition do the same job in two fabric types: they separate traffic. So both sit in one list with the same columns.</p>
+<ul>
+  <li><b>Toolbar.</b> The switch VLANs 22 | IB partitions 4 | All, a text filter (VID, name or prefix) and the chip of the site.</li>
+  <li><b>VLAN domain cards.</b> <code>campus-hall2</code> (VID 1–4094, 14 VLANs) and <code>osprey-roce</code> (VID 3100–3199, rails 1–8). A card head names the domain. A VID is unique inside one domain only.</li>
+  <li><b>Table.</b> VID, name, subnets v4, subnets v6, fabric, site, team. A dual-stack VLAN shows both subnets: VLAN 204 has <code>10.20.4.0/22</code> and <code>2001:db8:4200:204::/64</code>. A fold keeps the 8 more VLANs of the campus domain.</li>
+  <li><b>Free VIDs line.</b> A grey dashed line under each table: "Free VIDs 121–203 · 205–207 · 209–211 · 213–239 · 241–499". The hint "Next free for a /24: 213" and the button Allocate next VID… sit on the same line.</li>
+  <li><b>Partitions card.</b> <code>kestrel-ib</code> with its four partitions and the free P_Keys (0x8004 up to 0xfffe).</li>
+</ul>
+<p>Why free IDs: a network engineer needs a new VLAN more often than a list of the old ones. The hint answers it without a calculation. The numbers come from the VLAN domain, not from a guess.</p>
+
+<h3 id="fabrics-states">States</h3>
+<ul>
+  <li><b>Export stale.</b> The pill "not pulled for 26 h" turns red after 48 h. The preview keeps the current content. The advisory button opens an explanation with the agent log of <code>sm-kestrel</code>.</li>
+  <li><b>QoS mismatch.</b> If a host or switch reports other values than the profile, the card shows a finding with the object and the value.</li>
+  <li><b>Unknown GUID.</b> A GUID that the SM sees and bembel does not know goes to the list "unknown ports" of the fabric. The card shows the count.</li>
+  <li><b>Fabric without a subnet manager.</b> The OpenSM card shows "No subnet manager" and the button Add subnet manager….</li>
+  <li><b>Conflict in a domain.</b> A VID that two VLANs of one domain use cannot be saved. The table shows a red row only after an import.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/networks/fabrics</code> (page), <code>/networks/fabrics/{fabric}#partitions</code>, <code>/networks/vlans[?kind=vlan|partition]</code></dd>
+  <dt>API</dt><dd><code>GET /v1/fabrics</code>, <code>GET /v1/fabrics/{id}</code>, <code>GET /v1/fabrics/{id}/intent</code>, <code>GET /v1/vlans?domain=campus-hall2</code>, <code>GET /v1/vlan-domains/{id}/free?count=3</code>, <code>GET /v1/ib-partitions?fabric=kestrel-ib</code>, <code>GET /v1/exports/opensm/sm-kestrel</code></dd>
+  <dt>CLI</dt><dd><code>bembel fabric ls</code>, <code>bembel fabric show osprey-roce --qos</code>, <code>bembel vlan ls --domain campus-hall2</code>, <code>bembel vlan free --domain campus-hall2 --count 3</code>, <code>bembel partition ls --fabric kestrel-ib</code>, <code>bembel export opensm --fabric kestrel-ib</code></dd>
+</dl>
+</body>
+</html>

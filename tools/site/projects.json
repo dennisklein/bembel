@@ -1,0 +1,476 @@
+{
+  "comment": "Other projects that the design record names. tools/site/build.py links the first use per section of each form to https://github.com/<repo>. A form in prose, or the whole text of a <code> element, links. The repo itself (owner/name) is always a form. Rules as in docs/assets/glossary-data.js: only_after, not_after (regex on the text before), not_before (regex on the text after).",
+  "projects": [
+    {
+      "repo": "dennisklein/brig",
+      "forms": [
+        "brig"
+      ]
+    },
+    {
+      "repo": "dennisklein/repoctl",
+      "forms": [
+        "repoctl"
+      ]
+    },
+    {
+      "repo": "dennisklein/rackplanner",
+      "forms": [
+        "rackplanner",
+        "Rackplanner"
+      ]
+    },
+    {
+      "repo": "dennisklein/fntcommand-restclient",
+      "forms": []
+    },
+    {
+      "repo": "GSI-HPC/go-clikit",
+      "forms": [
+        "go-clikit"
+      ]
+    },
+    {
+      "repo": "GSI-HPC/sind",
+      "forms": [
+        "sind"
+      ]
+    },
+    {
+      "repo": "skyhook-io/radar",
+      "forms": []
+    },
+    {
+      "repo": "opennetadmin/ona",
+      "forms": [
+        "OpenNetAdmin"
+      ]
+    },
+    {
+      "repo": "opennetadmin/dcm",
+      "forms": [
+        "dcm.pl"
+      ]
+    },
+    {
+      "repo": "opennetadmin/build_bind",
+      "forms": [
+        "build_bind"
+      ]
+    },
+    {
+      "repo": "opennetadmin/build_isc_dhcp",
+      "forms": [
+        "build_dhcpd",
+        "build_isc_dhcp"
+      ]
+    },
+    {
+      "repo": "netbox-community/netbox",
+      "forms": [
+        "NetBox"
+      ],
+      "not_before": "^\\s+(?:Labs|Branching|Diode)\\b"
+    },
+    {
+      "repo": "netboxlabs/netbox-branching",
+      "forms": [
+        "NetBox Branching"
+      ]
+    },
+    {
+      "repo": "netbox-community/devicetype-library",
+      "forms": [
+        "devicetype-library"
+      ]
+    },
+    {
+      "repo": "openstack/neutron",
+      "forms": [
+        "Neutron"
+      ]
+    },
+    {
+      "repo": "openstack/designate",
+      "forms": [
+        "Designate"
+      ]
+    },
+    {
+      "repo": "openstack/ironic",
+      "forms": [
+        "Ironic"
+      ]
+    },
+    {
+      "repo": "openstack/keystone",
+      "forms": [
+        "Keystone"
+      ]
+    },
+    {
+      "repo": "kubernetes-sigs/cluster-api",
+      "forms": [
+        "Cluster API"
+      ]
+    },
+    {
+      "repo": "kubernetes-sigs/cluster-api-ipam-provider-in-cluster",
+      "forms": []
+    },
+    {
+      "repo": "kubernetes-sigs/external-dns",
+      "forms": [
+        "external-dns"
+      ]
+    },
+    {
+      "repo": "metallb/metallb",
+      "forms": [
+        "MetalLB"
+      ]
+    },
+    {
+      "repo": "cilium/cilium",
+      "forms": [
+        "Cilium"
+      ]
+    },
+    {
+      "repo": "k8snetworkplumbingwg/whereabouts",
+      "forms": [
+        "Whereabouts"
+      ]
+    },
+    {
+      "repo": "keycloak/keycloak",
+      "forms": [
+        "Keycloak"
+      ]
+    },
+    {
+      "repo": "coreos/go-oidc",
+      "forms": [
+        "go-oidc"
+      ]
+    },
+    {
+      "repo": "ogen-go/ogen",
+      "forms": [
+        "ogen"
+      ]
+    },
+    {
+      "repo": "danielgtaylor/huma",
+      "forms": [
+        "huma"
+      ]
+    },
+    {
+      "repo": "jackc/pgx",
+      "forms": [
+        "pgx"
+      ]
+    },
+    {
+      "repo": "sqlc-dev/sqlc",
+      "forms": [
+        "sqlc"
+      ]
+    },
+    {
+      "repo": "pressly/goose",
+      "forms": [
+        "goose"
+      ]
+    },
+    {
+      "repo": "kubernetes-sigs/controller-runtime",
+      "forms": [
+        "controller-runtime"
+      ]
+    },
+    {
+      "repo": "sveltejs/kit",
+      "forms": [
+        "SvelteKit"
+      ]
+    },
+    {
+      "repo": "openapi-ts/openapi-typescript",
+      "forms": [
+        "openapi-typescript",
+        "openapi-fetch"
+      ]
+    },
+    {
+      "repo": "jdx/mise",
+      "forms": [
+        "mise"
+      ]
+    },
+    {
+      "repo": "isc-projects/bind9",
+      "forms": []
+    },
+    {
+      "repo": "isc-projects/kea",
+      "forms": [
+        "Kea"
+      ]
+    },
+    {
+      "repo": "linux-rdma/opensm",
+      "forms": [
+        "OpenSM"
+      ]
+    },
+    {
+      "repo": "FRRouting/frr",
+      "forms": [
+        "FRR"
+      ]
+    },
+    {
+      "repo": "libvirt/libvirt",
+      "forms": [
+        "libvirt"
+      ],
+      "not_before": "^\\s+hook"
+    },
+    {
+      "repo": "ollama/ollama",
+      "forms": [
+        "Ollama"
+      ]
+    },
+    {
+      "repo": "vllm-project/vllm",
+      "forms": [
+        "vLLM"
+      ]
+    },
+    {
+      "repo": "ggml-org/llama.cpp",
+      "forms": [
+        "llama.cpp"
+      ]
+    },
+    {
+      "repo": "cedar-policy/cedar-go",
+      "forms": [
+        "cedar-go"
+      ]
+    },
+    {
+      "repo": "go4org/netipx",
+      "forms": [
+        "netipx"
+      ]
+    },
+    {
+      "repo": "cloudnative-pg/cloudnative-pg",
+      "forms": [
+        "CloudNativePG"
+      ]
+    },
+    {
+      "repo": "pgvector/pgvector",
+      "forms": [
+        "pgvector"
+      ]
+    },
+    {
+      "repo": "sigstore/cosign",
+      "forms": [
+        "cosign"
+      ]
+    },
+    {
+      "repo": "grafana/alloy",
+      "forms": [
+        "Grafana Alloy"
+      ]
+    },
+    {
+      "repo": "grafana/loki",
+      "forms": [
+        "Loki"
+      ]
+    },
+    {
+      "repo": "prometheus/prometheus",
+      "forms": [
+        "Prometheus"
+      ]
+    },
+    {
+      "repo": "grafana/grafana",
+      "forms": [
+        "Grafana"
+      ]
+    },
+    {
+      "repo": "oasdiff/oasdiff",
+      "forms": [
+        "oasdiff"
+      ]
+    },
+    {
+      "repo": "cloudevents/spec",
+      "forms": [
+        "CloudEvents"
+      ]
+    },
+    {
+      "repo": "standard-webhooks/standard-webhooks",
+      "forms": [
+        "Standard Webhooks"
+      ]
+    },
+    {
+      "repo": "openfga/openfga",
+      "forms": [
+        "OpenFGA"
+      ]
+    },
+    {
+      "repo": "authzed/spicedb",
+      "forms": [
+        "SpiceDB"
+      ]
+    },
+    {
+      "repo": "open-policy-agent/opa",
+      "forms": [
+        "OPA"
+      ]
+    },
+    {
+      "repo": "PowerDNS/pdns",
+      "forms": [
+        "PowerDNS"
+      ]
+    },
+    {
+      "repo": "peteeckel/netbox-plugin-dns",
+      "forms": [
+        "netbox-plugin-dns"
+      ]
+    },
+    {
+      "repo": "nautobot/nautobot",
+      "forms": [
+        "Nautobot"
+      ]
+    },
+    {
+      "repo": "phpipam/phpipam",
+      "forms": [
+        "phpIPAM"
+      ]
+    },
+    {
+      "repo": "hashicorp/terraform",
+      "forms": [
+        "Terraform"
+      ]
+    },
+    {
+      "repo": "opentofu/opentofu",
+      "forms": [
+        "OpenTofu"
+      ]
+    },
+    {
+      "repo": "crossplane/crossplane",
+      "forms": [
+        "Crossplane"
+      ]
+    },
+    {
+      "repo": "ansible/ansible",
+      "forms": [
+        "Ansible"
+      ]
+    },
+    {
+      "repo": "CZ-NIC/bird",
+      "forms": [
+        "BIRD"
+      ]
+    },
+    {
+      "repo": "canonical/cloud-init",
+      "forms": [
+        "cloud-init"
+      ]
+    },
+    {
+      "repo": "projectcalico/calico",
+      "forms": [
+        "Calico"
+      ]
+    },
+    {
+      "repo": "kube-vip/kube-vip",
+      "forms": [
+        "kube-vip"
+      ]
+    },
+    {
+      "repo": "stoplightio/spectral",
+      "forms": [
+        "Spectral"
+      ]
+    },
+    {
+      "repo": "TanStack/table",
+      "forms": [
+        "TanStack Table"
+      ]
+    },
+    {
+      "repo": "vitest-dev/vitest",
+      "forms": [
+        "Vitest"
+      ]
+    },
+    {
+      "repo": "microsoft/playwright",
+      "forms": [
+        "Playwright"
+      ]
+    },
+    {
+      "repo": "goreleaser/goreleaser",
+      "forms": [
+        "goreleaser"
+      ]
+    },
+    {
+      "repo": "nornir-automation/nornir",
+      "forms": [
+        "Nornir"
+      ]
+    },
+    {
+      "repo": "MariaDB/server",
+      "forms": [
+        "MariaDB"
+      ]
+    },
+    {
+      "repo": "oapi-codegen/oapi-codegen",
+      "forms": [
+        "oapi-codegen"
+      ]
+    },
+    {
+      "repo": "open-telemetry/opentelemetry-go",
+      "forms": [
+        "OpenTelemetry"
+      ]
+    }
+  ]
+}

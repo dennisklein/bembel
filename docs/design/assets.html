@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Assets from FNT Command</title>
+<meta name="description" content="The read-only asset mirror of FNT Command: the Business Gateway REST API, the entity mapping, the sync, the matching rules, the conflict rules and the floor, rack and device views.">
+</head>
+<body>
+<h1>Assets from FNT Command</h1>
+<p class="lede">FNT Command is the system of record for the physical world: sites, rooms, racks, devices and ports. bembel mirrors it, read-only, and joins it with the IP data. This chapter specifies the mirror, the sync, the matching of devices to hosts and the views that show both.</p>
+<ul class="keypoints">
+  <li>bembel only reads from FNT Command. It never writes back.</li>
+  <li>The interface is the FNT Business Gateway REST API. The public documentation is thin, so this chapter marks what is verified and what must be checked on a real tenant.</li>
+  <li>The sync is a nightly full reconcile plus a delta every 15 minutes. It keeps the raw payload and marks missing objects instead of deleting them.</li>
+  <li>A host links to a device by serial, asset tag, MAC, hostname and management IP, in this order. An ambiguous match goes to a review list. A manual link always wins.</li>
+  <li>FNT wins for physical fields. bembel wins for IP, DNS and VLAN data.</li>
+  <li>The views are the floor map, the rack elevation (in the look of rackplanner) and the device page. The device face shows its addresses and their state.</li>
+</ul>
+
+<h2 id="scope">Scope</h2>
+<p>The organisation keeps its racks, devices and cables in FNT Command. Hosts, addresses and names live in bembel. Today an admin looks at two tools and joins the data by hand. The mirror joins it.</p>
+<table>
+<thead><tr><th>In scope</th><th>Out of scope</th></tr></thead>
+<tbody>
+<tr><td>Read the location tree (site, building, floor, room, row), racks, devices, ports and optional cables.</td><td>Write to FNT Command (rack moves, new devices, port changes).</td></tr>
+<tr><td>Keep the raw FNT payload next to the mapped fields.</td><td>Edit a mirrored object in bembel. The object has <code>managed_by=fnt</code>.</td></tr>
+<tr><td>Link hosts and interfaces to devices and ports.</td><td>Power and weight budgets, cable plans, patch panels as a model.</td></tr>
+<tr><td>Show the floor map, the rack elevation and the device page with the IP overlay.</td><td>Drawing and placing racks (this stays in FNT Command and in rackplanner).</td></tr>
+</tbody>
+</table>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 270" role="img" aria-labelledby="sc-t">
+<title id="sc-t">Data flow of the asset mirror: FNT Command to the sync worker, to PostgreSQL, to the API and the views</title>
+<rect class="box" x="20" y="50" width="170" height="90" rx="8"/>
+<text class="t-title" x="36" y="76">FNT Command</text>
+<text class="t-small" x="36" y="98">system of record</text>
+<text class="t-small t-muted" x="36" y="118">Business Gateway REST</text>
+<rect class="box-accent" x="260" y="50" width="170" height="90" rx="8"/>
+<text class="t-title t-on" x="276" y="76">sync worker</text>
+<text class="t-small t-on" x="276" y="98">bembel serve</text>
+<text class="t-small t-on" x="276" y="118">full 02:30, delta 15 min</text>
+<rect class="box" x="500" y="50" width="170" height="90" rx="8"/>
+<text class="t-title" x="516" y="76">PostgreSQL</text>
+<text class="t-small" x="516" y="98">asset tables, raw payload</text>
+<text class="t-small t-muted" x="516" y="118">asset_link, sync_run</text>
+<rect class="box" x="740" y="50" width="140" height="90" rx="8"/>
+<text class="t-title" x="756" y="76">REST API</text>
+<text class="t-small" x="756" y="98">/v1/sites … /v1/devices</text>
+<path class="edge" d="M190,95 L256,95" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="223" y="86" text-anchor="middle">read</text>
+<path class="edge" d="M430,95 L496,95" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="463" y="86" text-anchor="middle">upsert</text>
+<path class="edge" d="M670,95 L736,95" marker-end="url(#arrow)"/>
+<rect class="box-soft" x="500" y="190" width="170" height="60" rx="8"/>
+<text class="t-title" x="516" y="216">hosts, addresses</text>
+<text class="t-small t-muted" x="516" y="236">source local / import</text>
+<path class="edge-muted" d="M585,190 L585,144" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="595" y="170">asset link</text>
+<rect class="box-soft" x="740" y="190" width="140" height="60" rx="8"/>
+<text class="t-title" x="756" y="216">UI, CLI</text>
+<text class="t-small t-muted" x="756" y="236">floor, rack, device</text>
+<path class="edge" d="M810,140 L810,186" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M130,140 L130,240 L260,240" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="140" y="232">no write back</text>
+</svg>
+<figcaption>The mirror is a one-way flow. The asset link is the only place where bembel joins the two sides.</figcaption>
+</figure>
+
+<h2 id="fnt">FNT Command interface</h2>
+<p>FNT Command has an integration layer called C gate. Its web services are REST and SOAP. The REST side is the <dfn>Business Gateway</dfn>. It exposes the entities of the data model (campus, building, floor and so on) under a base path. The documentation is in the FNT customer portal. bembel could not read it when this chapter was written. The facts below come from public code that uses the API.</p>
+<div class="callout warn">
+<p class="callout-title">Thin public documentation</p>
+<p>The design depends on the shape of the API, not on details that nobody verified. Each point in the table has a state. Before the sync is built, an FNT admin must give a Swagger or OpenAPI export of the tenant (FNT can export one per Business Gateway configuration). Names of attributes, the login call and the timestamp field for deltas then become facts.</p>
+</div>
+<table>
+<thead><tr><th>Point</th><th>What we know</th><th>State</th></tr></thead>
+<tbody>
+<tr><td>Base path</td><td>Starts with <code>/axis</code>. The REST part is <code>/axis/api/rest</code>. The client <code>dennisklein/fntcommand-restclient</code> (Python, maintained by the author) calls <code>/axis/api/rest/businessGateway/…</code>. Public gateway code shows the shorter form <code>/api/rest/entity/&lt;name&gt;/query</code>.</td><td>verified that both forms exist in code; which one a tenant uses: to verify</td></tr>
+<tr><td>Entity query</td><td><code>POST …/entity/&lt;name&gt;/query</code> reads. Relations use <code>…/entity/&lt;name&gt;/&lt;ELID&gt;/…</code>. All other calls need work rights.</td><td>verified (route names). Body schema: to verify</td></tr>
+<tr><td>ELID</td><td>A numeric id of an element. The gateway documents "relation operations on a specific ELID". bembel uses it as the stable key.</td><td>verified</td></tr>
+<tr><td>Entity names</td><td><code>campus</code>, <code>building</code>, <code>floor</code>, <code>room</code>, <code>zone</code>, <code>logicalPort</code>, <code>vlan</code>, <code>sVlan</code>, <code>organization</code>, <code>person</code>, <code>easySearch</code>, <code>scrollQuery</code>.</td><td>verified (route configuration of a public gateway)</td></tr>
+<tr><td>Rack, device, card, port, cable</td><td>Entity names and attributes are not public. They are probably <code>rack</code>, an item type for devices, <code>port</code> and <code>cable</code>.</td><td>not verified</td></tr>
+<tr><td>Login</td><td>Server-side login with user, password, group and client yields a session id. A client reuses the session id. The login path, the header or cookie name and the body are not documented publicly.</td><td>concept verified; call to verify</td></tr>
+<tr><td>Roles</td><td>The Command user has roles such as <code>read</code> and <code>full-work</code>. bembel needs only <code>read</code>.</td><td>verified</td></tr>
+<tr><td>Paging</td><td><code>scrollQuery</code> exists for large result sets.</td><td>name verified; parameters to verify</td></tr>
+<tr><td>Change timestamp</td><td>A last-modified attribute would allow deltas. If an entity has none, the sync reads all objects and compares hashes.</td><td>to verify</td></tr>
+<tr><td>Webhooks, rate limits</td><td>None found. bembel polls and backs off on errors.</td><td>assumed</td></tr>
+<tr><td>OpenAPI</td><td>A public project generates an OpenAPI 3 file for a subset of entities with the tool <code>bge2swagger</code>. The same route can generate the bembel client for the real tenant.</td><td>verified (subset only)</td></tr>
+</tbody>
+</table>
+<p>The author's client <code>fntcommand-restclient</code> is the base for the bembel client code: the same login, the same session reuse and the same retry on <code>401</code>. bembel re-implements it in Go (no Python at runtime) and keeps the request and response shapes in test fixtures taken from the tenant.</p>
+<h3 id="fnt-config">Source configuration</h3>
+<pre><code class="language-yaml">sources:
+  fnt:
+    type: fnt
+    base_url: https://fnt.example.org
+    api_path: /axis/api/rest/businessGateway      # verify on the tenant
+    login:
+      path: /axis/api/rest/login                  # verify on the tenant
+      user: bembel-ro
+      password_file: /run/secrets/fnt-password
+      group: example-readers
+    schedule:
+      full: "30 2 * * *"        # nightly reconcile
+      delta: "*/15 * * * *"     # every 15 minutes
+    page_size: 500
+    min_ratio: 0.8              # abort a full run that reads < 80 % of the last count
+    row_from: rack.attribute.row   # or: zone
+    entities: [campus, building, floor, room, zone, rack, device, port]
+    cables: false</code></pre>
+
+<h2 id="entities">Entity mapping</h2>
+<p>Every mirrored object has <code>source=fnt</code>, <code>external_ref</code> (the ELID as a string), <code>synced_at</code> and the raw payload (<code>fnt_raw</code>, JSONB). The location kinds form a tree with <code>ltree</code> paths, for example <code>hall2.ground.row-a.a01</code>.</p>
+<table>
+<thead><tr><th>FNT entity</th><th>bembel kind</th><th>Mapped fields</th><th>State</th></tr></thead>
+<tbody>
+<tr><td><code>campus</code></td><td><code>site</code></td><td><code>name</code>, ELID, address, time zone</td><td>entity verified; attributes to verify</td></tr>
+<tr><td><code>building</code></td><td><code>building</code></td><td><code>name</code>, ELID, parent site</td><td>same</td></tr>
+<tr><td><code>floor</code></td><td><code>floor</code></td><td><code>name</code>, level, parent building</td><td>same</td></tr>
+<tr><td><code>room</code></td><td><code>room</code></td><td><code>name</code>, parent floor, purpose</td><td>same</td></tr>
+<tr><td><code>zone</code></td><td><code>row</code> (if <code>row_from: zone</code>)</td><td><code>name</code>, parent room</td><td>entity verified; use as row to verify</td></tr>
+<tr><td>rack (cabinet)</td><td><code>rack</code></td><td><code>name</code>, ELID, parent row or room, <code>height_u</code>, <code>numbering</code> (<code>top-down</code> or <code>bottom-up</code>), position on the floor (x, y, rotation)</td><td>not verified</td></tr>
+<tr><td>device (item)</td><td><code>device</code></td><td><code>name</code>, ELID, manufacturer, <code>model</code>, <code>serial</code>, <code>asset_tag</code>, <code>status</code>, <code>rack_id</code>, <code>position_u</code> (lowest U), <code>height_u</code>, <code>face</code> (<code>front</code>, <code>rear</code>, <code>both</code>), half-width, depth, custom attributes</td><td>not verified</td></tr>
+<tr><td>card, port</td><td><code>port</code></td><td><code>name</code>, ELID, <code>mac</code> (if present), <code>speed</code>, parent device, label</td><td>not verified. Only ports with a name or a MAC are mirrored.</td></tr>
+<tr><td><code>vlan</code>, <code>sVlan</code>, <code>logicalPort</code></td><td>read for a comparison report; not mirrored in v1</td><td>VID and name</td><td>entity verified</td></tr>
+<tr><td>cable, connection</td><td>optional <code>cable</code> (peer port to peer port)</td><td>two port ELIDs, medium, length</td><td>not verified; off by default</td></tr>
+</tbody>
+</table>
+<p>A device that has no rack (0U, a free-standing appliance) has <code>rack_id = null</code>. The rack view lists it beside the rack. A device with an <code>height_u</code> that overlaps another in the same rack and face gets the flag <code>overlap=true</code>. The view shows a warning and does not hide either device.</p>
+<pre><code class="language-json">{
+  "id": "0197c1b0-2e44-7d0a-a7c4-91b0d5e2f3a1",
+  "kind": "device",
+  "name": "cn-004",
+  "source": "fnt",
+  "external_ref": "4120587",
+  "synced_at": "2026-11-04T02:41:12Z",
+  "rack_id": "0197c1af-9c10-7b21-8e05-3a4d12c77f90",
+  "position_u": 10,
+  "height_u": 2,
+  "face": "front",
+  "model": "ExampleServer 2U-4N",
+  "serial": "SN7K4-0042",
+  "asset_tag": "A-004213",
+  "status": "in-production",
+  "managed_by": "fnt",
+  "host_link": {"host": "cn-004.kestrel.example.org", "rule": "serial", "confidence": "exact"}
+}</code></pre>
+
+<h2 id="sync">Sync</h2>
+<p>A sync run reads FNT Command and makes the mirror equal to it. There are two modes. The <dfn>full</dfn> run reads all entities every night at 02:30. The <dfn>delta</dfn> run reads only objects that changed since the last successful run, every 15 minutes.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 250" role="img" aria-labelledby="sp-t">
+<title id="sp-t">The sync pipeline: login, scrollQuery per entity, hash compare, upsert or soft delete, match, run log</title>
+<rect class="box" x="20" y="40" width="130" height="80" rx="8"/>
+<text class="t-title" x="85" y="68" text-anchor="middle">1 login</text>
+<text class="t-small t-muted" x="85" y="90" text-anchor="middle">one session,</text>
+<text class="t-small t-muted" x="85" y="106" text-anchor="middle">re-login on 401</text>
+<rect class="box" x="180" y="40" width="150" height="80" rx="8"/>
+<text class="t-title" x="255" y="68" text-anchor="middle">2 scrollQuery</text>
+<text class="t-small t-muted" x="255" y="90" text-anchor="middle">per entity, in order</text>
+<text class="t-small t-muted" x="255" y="106" text-anchor="middle">pages of 500</text>
+<rect class="box" x="360" y="40" width="150" height="80" rx="8"/>
+<text class="t-title" x="435" y="68" text-anchor="middle">3 hash compare</text>
+<text class="t-small t-muted" x="435" y="90" text-anchor="middle">SHA-256 of payload</text>
+<text class="t-small t-muted" x="435" y="106" text-anchor="middle">same hash: skip</text>
+<rect class="box" x="540" y="40" width="150" height="80" rx="8"/>
+<text class="t-title" x="615" y="68" text-anchor="middle">4 upsert</text>
+<text class="t-small t-muted" x="615" y="90" text-anchor="middle">mapped fields + raw</text>
+<text class="t-small t-muted" x="615" y="106" text-anchor="middle">one tx per page</text>
+<rect class="box" x="720" y="40" width="160" height="80" rx="8"/>
+<text class="t-title" x="800" y="68" text-anchor="middle">5 mark missing</text>
+<text class="t-small t-muted" x="800" y="90" text-anchor="middle">full run only</text>
+<text class="t-small t-muted" x="800" y="106" text-anchor="middle">soft delete after 2</text>
+<path class="edge" d="M150,80 L176,80" marker-end="url(#arrow)"/>
+<path class="edge" d="M330,80 L356,80" marker-end="url(#arrow)"/>
+<path class="edge" d="M510,80 L536,80" marker-end="url(#arrow)"/>
+<path class="edge" d="M690,80 L716,80" marker-end="url(#arrow)"/>
+<path class="edge" d="M800,120 L800,160 L615,160 L615,170" marker-end="url(#arrow)"/>
+<rect class="box-accent" x="520" y="170" width="190" height="60" rx="8"/>
+<text class="t-title t-on" x="615" y="196" text-anchor="middle">6 match</text>
+<text class="t-small t-on" x="615" y="216" text-anchor="middle">links and review list</text>
+<path class="edge" d="M520,200 L440,200" marker-end="url(#arrow)"/>
+<rect class="box" x="250" y="170" width="190" height="60" rx="8"/>
+<text class="t-title" x="345" y="196" text-anchor="middle">7 run log</text>
+<text class="t-small t-muted" x="345" y="216" text-anchor="middle">sync_run, metrics, event</text>
+</svg>
+<figcaption>One sync run. Steps 2 to 4 repeat for each entity: sites first, then racks, devices, ports.</figcaption>
+</figure>
+<h3 id="sync-rules">Rules</h3>
+<ul>
+  <li><strong>Order.</strong> The run reads parents before children. A child with an unknown parent waits until the parent exists. If it does not exist at the end of the run, bembel records an error for that object and continues.</li>
+  <li><strong>Paging.</strong> The client uses <code>scrollQuery</code> with a page size of 500 and keeps the scroll id only inside one run.</li>
+  <li><strong>Raw payload.</strong> Each object keeps the last FNT payload in <code>fnt_raw</code> and its SHA-256 in <code>fnt_hash</code>. A mapping change in bembel re-maps from <code>fnt_raw</code> without a call to FNT.</li>
+  <li><strong>Delta.</strong> If the tenant has a last-modified attribute, the delta asks for objects with a value after the start of the last successful run minus 2 minutes. If an entity has no such attribute, the delta reads the entity in full and uses the hash compare.</li>
+  <li><strong>Soft delete.</strong> The full run sets <code>missing_since</code> on objects it did not see. A second full run without the object sets <code>deleted_at</code>. The object leaves the views. The asset link, the history and the audit events stay. If the object returns, <code>deleted_at</code> clears.</li>
+  <li><strong>Guard.</strong> A full run that reads less than <code>min_ratio</code> (80 %) of the last object count aborts before it marks anything. This protects the mirror from a partial FNT outage.</li>
+  <li><strong>Locks.</strong> One sync run per source at a time. The worker takes <code>pg_try_advisory_lock</code> for the source. The three replicas never run the same source together (<a href="operations.html#ha">High availability</a>).</li>
+  <li><strong>Backoff.</strong> A <code>429</code> or <code>5xx</code> response makes the client wait (1 s, 2 s, 4 s … up to 60 s, 6 tries). Then the run fails and the next schedule tries again.</li>
+</ul>
+<h3 id="sync-log">Run log and metrics</h3>
+<pre><code class="language-sql">CREATE TABLE sync_run (
+  id           uuid PRIMARY KEY DEFAULT uuidv7(),
+  source       text        NOT NULL,           -- 'fnt'
+  mode         text        NOT NULL CHECK (mode IN ('full', 'delta')),
+  started_at   timestamptz NOT NULL,
+  finished_at  timestamptz,
+  result       text        CHECK (result IN ('ok', 'partial', 'failed', 'aborted')),
+  counts       jsonb       NOT NULL DEFAULT '{}',   -- per kind: seen, created, updated, unchanged, missing
+  errors       jsonb       NOT NULL DEFAULT '[]'
+);</code></pre>
+<pre class="term">$ bembel sync fnt --full
+sync fnt full  run 0197c1b4-71a2-7e10-bd55-0a1f9c2e48d3
+  campus      1 seen      0 changed
+  building    3 seen      0 changed
+  floor       7 seen      0 changed
+  room       19 seen      1 changed
+  rack      212 seen      2 changed
+  device   2418 seen     14 changed   1 missing
+  port     9760 seen     31 changed
+links: 3 new, 2 in review      duration 4m 12s      result ok</pre>
+<p>The metrics (<a href="operations.html#observability">Observability</a>) are <code>bembel_sync_runs_total{source,mode,result}</code>, <code>bembel_sync_run_duration_seconds{source,mode}</code>, <code>bembel_sync_last_success_timestamp_seconds{source}</code> and <code>bembel_sync_objects_total{source,kind,action}</code>. The alert <code>BembelSyncFailing</code> fires when the last success is older than 3 hours for a delta source.</p>
+
+<h2 id="matching">Matching hosts to devices</h2>
+<p>A host is a named logical system in bembel. A device is a physical item in FNT Command. The <a href="model.html#assets">asset link</a> joins them: host to device, and interface to port. bembel finds links with fixed rules, in this order. The first rule that gives exactly one candidate wins.</p>
+<table>
+<thead><tr><th>#</th><th>Rule</th><th>Compare</th><th>Normalisation</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>serial</td><td>host attribute <code>serial</code> and device <code>serial</code></td><td>trim, upper case, remove spaces and dashes</td></tr>
+<tr><td>2</td><td>asset tag</td><td>host attribute <code>asset_tag</code> and device <code>asset_tag</code></td><td>trim, upper case</td></tr>
+<tr><td>3</td><td>MAC</td><td>interface MAC and port MAC</td><td>lower case, colon form</td></tr>
+<tr><td>4</td><td>hostname</td><td>first label of the host FQDN and the device name</td><td>lower case, remove the domain</td></tr>
+<tr><td>5</td><td>management IP</td><td>address of the interface with role <code>management</code>, and the device management IP attribute</td><td>canonical address form</td></tr>
+</tbody>
+</table>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 380" role="img" aria-labelledby="mt-t">
+<title id="mt-t">Matching decision tree: manual link, then serial, asset tag, MAC, hostname and management IP; one match links, several matches go to review, none goes on</title>
+<rect class="box-muted" x="20" y="24" width="150" height="56" rx="8"/>
+<text class="t-title" x="95" y="48" text-anchor="middle">host or device</text>
+<text class="t-small t-muted" x="95" y="68" text-anchor="middle">to match</text>
+<rect class="box" x="210" y="24" width="170" height="56" rx="8"/>
+<text class="t-title" x="295" y="48" text-anchor="middle">manual link?</text>
+<text class="t-small t-muted" x="295" y="68" text-anchor="middle">a user set or cut it</text>
+<rect class="box-ok" x="420" y="24" width="170" height="56" rx="8"/>
+<text class="t-title" x="505" y="48" text-anchor="middle">keep the link</text>
+<text class="t-small t-muted" x="505" y="68" text-anchor="middle">no rule runs</text>
+<path class="edge" d="M170,52 L206,52" marker-end="url(#arrow)"/>
+<path class="edge" d="M380,52 L416,52" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="398" y="44" text-anchor="middle">yes</text>
+<rect class="box" x="20" y="130" width="140" height="64" rx="8"/>
+<text class="t-title" x="90" y="156" text-anchor="middle">1 serial</text>
+<rect class="box" x="195" y="130" width="140" height="64" rx="8"/>
+<text class="t-title" x="265" y="156" text-anchor="middle">2 asset tag</text>
+<rect class="box" x="370" y="130" width="140" height="64" rx="8"/>
+<text class="t-title" x="440" y="156" text-anchor="middle">3 MAC</text>
+<rect class="box" x="545" y="130" width="140" height="64" rx="8"/>
+<text class="t-title" x="615" y="156" text-anchor="middle">4 hostname</text>
+<rect class="box" x="720" y="130" width="160" height="64" rx="8"/>
+<text class="t-title" x="800" y="156" text-anchor="middle">5 management IP</text>
+<text class="t-small t-muted" x="90" y="178" text-anchor="middle">exact</text>
+<text class="t-small t-muted" x="265" y="178" text-anchor="middle">exact</text>
+<text class="t-small t-muted" x="440" y="178" text-anchor="middle">port to interface</text>
+<text class="t-small t-muted" x="615" y="178" text-anchor="middle">first label</text>
+<text class="t-small t-muted" x="800" y="178" text-anchor="middle">same VRF</text>
+<path class="edge" d="M295,80 L295,106 L90,106 L90,126" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="230" y="100">no</text>
+<path class="edge" d="M160,162 L191,162" marker-end="url(#arrow)"/>
+<path class="edge" d="M335,162 L366,162" marker-end="url(#arrow)"/>
+<path class="edge" d="M510,162 L541,162" marker-end="url(#arrow)"/>
+<path class="edge" d="M685,162 L716,162" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="175" y="154" text-anchor="middle">0</text>
+<text class="t-small t-muted" x="350" y="154" text-anchor="middle">0</text>
+<text class="t-small t-muted" x="525" y="154" text-anchor="middle">0</text>
+<text class="t-small t-muted" x="700" y="154" text-anchor="middle">0</text>
+<rect class="box-ok" x="20" y="270" width="400" height="64" rx="8"/>
+<text class="t-title" x="36" y="296">exactly 1 candidate: link</text>
+<text class="t-small t-muted" x="36" y="316">store the rule name and the confidence (exact, derived)</text>
+<rect class="box-warn" x="450" y="270" width="230" height="64" rx="8"/>
+<text class="t-title" x="466" y="296">2 or more: review list</text>
+<text class="t-small t-muted" x="466" y="316">any rule with 2 or more; no link yet</text>
+<rect class="box-muted" x="710" y="270" width="170" height="64" rx="8"/>
+<text class="t-title" x="726" y="296">0 after rule 5</text>
+<text class="t-small t-muted" x="726" y="316">unmatched list</text>
+<path class="edge-ok" d="M90,194 L90,266" marker-end="url(#arrow)"/>
+<path class="edge-ok" d="M265,194 L265,266" marker-end="url(#arrow)"/>
+<path class="edge-ok" d="M440,194 L440,230 L300,230 L300,266" marker-end="url(#arrow)"/>
+<path class="edge-ok" d="M615,194 L615,240 L400,240 L400,266" marker-end="url(#arrow)"/>
+<path class="edge" d="M800,194 L800,266" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="104" y="236">1</text>
+<text class="t-small t-muted" x="279" y="236">1</text>
+<text class="t-small t-muted" x="627" y="232">1</text>
+<text class="t-small t-muted" x="812" y="236">0</text>
+<text class="t-small t-muted" x="720" y="354">rule 5 with 1: link</text>
+<text class="t-small t-muted" x="20" y="366">Every rule: 1 candidate links, 2 or more candidates go to review, 0 candidates try the next rule.</text>
+</svg>
+<figcaption>The decision tree for one host. The tree runs for devices without a host in the same way, in the other direction.</figcaption>
+</figure>
+<h3 id="match-details">Details</h3>
+<ul>
+  <li><strong>A conflict between rules.</strong> If rule 1 links a host to device X and rule 3 would link it to device Y, bembel keeps X and adds a finding "MAC points to another device". The host page shows it.</li>
+  <li><strong>Link by MAC.</strong> A match of a port MAC to an interface MAC links the two interfaces. If the devices differ from the host link, it is a finding too.</li>
+  <li><strong>One device, one host.</strong> A device links to one host. A blade chassis with four nodes has four devices. A second host that matches the same device goes to review.</li>
+  <li><strong>Virtual machines.</strong> A host of kind <code>vm</code> never matches a device. Its <code>runs_on</code> link points to the hypervisor host, which has the asset link.</li>
+  <li><strong>The review list.</strong> Each entry has the host, the candidate devices and the rule that produced them. A user with <code>assetlink:write</code> picks one, rejects all, or opens both objects. The decision becomes a <em>manual link</em> (or a manual "no link"). Manual links win over every rule, and the next sync does not change them.</li>
+  <li><strong>The unmatched lists.</strong> Two lists: hosts without a device, and devices without a host. Both have a filter by team and by site.</li>
+  <li><strong>Re-run.</strong> The matcher runs after each sync run for the objects that changed, and nightly for all. A rule link can change when the data changes. The audit event <code>asset-link.changed</code> records old and new.</li>
+</ul>
+<p>Story data: the host <code>cn-004.kestrel.example.org</code> has the serial <code>SN7K4-0042</code>. FNT has one device with that serial in Rack A01 at U10 to U11. Rule 1 links them. The MAC <code>3c:ec:ef:12:0a:44</code> then links the interface <code>eno1</code> to the port <code>eno1</code> of the device, and <code>3c:ec:ef:12:0a:45</code> links <code>bmc</code> to the BMC port.</p>
+
+<h2 id="conflicts">Conflicts</h2>
+<p>Both systems hold some data about the same thing. bembel decides per field who wins. The sync never overwrites the loser. It shows a difference when the two disagree.</p>
+<table>
+<thead><tr><th>Field</th><th>Winner</th><th>When they differ</th></tr></thead>
+<tbody>
+<tr><td>Location, rack, position, height, face, model, serial, asset tag, status, port names, port MACs</td><td>FNT Command</td><td>bembel shows FNT's value. A change in bembel is not possible (<code>managed_by=fnt</code>).</td></tr>
+<tr><td>IP addresses, DNS names, VLANs, DHCP reservations, fabrics</td><td>bembel</td><td>FNT may hold a management IP attribute. bembel compares it with the interface address and shows a difference. It never writes the value into FNT.</td></tr>
+<tr><td>Hostname</td><td>bembel for the host, FNT for the device</td><td>The names are different fields. If the first labels differ, the host page shows a "hostname differs" notice. Nothing is renamed.</td></tr>
+<tr><td>Owner team</td><td>bembel for hosts, FNT attribute for devices</td><td>The sync reads a configurable FNT attribute (<code>team_attribute</code>) and shows a notice if it names another team than the host.</td></tr>
+<tr><td>A device removed in FNT while its host stays</td><td>FNT</td><td>The link shows <code>device missing</code>. The host stays. A finding appears after the soft delete.</td></tr>
+<tr><td>A rack moved in FNT</td><td>FNT</td><td>The mirror updates. The event <code>device.moved</code> goes out. Agents and exports do not depend on it.</td></tr>
+</tbody>
+</table>
+<div class="callout why">
+<p class="callout-title">Why one winner per field</p>
+<p>A two-way sync needs conflict logic for each field and a rule for loops. The mirror has none of that. FNT is the register of the physical world, and bembel is the register of the logical world. Each owns its fields, and the join is an explicit, visible link.</p>
+</div>
+
+<h2 id="views">Views</h2>
+<p>The UI has four asset pages. The chapter <a href="ui-assets.html">UI: assets and fabrics</a> specifies them in detail. This section gives the content and the data rules. The mockups are static HTML pages with the story data.</p>
+<figure class="shot"><a href="mockups/ui/floor.html"><img src="img/ui-floor.webp" alt="The floor map of Hall 2, ground floor: a top view of rows A, B and D with ten racks, the overlay switch and the Row A summary" loading="lazy"></a><figcaption>The floor map: a top view of the hall with one box per rack. The overlay switch colours the racks by team, IP state or power. The panel on the right sums up the selected row.</figcaption></figure>
+<table>
+<thead><tr><th>Page</th><th>Route</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td>Floor map</td><td><code>/assets/floor/{floor}</code></td><td>A top view of the floor with one box per rack. Overlay switch: team, IP state, power. A panel sums up the selected row (space, power, hosts without IP). Click a rack to open the elevation.</td></tr>
+<tr><td>Rack elevation</td><td><code>/assets/racks/{rack}</code></td><td>The front view of one or more racks in a row (one SVG per row). Device faces with the IP overlay. A side panel for the selected device.</td></tr>
+<tr><td>Device page</td><td><code>/assets/devices/{device}</code></td><td>FNT data (read-only), the linked host, the ports with their interfaces and addresses, the sync state, the raw payload (admins).</td></tr>
+<tr><td>Sync and review</td><td><code>/assets/sync</code></td><td>The last runs, the review list, the unmatched lists, the differences.</td></tr>
+</tbody>
+</table>
+<figure class="shot"><a href="mockups/ui/device.html"><img src="img/ui-device.webp" alt="The device page of cn-004 with the FNT data, the linked host and the port table with addresses" loading="lazy"></a><figcaption>The device page of cn-004: the left side is FNT data and read-only, the right side is the host with its interfaces and addresses.</figcaption></figure>
+<figure class="shot"><a href="mockups/ui/sync-review.html"><img src="img/ui-sync-review.webp" alt="The sync page with the run history, the review list of ambiguous matches and the unmatched lists" loading="lazy"></a><figcaption>The sync page: the run table, the review list with the candidates, and the two unmatched lists.</figcaption></figure>
+
+<h2 id="rack">Rack elevation</h2>
+<p>The elevation follows the look of the author's tool <code>dennisklein/rackplanner</code>. The drawing is SVG, not DOM. It scales, it prints and it exports. bembel builds <em>one SVG per row</em>. The racks of a row share a floor line, so a row reads like a photo of the aisle.</p>
+<figure class="shot"><a href="mockups/ui/rack.html"><img src="img/ui-rack.webp" alt="The rack elevation of Row A: three racks with tape labels, device faces in team colours and address chips on the faces" loading="lazy"></a><figcaption>Row A as one SVG. The yellow tape labels name the racks. The chips on the faces show the addresses and their state.</figcaption></figure>
+<h3 id="rack-geometry">Geometry</h3>
+<table>
+<thead><tr><th>Part</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>1 U</td><td>20 px high</td></tr>
+<tr><td>Mounting area (19 inch)</td><td>240 px wide, 24 px rail on each side, 36 px side channel on the right</td></tr>
+<tr><td>Rack width</td><td>344 px including the frame (10 px). Gap between racks: 36 px.</td></tr>
+<tr><td>Height of a 47 U rack</td><td>about 940 px. Racks are bottom-aligned to a shared floor line.</td></tr>
+<tr><td>U numbers</td><td>Mono, 8.5 px, at the left rail. The direction follows the rack field <code>numbering</code> from FNT. rackplanner counts from the top, so the numbering is a rack field and not a constant. <span class="tag warn">to verify</span></td></tr>
+<tr><td>Rack tape label</td><td>A yellow strip above the rack with the name, for example <code>Rack A01</code>. At its right: used U, for example <code>12/47 U</code>, and the number of hosts without an address.</td></tr>
+<tr><td>Space bar</td><td>A thin bar under the tape: used (dark), reserved (grey), free.</td></tr>
+</tbody>
+</table>
+<h3 id="rack-colours">Colours</h3>
+<p>The device ears and the face tint use the <em>team colour</em> of the linked host (the cluster colour in rackplanner). The colours come from a fixed list that is safe for colour-blind users. The list is: cobalt, amber, sky, teal, vermilion, plum, yellow, brown, violet, green, rose, olive. A team gets one colour in its team settings. A device without a host link uses a neutral grey. The legend under the row shows the teams and the count of devices. Colour is never the only code. A small team number replaces the upper-left screw in the legend mode.</p>
+<h3 id="rack-overlay">The IP overlay</h3>
+<p>The overlay is the main reason for the view. It answers "which address is on this box, and is it healthy" without a click.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 400" role="img" aria-labelledby="rk-t">
+<title id="rk-t">Excerpt of Rack A01, U1 to U13: switches and compute nodes, with the address overlay of cn-004</title>
+<rect class="zone" x="20" y="30" width="330" height="344" rx="8"/>
+<text class="t-small t-muted" x="34" y="24">Rack A01, U1 to U13 of 47 (20 px per U)</text>
+<text class="t-small t-mono t-muted" x="30" y="52">1</text>
+<text class="t-small t-mono t-muted" x="30" y="72">2</text>
+<text class="t-small t-mono t-muted" x="30" y="92">3</text>
+<text class="t-small t-mono t-muted" x="30" y="112">4</text>
+<text class="t-small t-mono t-muted" x="30" y="132">5</text>
+<text class="t-small t-mono t-muted" x="30" y="152">6</text>
+<text class="t-small t-mono t-muted" x="30" y="172">7</text>
+<text class="t-small t-mono t-muted" x="30" y="192">8</text>
+<text class="t-small t-mono t-muted" x="30" y="212">9</text>
+<text class="t-small t-mono t-muted" x="30" y="232">10</text>
+<text class="t-small t-mono t-muted" x="30" y="252">11</text>
+<text class="t-small t-mono t-muted" x="30" y="272">12</text>
+<text class="t-small t-mono t-muted" x="30" y="292">13</text>
+<rect class="box-info" x="52" y="38" width="280" height="18" rx="2"/>
+<text class="t-small t-mono" x="62" y="51">sw-mgmt-a01</text>
+<rect class="box-info" x="52" y="58" width="280" height="18" rx="2"/>
+<text class="t-small t-mono" x="62" y="71">ib-leaf-a01</text>
+<rect class="box-muted" x="52" y="78" width="280" height="18" rx="2"/>
+<text class="t-small t-mono t-muted" x="62" y="91">free</text>
+<rect class="box" x="52" y="98" width="280" height="38" rx="2"/>
+<text class="t-small t-mono" x="62" y="121">cn-001</text>
+<rect class="box" x="52" y="138" width="280" height="38" rx="2"/>
+<text class="t-small t-mono" x="62" y="161">cn-002</text>
+<rect class="box" x="52" y="178" width="280" height="38" rx="2"/>
+<text class="t-small t-mono" x="62" y="201">cn-003</text>
+<rect class="box-accent" x="52" y="218" width="280" height="38" rx="2"/>
+<text class="t-small t-mono t-on" x="62" y="235">cn-004</text>
+<text class="t-small t-on" x="62" y="250">COMPUTE · 2U · hpc-ops</text>
+<rect class="box" x="52" y="258" width="280" height="38" rx="2"/>
+<text class="t-small t-mono" x="62" y="281">cn-005</text>
+<rect class="box-warn" x="296" y="260" width="30" height="14" rx="3"/>
+<text class="t-small t-mono" x="311" y="271" text-anchor="middle">dep</text>
+<path class="edge-accent" d="M332,237 L420,237" marker-end="url(#arrow-accent)"/>
+<rect class="box" x="424" y="40" width="456" height="330" rx="8"/>
+<text class="t-title" x="440" y="66">cn-004.kestrel.example.org</text>
+<text class="t-small t-muted" x="440" y="86">side panel · FNT: A01 U10–11, front, serial SN7K4-0042 · link: serial, exact</text>
+<text class="t-small t-muted" x="440" y="120">interface</text>
+<text class="t-small t-muted" x="540" y="120">address</text>
+<text class="t-small t-muted" x="770" y="120">state</text>
+<path class="edge-muted" d="M440,128 L864,128"/>
+<text class="t-small t-mono" x="440" y="150">eno1</text>
+<text class="t-small t-mono" x="540" y="150">10.20.4.44</text>
+<text class="t-small t-ok" x="770" y="150">allocated</text>
+<text class="t-small t-mono" x="440" y="176">eno1</text>
+<text class="t-small t-mono" x="540" y="176">2001:db8:4200:204::44</text>
+<text class="t-small t-ok" x="770" y="176">allocated</text>
+<text class="t-small t-mono" x="440" y="202">ib0</text>
+<text class="t-small t-mono" x="540" y="202">10.100.4.44 (hpc-fabric)</text>
+<text class="t-small t-ok" x="770" y="202">allocated</text>
+<text class="t-small t-mono" x="440" y="228">bmc</text>
+<text class="t-small t-mono" x="540" y="228">172.16.4.44 (oob)</text>
+<text class="t-small t-ok" x="770" y="228">allocated</text>
+<text class="t-small t-muted" x="440" y="270">Chip colours on the face</text>
+<text class="t-small t-ok" x="440" y="292">green: allocated, DNS ok</text>
+<text class="t-small t-warn" x="440" y="312">amber: claimed or deprecated</text>
+<text class="t-small t-err" x="440" y="332">red: duplicate, no DNS record, link finding</text>
+<text class="t-small t-muted" x="440" y="352">grey: no address (planned, not linked)</text>
+</svg>
+<figcaption>Rack A01 excerpt and the side panel of cn-004. The device face carries one chip per address; the chip colour is the address state.</figcaption>
+</figure>
+<ul>
+  <li><strong>Chips on the face.</strong> A 2U device shows up to 4 chips on its face: the primary address first. Each chip has the address (short form) and a dot for the state. A 1U device shows one chip and a "+3" counter. The side panel lists all.</li>
+  <li><strong>Overlay modes.</strong> A switch above the row: <em>Teams</em> (default colours), <em>Address state</em> (face tinted by the worst state of its addresses), <em>Fabric</em> (ethernet, ethernet-roce, infiniband), <em>Sync</em> (age of <code>synced_at</code>, link rule).</li>
+  <li><strong>Link in both directions.</strong> A click on a device opens the side panel with a button <em>Open host</em>. The host page has a button <em>Show in rack</em> that opens the elevation with the device selected. The same holds for the interface and its port. Both buttons need the asset link. Without a link, the panel offers <em>Find a host</em> and goes to the review list.</li>
+  <li><strong>Selection.</strong> A dashed outline with yellow corner handles marks the selected device. Hover gives a thin dark outline. The handles are for orientation only: the view has no drag and drop, because the mirror is read-only.</li>
+  <li><strong>Keyboard.</strong> Arrow keys move the selection, <code>Enter</code> opens the panel, <code>h</code> opens the host, <code>/</code> searches by name, serial or address.</li>
+  <li><strong>Warnings.</strong> Overlap of two devices, a device higher than its rack, a host with addresses and no device, a duplicate MAC. Each warning links to a finding.</li>
+  <li><strong>Print and export.</strong> The same SVG, on a drawing sheet with a title block (rack plan, date, location, revision, drawn by). A button downloads SVG and PDF.</li>
+</ul>
+<div class="callout note">
+<p class="callout-title">Why SVG per row</p>
+<p>A row is the unit that an admin walks along. One SVG keeps the floor line, the scale and the legend correct for all racks in the row. It also needs no layout engine in the browser and gives the same picture on screen, on paper and in a ticket.</p>
+</div>
+
+<h2 id="limits">Limits</h2>
+<ul>
+  <li><strong>No write back.</strong> A rack move or a new device is done in FNT Command. The mirror shows it after the next delta (up to 15 minutes).</li>
+  <li><strong>Unverified API details.</strong> Entity names for rack, device, port and cable, the login call, the delta timestamp and the paging parameters need a tenant export. The first sync milestone starts with this export (<a href="roadmap.html#open">Open questions</a>).</li>
+  <li><strong>No deletes in deltas.</strong> A delta cannot see a deleted object. Removals appear after the next full run, and the soft delete needs two runs. A removal can therefore take up to two days to leave the views.</li>
+  <li><strong>One tenant per source.</strong> A second FNT tenant is a second source with its own configuration.</li>
+  <li><strong>IP data in FNT.</strong> FNT may hold IP or VLAN data. bembel reads VLAN and management-IP attributes only for the comparison report. It does not import them as truth.</li>
+  <li><strong>Size.</strong> A site with 10<sup>4</sup> devices and 10<sup>5</sup> ports is expected. A full run at a page size of 500 needs about 200 requests for the ports. The duration depends on the tenant and is not measured. The guard and the metrics make a slow run visible.</li>
+  <li><strong>Cables.</strong> Cable mirroring is off by default. The device page then shows no peer ports.</li>
+  <li><strong>Not an inventory of record.</strong> If FNT is wrong, the mirror is wrong. The review list and the findings show the mismatch. They do not fix it.</li>
+</ul>
+</body>
+</html>

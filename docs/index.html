@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>bembel design record</title>
+<meta name="description" content="The design of bembel: an API-first IPAM, DNS and DHCP source of truth with OIDC access control, asset views from FNT Command and a migration path from OpenNetAdmin.">
+</head>
+<body class="home">
+
+<section class="hero">
+<div class="hero-inner">
+<div class="hero-head">
+<p class="hero-eyebrow">Design record</p>
+<h1>bembel</h1>
+<p class="hero-tagline">Hold the address space. Pour out addresses, names and networks.</p>
+</div>
+<div class="hero-side">
+<p class="hero-text">bembel is the source of truth for IP addresses, DNS and DHCP of a research and HPC organisation. It replaces OpenNetAdmin. It is API first: the web UI, the CLI, the OpenStack and Kubernetes integrations and the export agents use only the public REST API. Access control uses OIDC with roles and scopes. bembel models IPv4 and IPv6, VRFs, Ethernet, RoCEv2 and InfiniBand. It exports BIND zones, <code>dhcpd.conf</code> and OpenSM partitions, and shows the racks from FNT Command.</p>
+<p class="hero-actions"><a class="button button-primary" href="design/decision.html">Read chapter 1</a><a class="button" href="design/mockups/index.html">Mockup gallery</a></p>
+</div>
+</div>
+<figure class="diagram wide hero-figure">
+<svg viewBox="0 0 1040 380" role="img" aria-labelledby="home-t">
+<title id="home-t">bembel in its environment: clients on the left, the bembel server and PostgreSQL in the middle, export targets and sources on the right</title>
+<rect class="box" x="16" y="30" width="190" height="40" rx="8"/><text class="t-small" x="30" y="55">users: web UI, CLI</text>
+<rect class="box" x="16" y="80" width="190" height="40" rx="8"/><text class="t-small" x="30" y="105">OpenStack Neutron</text>
+<rect class="box" x="16" y="130" width="190" height="40" rx="8"/><text class="t-small" x="30" y="155">Kubernetes, Cluster API</text>
+<rect class="box" x="16" y="180" width="190" height="40" rx="8"/><text class="t-small" x="30" y="205">libvirt hypervisors</text>
+<rect class="box" x="16" y="230" width="190" height="40" rx="8"/><text class="t-small" x="30" y="255">scripts, Ansible, MCP</text>
+<rect class="box-muted" x="16" y="300" width="190" height="56" rx="8"/><text class="t-small" x="30" y="324">OpenNetAdmin</text><text class="t-small t-muted" x="30" y="342">import, parallel run</text>
+<rect class="box-accent" x="300" y="60" width="300" height="190" rx="12"/>
+<text class="t-title t-on" x="320" y="92">bembel</text>
+<text class="t-small t-on" x="320" y="118">REST API (OpenAPI 3.1) · OIDC</text>
+<text class="t-small t-on" x="320" y="140">bindings with scopes · change requests</text>
+<text class="t-small t-on" x="320" y="162">prefix tree · allocation · claims</text>
+<text class="t-small t-on" x="320" y="184">derived DNS · DHCP · fabrics</text>
+<text class="t-small t-on" x="320" y="206">exports · syncs · events</text>
+<text class="t-small t-on" x="320" y="228">assistant on a local LLM</text>
+<rect class="box" x="300" y="280" width="300" height="56" rx="10"/><text class="t-title" x="320" y="304">PostgreSQL 18</text><text class="t-small t-muted" x="320" y="322">constraints, history, pgvector</text>
+<rect class="box" x="700" y="30" width="324" height="40" rx="8"/><text class="t-small" x="714" y="55">BIND: ns1, ns2, ns3 (zones, views)</text>
+<rect class="box" x="700" y="80" width="324" height="40" rx="8"/><text class="t-small" x="714" y="105">ISC dhcpd: dhcp1, dhcp2 (failover)</text>
+<rect class="box" x="700" y="130" width="324" height="40" rx="8"/><text class="t-small" x="714" y="155">OpenSM: partitions.conf</text>
+<rect class="box" x="700" y="180" width="324" height="40" rx="8"/><text class="t-small" x="714" y="205">routers, firewalls: prefix lists, feeds</text>
+<rect class="box-muted" x="700" y="250" width="324" height="40" rx="8"/><text class="t-small" x="714" y="275">FNT Command: sites, racks, devices</text>
+<rect class="box-muted" x="700" y="300" width="324" height="40" rx="8"/><text class="t-small" x="714" y="325">Keycloak · local LLM · Prometheus, Loki</text>
+<path class="edge" d="M206,50 L296,100" marker-end="url(#arrow)"/>
+<path class="edge" d="M206,100 L296,120" marker-end="url(#arrow)"/>
+<path class="edge" d="M206,150 L296,150" marker-end="url(#arrow)"/>
+<path class="edge" d="M206,200 L296,180" marker-end="url(#arrow)"/>
+<path class="edge" d="M206,250 L296,210" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M206,328 C 250,328 260,240 296,232" marker-end="url(#arrow-muted)"/>
+<path class="edge" d="M450,250 L450,276" marker-end="url(#arrow)"/>
+<path class="edge-accent" d="M600,90 L696,50" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M600,110 L696,100" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M600,140 L696,150" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M600,170 L696,200" marker-end="url(#arrow-accent)"/>
+<path class="edge-muted" d="M696,270 L604,220" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="650" y="20" text-anchor="middle">agents pull</text>
+<text class="t-small t-muted" x="650" y="244" text-anchor="middle">sync</text>
+</svg>
+<figcaption>bembel holds the truth. Agents pull signed bundles for the servers. FNT Command and the clouds feed observations back.</figcaption>
+</figure>
+</section>
+
+<section class="home-section" id="decisions">
+<h2 id="key-decisions">Key decisions</h2>
+<p class="section-intro">The twelve decisions that shape the design. Each card links to the chapter that specifies it.</p>
+<ol class="decisions">
+<li><a class="decision" href="design/decision.html#choice"><span class="decision-text"><b>Build, not adopt:</b> NetBox is strong on the generic parts and weak on fabrics, DNS, DHCP, assets and the ONA migration, which are the daily work here.</span><span class="decision-link">Why a new tool</span></a></li>
+<li><a class="decision" href="design/architecture.html#backend"><span class="decision-text"><b>Go, PostgreSQL 18, SvelteKit:</b> one binary with an embedded static UI, one language for the server, the CLI and the Kubernetes parts.</span><span class="decision-link">Architecture and stack</span></a></li>
+<li><a class="decision" href="design/architecture.html#api-first"><span class="decision-text"><b>Spec first:</b> <code>api/openapi.yaml</code> is the reviewed contract, and all clients are generated from it.</span><span class="decision-link">API first</span></a></li>
+<li><a class="decision" href="design/model.html#principles"><span class="decision-text"><b>The database enforces the model:</b> unique addresses per VRF, no overlapping siblings, typed links, history for each row.</span><span class="decision-link">Core model</span></a></li>
+<li><a class="decision" href="design/model.html#dns"><span class="decision-text"><b>Derive, do not copy:</b> A, AAAA and PTR records, reverse zones and DHCP reservations follow from addresses and interfaces.</span><span class="decision-link">DNS in the model</span></a></li>
+<li><a class="decision" href="design/fabrics.html#kinds"><span class="decision-text"><b>Fabrics are first class:</b> Ethernet, RoCEv2 with QoS profiles and rails, InfiniBand with partitions and port GUIDs.</span><span class="decision-link">Fabrics</span></a></li>
+<li><a class="decision" href="design/access.html#scopes"><span class="decision-text"><b>Scoped bindings:</b> a role in a VRF, a prefix subtree, a zone subtree, a site, a team or a tag. Dangerous changes need a second person.</span><span class="decision-link">Access control</span></a></li>
+<li><a class="decision" href="design/dns.html#export"><span class="decision-text"><b>Export to the servers we have:</b> BIND and ISC dhcpd stay. Agents pull signed bundles, check them and reload.</span><span class="decision-link">DNS export</span></a></li>
+<li><a class="decision" href="design/migration.html#parallel-run"><span class="decision-text"><b>No flag day:</b> import ONA, diff the exports of both tools each night, switch over after 14 clean nights.</span><span class="decision-link">Migration</span></a></li>
+<li><a class="decision" href="design/assets.html#scope"><span class="decision-text"><b>FNT Command stays the DCIM:</b> bembel mirrors racks and devices read-only and links hosts to them.</span><span class="decision-link">Assets</span></a></li>
+<li><a class="decision" href="design/assistant.html#safety"><span class="decision-text"><b>A local assistant that cannot change data:</b> it reads with the permissions of the user and proposes drafts that the user applies.</span><span class="decision-link">Assistant</span></a></li>
+<li><a class="decision" href="design/operations.html#ha"><span class="decision-text"><b>Stateless and observable:</b> three replicas in Kubernetes, CloudNativePG, Prometheus metrics, JSON logs for Loki.</span><span class="decision-link">Operations</span></a></li>
+</ol>
+</section>
+
+<section class="home-section" id="chapters">
+<h2 id="all-chapters">Chapters</h2>
+<p class="section-intro">Twenty-five chapters in six parts. Read Part I first. The other parts are references.</p>
+<div class="chapter-index" data-build="chapters"></div>
+</section>
+
+<section class="home-section" id="example">
+<h2 id="the-example">The example in this record</h2>
+<div class="story">
+<div class="story-text">
+<p>All examples, mockups and API calls use one data story: one organisation, one HPC hall, four users and one migration. When a chapter shows an address or a name, it comes from this story.</p>
+<dl class="story-facts">
+<dt>Organisation</dt><dd><code>example.org</code>, IdP <code>https://id.example.org/realms/main</code></dd>
+<dt>Users</dt><dd><code>d.klein</code> (network admin), <code>a.berger</code> (HPC ops), <code>m.huber</code> (DNS, approver), <code>s.yildiz</code> (OpenStack)</dd>
+<dt>VRFs</dt><dd><code>global</code>, <code>hpc-fabric</code>, <code>oob</code>, <code>os-provider</code></dd>
+<dt>Subnet</dt><dd><code>10.20.4.0/22</code> kestrel-compute, VLAN 204, 92 % used, twin <code>2001:db8:4200:204::/64</code></dd>
+<dt>Host</dt><dd><code>cn-004.kestrel.example.org</code>, Rack A01 U10–11, Hall 2</dd>
+<dt>ONA</dt><dd>41 000 hosts, 1 900 subnets, 62 000 DNS records</dd>
+</dl>
+</div>
+<ol class="timeline">
+<li><time>2026-10-23</time><p>The parallel run starts. Each night, bembel and a shadow copy of ONA build BIND and dhcpd files, and a job diffs them.</p></li>
+<li><time>2026-11-04 01:31</time><p>Night 12 of 14: the nightly import <code>imp-20261104-0131</code> has 219 findings. All diffs are explained.</p></li>
+<li class="is-key"><time>09:12</time><p>Import run <code>imp-20261104-0912</code> has 214 findings: orphan records, duplicate MACs, overlapping subnets, IPv6 stored as decimal.</p></li>
+<li><time>14:20</time><p>a.berger allocates <code>10.20.4.45</code> for <code>cn-045</code>. The A, AAAA and PTR records and the reservation follow.</p></li>
+<li class="is-key"><time>16:40</time><p>a.berger asks to delete the planned <code>10.20.16.0/22</code>. The change request <code>cr-0042</code> waits for a second user with approver rights.</p></li>
+<li><time>2026-11-09</time><p>Cutover window A: freeze, final import, DNS goes live. DHCP follows on 11-11, secondary first.</p></li>
+</ol>
+</div>
+</section>
+
+<section class="home-section home-status" id="status">
+<h2 id="project-status">Status</h2>
+<div class="status-card">
+<span class="status-pill">Design</span>
+<p><strong>Status: design. No code yet.</strong> The releases and their exit criteria are in <a href="design/roadmap.html#v1">Roadmap</a>.</p>
+<a class="button" href="https://github.com/dennisklein/bembel">Repository on GitHub</a>
+</div>
+</section>
+
+</body>
+</html>

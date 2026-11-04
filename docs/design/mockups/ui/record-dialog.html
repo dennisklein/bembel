@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>New record · bembel</title>
+<link rel="stylesheet" href="../assets/bembel.css">
+<link rel="stylesheet" href="../assets/shell.css">
+<link rel="stylesheet" href="../assets/dns.css">
+</head>
+<body data-page="record-dialog">
+<a class="skip" href="#main">Skip to content</a>
+<div class="app">
+<!-- SHELL: top bar. Copy it unchanged to each page; change only aria-current in the sidebar and the VRF in the switcher. -->
+<header class="topbar">
+  <a class="icon-btn nav-toggle" href="#nav" aria-controls="nav" aria-expanded="false" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></a>
+  <a class="brand" href="overview.html" aria-label="bembel: overview"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M12.6 7h6.8M13.6 7v2.6C9.9 11 8.4 13.6 8.4 16.8c0 3.2 1.4 5.7 3.1 7.2h9c1.7-1.5 3.1-4 3.1-7.2 0-3.2-1.5-5.8-5.2-7.2V7M19.4 8.3c4.4-.3 6.9 1.4 6.9 4.4 0 2.3-1.1 3.9-2.5 4.8M9.4 15.6h13.2"/></svg></span><span class="brand-name">bembel</span></a>
+  <details class="set-menu vrf-menu">
+    <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+    <div class="set-pop">
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+    </div>
+  </details>
+  <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
+    <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
+  <span class="spacer"></span>
+  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
+  <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
+  <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
+    <div class="more-pop" role="menu">
+      <div class="um-head"><b>Dennis Klein</b><span class="mono">d.klein · id.example.org</span><span class="muted small">groups netops, hpc-ops</span></div>
+      <a href="#" role="menuitem">My access</a><a href="#" role="menuitem">Tokens</a><a href="#" role="menuitem">Sign out</a></div></details>
+  <button class="icon-btn" type="button" data-help aria-label="Help (?)">?</button>
+  <button class="icon-btn" type="button" data-theme-toggle aria-label="Theme: auto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/></svg></button>
+</header>
+<!-- SHELL: sidebar. Groups and icons follow the glossary domains (docs/assets/glossary-data.js). -->
+<nav class="sidebar" id="nav" aria-label="Navigation">
+  <a class="nav-item" href="overview.html" data-key="o"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview<span class="count attn">6</span></a>
+  <div class="nav-label" data-domain="addr"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 1.8h3v3h-3Z M2 11.2h3v3H2Z M11 11.2h3v3h-3Z M8 4.8v3.2 M3.5 11.2V8h9v3.2"/></svg>Addressing</div>
+  <a class="nav-item" data-domain="addr" href="prefixes.html" data-key="p"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v4H4zM4 16h6v4H4zM14 10h6v4h-6z"/><path d="M7 8v8M10 12h4"/></svg>Prefixes</a>
+  <a class="nav-item" data-domain="addr" href="hosts.html" data-key="h"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>Hosts</a>
+  <a class="nav-item" data-domain="addr" href="vlans.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/><path d="M8 3v18"/></svg>VLANs and partitions</a>
+  <a class="nav-item" data-domain="addr" href="fabrics.html" data-key="f"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8M7.5 7.5l9 9"/></svg>Fabrics</a>
+  <a class="nav-item" data-domain="addr" href="routing.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h4a4 4 0 004-4V8"/></svg>Routing and groups</a>
+  <div class="nav-label" data-domain="dns"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 1 0 0 12.4A6.2 6.2 0 0 0 8 1.8Z M1.8 8h12.4 M8 1.8C6 3.8 5.4 5.8 5.4 8S6 12.2 8 14.2 M8 1.8c2 2 2.6 4 2.6 6.2S10 12.2 8 14.2"/></svg>DNS and DHCP</div>
+  <a class="nav-item" data-domain="dns" href="zones.html" data-key="z" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-2.5 2.6-3.5 5.6-3.5 9s1 6.4 3.5 9M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9"/></svg>Zones</a>
+  <a class="nav-item" data-domain="dhcp" href="dhcp.html" data-key="d"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12l4 5-4 5H3z"/><path d="M7 12h5"/></svg>DHCP scopes</a>
+  <a class="nav-item" data-domain="integ" href="exports.html" data-key="e"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Exports<span class="count attn">1 diff</span></a>
+  <div class="nav-label" data-domain="assets"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 1.8h8.8v12.4H3.6Z M3.6 5h8.8 M3.6 8.2h8.8 M3.6 11.4h8.8 M5.6 3.4h1.2 M5.6 6.6h1.2 M5.6 9.8h1.2"/></svg>Assets</div>
+  <a class="nav-item" data-domain="assets" href="floor.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 3v16M15 5v16"/></svg>Floor map</a>
+  <a class="nav-item" data-domain="assets" href="rack.html" data-key="r"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="1.5"/><path d="M5 8h14M5 13.5h14M8 5.3h2M8 10.8h2M8 16.5h2"/></svg>Racks</a>
+  <a class="nav-item" data-domain="assets" href="sync-review.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0114-5.3L20 9M20 12a8 8 0 01-14 5.3L4 15"/><path d="M20 4v5h-5M4 20v-5h5"/></svg>Sync review<span class="count attn">4</span></a>
+  <div class="nav-label" data-domain="access"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 3.6v4.1c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.6Z M5.9 8l1.5 1.5 2.8-3"/></svg>Access</div>
+  <a class="nav-item" data-domain="access" href="bindings.html" data-key="b"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.4c1.8.9 3 2.9 3 5.6"/></svg>Roles and bindings</a>
+  <a class="nav-item" data-domain="access" href="changes.html" data-key="c"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg>Change requests<span class="count attn">2</span></a>
+  <a class="nav-item" data-domain="access" href="audit.html" data-key="a"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Audit log</a>
+  <div class="nav-label" data-domain="integ"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h9 M8.6 2.6 11 5 8.6 7.4 M14 11H5 M7.4 8.6 5 11l2.4 2.4"/></svg>Integrations</div>
+  <a class="nav-item" data-domain="integ" href="integrations.html" data-key="i"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0z"/><path d="M12 16v5"/></svg>Sources and syncs</a>
+  <a class="nav-item" data-domain="integ" href="import.html" data-key="m"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6M9 15l2.5 2.5L16 13"/></svg>ONA migration<span class="count attn">214</span></a>
+  <div class="side-foot">bembel v0.1.0 · api v1</div>
+</nav>
+<!-- /SHELL -->
+
+<main class="main" id="main">
+<div class="banner err offline" role="alert"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M2 8.5a15 15 0 0120 0M5 12a10 10 0 0114 0M8.5 15.5a5 5 0 017 0M12 19h.01M3 3l18 18"/></svg>
+  <div class="grow"><b>Offline.</b> <span data-why>The event stream of bembel stopped. The page shows old data.</span> The page tries again every 5 s.</div>
+  <button class="btn btn-sm" type="button" onclick="location.reload()">Reload</button></div>
+
+
+<div class="crumbs"><a href="zones.html">Zones</a><span class="sep">/</span><a href="zone.html">example.org</a><span class="sep">/</span><span>kestrel.example.org</span></div>
+<div class="page-head">
+  <div>
+    <div class="zhead"><h1 class="mono">kestrel.example.org</h1><span class="dchip" data-domain="dns">view internal</span><span class="pill st-ok">exported</span></div>
+    <div class="sub"><span>forward zone, child of <a class="fqdn" href="zone.html">example.org</a></span><span class="sep">·</span><span>Team <b>hpc-ops</b></span><span class="sep">·</span><span>1 846 records: 1 802 derived, 44 manual</span><span class="sep">·</span><span>exported 17:58, bundle <span class="id" title="sha256:7c41e0">b-7c41e0</span></span></div>
+  </div>
+  <div class="actions">
+    <span class="seg" role="group" aria-label="View"><a href="zone.html" aria-current="page">internal <span class="n">1 846</span></a><a href="#">external <span class="n">3</span></a></span>
+    <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
+      <div class="cli-pop"><span class="c"># list the manual records of this zone and view</span>
+bembel record ls kestrel.example.org --view internal --manual
+<span class="c"># add a record (same as the dialog)</span>
+bembel record add kestrel.example.org --view internal \
+  --name _slurmctld._tcp --type SRV --data "10 0 6817 ctl01.kestrel.example.org."
+<span class="c"># check the zone with named-checkzone, without a build</span>
+bembel zone check kestrel.example.org</div></details>
+    <button class="btn btn-agent" type="button" data-assistant="check-zone" title="Runs the assistant with the advisory check-zone. Tools: read only. It changes nothing.">Check zone</button>
+    <a class="btn btn-primary" href="record-dialog.html">New record…</a>
+  </div>
+</div>
+<section class="card recs" aria-hidden="true">
+  <div class="card-head"><h2>Records</h2><span class="right">view internal</span></div>
+  <div class="table-wrap"><table class="table rt"><tbody>
+<tr class=""><td class="c1"><input class="check" type="checkbox" aria-label="Select @ MX"></td><td><span class="fqdn at">@</span></td><td><span class="rtype t-MX">MX</span></td><td class="mono ttl">3600</td><td class="rdata"><span class="srvd"><b>10</b></span> <span class="fqdn">mail.example.org.</span></td><td><span class="org"><span class="src">manual</span> <span class="muted" title="2026-09-02">m.huber</span></span></td><td class="act"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for @ MX">⋯</summary><div class="more-pop" role="menu"><a href="record-dialog.html" role="menuitem">Edit…</a><a href="#" role="menuitem">Copy as zone file line</a><a href="#" role="menuitem">History of this record</a><a href="#" role="menuitem">Delete…</a></div></details></td></tr>
+<tr class=""><td class="c1"><input class="check" type="checkbox" aria-label="Select _ldap._tcp SRV"></td><td><span class="fqdn">_ldap._tcp</span></td><td><span class="rtype t-SRV">SRV</span></td><td class="mono ttl">3600</td><td class="rdata"><span class="srvd"><b>0</b> 100 <b>389</b></span> <span class="fqdn">ldap1.example.org.</span></td><td><span class="org"><span class="src">manual</span> <span class="muted" title="2026-09-02">m.huber</span></span></td><td class="act"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for _ldap._tcp SRV">⋯</summary><div class="more-pop" role="menu"><a href="record-dialog.html" role="menuitem">Edit…</a><a href="#" role="menuitem">Copy as zone file line</a><a href="#" role="menuitem">History of this record</a><a href="#" role="menuitem">Delete…</a></div></details></td></tr>
+<tr class=""><td class="c1"><input class="check" type="checkbox" aria-label="Select _slurmctld._tcp SRV"></td><td><span class="fqdn">_slurmctld._tcp</span></td><td><span class="rtype t-SRV">SRV</span></td><td class="mono ttl">3600</td><td class="rdata"><span class="srvd"><b>10</b> 0 <b>6817</b></span> <span class="fqdn">ctl01.kestrel.example.org.</span></td><td><span class="org"><span class="src">manual</span> <span class="muted" title="2026-10-11">a.berger</span></span></td><td class="act"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for _slurmctld._tcp SRV">⋯</summary><div class="more-pop" role="menu"><a href="record-dialog.html" role="menuitem">Edit…</a><a href="#" role="menuitem">Copy as zone file line</a><a href="#" role="menuitem">History of this record</a><a href="#" role="menuitem">Delete…</a></div></details></td></tr>
+<tr class="derived"><td class="c1"><span class="lk" title="Derived from an address. Change the address to change this record."><svg class="lock" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></span></td><td><span class="fqdn">cn-001</span></td><td><span class="rtype t-A">A</span></td><td class="mono ttl">3600</td><td class="rdata"><span class="ip">10.20.4.41</span></td><td><a class="org addr" href="address.html" title="Edit the address, not the record"><span class="src">address</span> <span class="ip">10.20.4.41</span></a></td><td class="act"><details class="more"><summary class="btn btn-sm btn-ghost" aria-label="Actions for cn-001 A">⋯</summary><div class="more-pop" role="menu"><a href="#" role="menuitem">Copy as zone file line</a><a href="#" role="menuitem">History of this record</a></div></details></td></tr>
+  </tbody></table></div>
+</section>
+
+</main>
+</div>
+
+<div class="scrim" aria-hidden="true"></div>
+<div class="dlg wide static rec-dlg" role="dialog" aria-modal="true" aria-labelledby="rd-t">
+  <header><h2 id="rd-t">New record in <span class="mono">kestrel.example.org</span></h2><span class="step-n">Esc closes</span></header>
+  <div class="body">
+    <div class="rd-grid">
+      <label class="field rd-name"><span>Name</span>
+        <span class="suffix-in"><input class="input mono" value="_slurmctld._tcp"><span class="suf mono">.kestrel.example.org.</span></span> for the zone name. Labels: 63 characters at most.</span></label>
+      <label class="field"><span>Type</span>
+        <select class="select"><option>A</option><option>AAAA</option><option>CNAME</option><option>MX</option><option>NS</option><option>CAA</option><option selected>SRV</option><option>TXT</option></select>
+        <span class="hint">A, AAAA and PTR come from addresses.</span></label>
+      <label class="field"><span>TTL <span class="muted">seconds</span></span>
+        <input class="input mono" value="3600" inputmode="numeric"><span class="hint">Zone default 3600.</span></label>
+    </div>
+    <fieldset class="rd-data"><legend>Data of an SRV record <span class="muted">RFC 2782</span></legend>
+      <div class="rd-srv">
+        <label class="field"><span>Priority</span><input class="input mono" value="30" inputmode="numeric"></label>
+        <label class="field"><span>Weight</span><input class="input mono" value="0" inputmode="numeric"></label>
+        <label class="field"><span>Port</span><input class="input mono" value="6817" inputmode="numeric"></label>
+        <label class="field rd-target"><span>Target</span><input class="input mono" value="ctl03.kestrel.example.org."><span class="hint ok-h"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Target has an A record in this view: <span class="ip">10.20.4.7</span></span></label>
+      </div>
+    </fieldset>
+    <div class="rd-views"><span class="lbl">Views</span>
+      <label class="vcheck"><input class="check" type="checkbox" checked> <span class="dchip" data-domain="dns">internal</span> <span class="muted small">zone has 1 846 records here</span></label>
+      <label class="vcheck"><input class="check" type="checkbox"> <span class="dchip" data-domain="dns">external</span> <span class="muted small">zone has 3 records here</span></label>
+      <span class="hint">The <a class="gl" href="../../glossary.html#record" data-gl="record" data-domain="dns">record</a> goes into the <a class="gl" href="../../glossary.html#zone" data-gl="zone" data-domain="dns">zone</a> file of each checked view.</span></div>
+    <div class="banner warn" role="status"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M12 3 2.5 20h19Z M12 10v4.5M12 17.5h.01"/></svg>
+      <div class="grow"><b>A name that holds an SRV cannot hold a CNAME.</b> A CNAME must be the only record at its name. bembel refuses the second type with <span class="mono">cname.conflict</span>. The name <span class="fqdn">_slurmctld._tcp</span> holds 2 SRV records now.</div></div>
+    <div><div class="pv-h">Preview, as in the zone file of view <b>internal</b></div>
+<pre class="log pv"><span class="dim">; kestrel.example.org, view internal, serial 2026110417 → 2026110418</span>
+_slurmctld._tcp.kestrel.example.org.  3600  IN  SRV  10 0 6817 ctl01.kestrel.example.org.
+_slurmctld._tcp.kestrel.example.org.  3600  IN  SRV  20 0 6817 ctl02.kestrel.example.org.
+<span class="ok">+_slurmctld._tcp.kestrel.example.org.  3600  IN  SRV  30 0 6817 ctl03.kestrel.example.org.</span></pre>
+      <div class="pv-f"><span class="qs ok">name valid</span><span class="qs ok">no CNAME at the name</span><span class="qs ok">target resolves</span><span class="qs ok">named-checkzone ok</span></div></div>
+    <div><div class="pv-h">Same change in the terminal</div>
+      <div class="cmd"><code>bembel record add kestrel.example.org --view internal --name _slurmctld._tcp --type SRV --data "30 0 6817 ctl03.kestrel.example.org."</code><button class="copy" type="button" data-copy="bembel record add kestrel.example.org" aria-label="Copy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button></div></div>
+  </div>
+  <footer><span class="left">You have <b>dns-editor</b> in zone <span class="mono">example.org</span>. The audit event names you. Undo: delete the record.</span>
+    <a class="btn" href="zone.html">Cancel</a><a class="btn btn-primary" href="zone.html">Create record</a></footer>
+</div>
+<dialog id="help" class="dlg" aria-labelledby="help-t">
+  <header><h2 id="help-t">Keyboard shortcuts</h2><span class="step-n">Esc closes</span></header>
+  <div class="body"><table class="keys">
+    <tr><td><kbd>g</kbd> <kbd>o</kbd></td><td>Overview</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>p</kbd></td><td>Prefixes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>h</kbd></td><td>Hosts</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>z</kbd></td><td>Zones</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>d</kbd></td><td>DHCP scopes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>e</kbd></td><td>Exports</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>r</kbd></td><td>Racks</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>c</kbd></td><td>Change requests</td></tr>
+    <tr><td><kbd>/</kbd></td><td>Jump to an IP, prefix, MAC, host, zone or page</td></tr>
+    <tr><td><kbd>Shift</kbd> <kbd>A</kbd></td><td>Open the assistant</td></tr>
+    <tr><td><kbd>?</kbd></td><td>Help for the element under the pointer, else for this page</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Close a dialog, a menu or a pane</td></tr>
+  </table><p class="muted">No key <a class="gl" href="../../glossary.html#allocate" data-gl="allocate" data-domain="addr">allocates</a>, deletes or <a class="gl" href="../../glossary.html#approve" data-gl="approve" data-domain="access">approves</a>.</p></div>
+  <footer><form method="dialog"><button class="btn">Close</button></form></footer>
+</dialog>
+<script src="../assets/shell.js"></script>
+<script src="../../../assets/glossary-data.js"></script>
+<script src="../../../assets/glossary.js"></script>
+</body>
+</html>

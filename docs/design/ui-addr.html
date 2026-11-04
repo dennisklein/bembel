@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UI: addressing</title>
+<meta name="description" content="Page specs of the bembel web UI for addressing: Overview, Prefixes, the prefix page with the address map, the Allocate dialog, the address drawer, Hosts, the host page and Search.">
+</head>
+<body>
+<h1>UI: addressing</h1>
+<p class="lede">This chapter specifies the pages of the bembel web UI for daily addressing work: Overview, Prefixes, the prefix page with its address map, the Allocate dialog, the address drawer, Hosts, the host page and Search. Each page has a screenshot of its mockup, its purpose, its parts and the reason for each part, its states, and a list of URL, API calls, CLI command and keys. The mockups are static HTML and CSS in <code>docs/design/mockups/ui/</code>. They use the story data of the design record.</p>
+<ul class="keypoints">
+  <li>The story moment is Wednesday 4 November 2026, 18:02. VRF <code>global</code>, user <code>d.klein</code> with <code>network-admin</code>.</li>
+  <li>The prefix tree shows <strong>free blocks</strong> as dashed rows between the prefixes. A user sees where space is left without a second tool.</li>
+  <li>The prefix page draws <strong>every address of a subnet as one cell</strong>. A /22 is 1 024 cells in 4 blocks. State and position are visible at once.</li>
+  <li>The Allocate dialog shows a <strong>preview</strong> of the address, the records and the reservation before it saves. It sends an <code>Idempotency-Key</code>.</li>
+  <li>A button that the user may not use stays visible and disabled. Its <code>title</code> names the missing permission.</li>
+  <li>The jump box and the Search page use hybrid search: exact parsing, full text, then vector similarity. Without the LLM service, the vector part is off and the rest works.</li>
+  <li>Every page uses only the public REST API. The CLI toggle in the page head shows the same action as a command.</li>
+</ul>
+
+<h2 id="overview">Overview and common parts</h2>
+<figure class="shot"><a href="mockups/ui/overview.html"><img src="img/ui-overview.webp" alt="Overview at 18:02: the list Needs you with six items, the address space table, exports, sources and recent changes" loading="lazy"></a><figcaption>Overview at 18:02. The one filled button is Allocate… in the page head.</figcaption></figure>
+<p>Purpose: the Overview is the landing page. It tells the user what needs action now, in work order, and it shows the state of the address space. The lead of the design record owns this mockup. This section only describes it.</p>
+<ul>
+  <li><strong>Needs you.</strong> One numbered list of six items. Item 1 is a change request to delete <code>10.20.16.0/22</code> with 3 child subnets (the user is approver in scope). Item 2 is the BIND export diff of the parallel run. Item 3 is the subnet <code>10.20.4.0/22</code> at 92 % with the button "Find stale addresses". Items 4 to 6 are unmatched FNT devices, expiring claims and the ONA import findings. Each item has a kind word, one sentence, one or two buttons and a small code.</li>
+  <li><strong>Address space.</strong> A table of the containers with VRF chip, team, fabric, number of subnets and a utilisation meter. A segmented control switches IPv4 and IPv6. The link "All prefixes" opens the Prefixes page.</li>
+  <li><strong>Side cards.</strong> Exports (per DNS and DHCP target: last pull, bundle id, check result), Sources and syncs (FNT, OpenStack, Kubernetes, libvirt, ONA) and Recent changes from the audit log.</li>
+  <li><strong>Page head.</strong> The CLI toggle holds <code>bembel status</code>. "Brief me" is an advisory button of the assistant. "Allocate…" is the one filled button.</li>
+</ul>
+
+<h3 id="shell">The shell and the page map</h3>
+<p>All pages share one shell: the top bar and the sidebar. The top bar has the brand, the VRF switcher, the jump box, the change request chip ("2 to approve"), the Assistant button, the live indicator, the user menu, help and the theme toggle. The sidebar groups the pages by domain: Addressing (Prefixes, Hosts, VLANs and partitions, Fabrics, Routing and groups), DNS and DHCP, Assets, Access and Integrations. A domain has a colour (<code>addr</code> indigo, <code>dns</code> teal, <code>dhcp</code> blue, <code>assets</code> slate, <code>access</code> plum, <code>integ</code> ochre). The colour marks a domain and never a state.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 760 270" role="img" aria-labelledby="map-t">
+<title id="map-t">Page map of the addressing area: Overview leads to Prefixes, then to the prefix page, then to the address drawer and the Allocate dialog. Hosts leads to the host page. The jump box leads to Search.</title>
+<rect class="box-accent" x="16" y="40" width="130" height="50" rx="10"/><text class="t-title t-on" x="81" y="62" text-anchor="middle">Overview</text><text class="t-small t-on" x="81" y="79" text-anchor="middle">/</text>
+<rect class="box" x="196" y="40" width="130" height="50" rx="10"/><text class="t-title" x="261" y="62" text-anchor="middle">Prefixes</text><text class="t-small t-muted" x="261" y="79" text-anchor="middle">/prefixes</text>
+<rect class="box" x="376" y="40" width="150" height="50" rx="10"/><text class="t-title" x="451" y="62" text-anchor="middle">Prefix page</text><text class="t-small t-muted" x="451" y="79" text-anchor="middle">/prefixes/{id}</text>
+<rect class="box-soft" x="576" y="40" width="170" height="50" rx="10"/><text class="t-title" x="661" y="62" text-anchor="middle">Address drawer</text><text class="t-small t-muted" x="661" y="79" text-anchor="middle">?address=10.20.4.44</text>
+<rect class="box-soft" x="576" y="170" width="170" height="50" rx="10"/><text class="t-title" x="661" y="192" text-anchor="middle">Allocate dialog</text><text class="t-small t-muted" x="661" y="209" text-anchor="middle">?dialog=allocate</text>
+<rect class="box" x="16" y="170" width="130" height="50" rx="10"/><text class="t-title" x="81" y="192" text-anchor="middle">Search</text><text class="t-small t-muted" x="81" y="209" text-anchor="middle">/search?q=</text>
+<rect class="box" x="196" y="170" width="130" height="50" rx="10"/><text class="t-title" x="261" y="192" text-anchor="middle">Hosts</text><text class="t-small t-muted" x="261" y="209" text-anchor="middle">/hosts</text>
+<rect class="box" x="376" y="170" width="150" height="50" rx="10"/><text class="t-title" x="451" y="192" text-anchor="middle">Host page</text><text class="t-small t-muted" x="451" y="209" text-anchor="middle">/hosts/{id}</text>
+<path class="edge-accent" d="M146,65 L192,65" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M326,65 L372,65" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M526,65 L572,65" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M500,90 L600,166" marker-end="url(#arrow)"/>
+<path class="edge" d="M146,195 L192,195" marker-end="url(#arrow)"/>
+<path class="edge" d="M326,195 L372,195" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="16" y="250">The jump box (key /) is in the top bar of each page. Arrows are links from a row, a card or a button.</text>
+</svg>
+<figcaption>The addressing pages. A dialog and the drawer have their own URL parameter, so a user can share the link and the page opens in the same state.</figcaption>
+</figure>
+
+<h3 id="rules">Rules for all pages</h3>
+<table>
+<thead><tr><th>Rule</th><th>What the page does</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>One filled button</td><td>Each page has one primary button for the real next step: Allocate… on Overview and Prefixes, Allocate address… on the prefix page, Add interface… on the host page.</td><td>The user sees the main action at once. Dangerous actions are never primary.</td></tr>
+<tr><td>CLI toggle</td><td>The page head holds the CLI commands of the page and of its dialogs. A dialog repeats its own command with a copy button.</td><td>The UI teaches the CLI. A user moves to a script without a manual.</td></tr>
+<tr><td>Allowed actions</td><td>A button that the user may not use stays visible, set to <code>aria-disabled</code>, with a <code>title</code> such as "Needs the permission record:write. Roles with it: dns-editor, admin."</td><td>A hidden button leaves the user to guess. A reason tells the user whom to ask.</td></tr>
+<tr><td>Dangerous actions</td><td>Delete… of a prefix with children or addresses says "Needs a change request". A second user with <code>approver</code> in scope approves.</td><td>Four-eyes for shared state (<a href="access.html#changes">change requests</a>).</td></tr>
+<tr><td>Values</td><td>IP, prefix, MAC, FQDN and VLAN id use one mono style with no line break. The prefix length is muted.</td><td>The eye finds the part that changes.</td></tr>
+<tr><td>Source badge</td><td>A badge shows <code>local</code>, <code>ona-import</code>, <code>fnt</code>, <code>openstack:&lt;cloud&gt;</code>, <code>k8s:&lt;cluster&gt;</code> or <code>libvirt:&lt;hv&gt;</code>. A managed source has a lock mark. A user cannot edit a managed object.</td><td>The user knows who owns the data before an edit.</td></tr>
+<tr><td>Assistant</td><td>An advisory button has a ✦ mark and a fixed prompt, for example "Find stale addresses". It reads data with the tools of the user. It changes nothing. It can give a draft.</td><td>The assistant is never a stronger subject than the user (<a href="assistant.html">assistant</a>).</td></tr>
+<tr><td>Offline</td><td>A banner at the top of main says "Offline" and the page shows old data. It tries again every 5 s.</td><td>Old data must not look live.</td></tr>
+</tbody></table>
+<p>The pages are responsive with a container query on <code>main</code>. When the drawer is open, <code>main</code> is narrower, and the tables drop their least important columns first (source, then team and fabric, then kind and VLAN). Below 760 px the sidebar becomes a menu and a drawer fills the screen.</p>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/</code></dd>
+  <dt>API</dt><dd><code>GET /v1/prefixes?kind=container</code> for the table, <code>GET /v1/change-requests?state=pending</code>, <code>GET /v1/exports</code>, <code>GET /v1/sources</code>, <code>GET /v1/audit-events?limit=4</code>, <code>GET /v1/events/stream</code> (SSE)</dd>
+  <dt>CLI</dt><dd><code>bembel status</code>, <code>bembel changes ls --state pending</code>, <code>bembel prefix ls --vrf global --used-above 85</code></dd>
+  <dt>Keys</dt><dd><kbd>g</kbd> <kbd>o</kbd> Overview, <kbd>/</kbd> jump, <kbd>Shift</kbd> <kbd>A</kbd> assistant, <kbd>?</kbd> help</dd>
+</dl>
+
+<h2 id="prefixes">Prefixes</h2>
+<figure class="shot"><a href="mockups/ui/prefixes.html"><img src="img/ui-prefixes.webp" alt="Prefix tree of VRF global with indented rows, dashed free blocks, utilisation meters and a filter bar" loading="lazy"></a><figcaption>The tree of VRF global. <code>10.20.4.0/22</code> is selected. Dashed rows are free blocks.</figcaption></figure>
+<figure class="shot"><a href="mockups/ui/prefixes.html"><img src="img/ui-prefixes-mobile.webp" alt="Prefix tree at 390 px with prefix, name, status and used" loading="lazy"></a><figcaption>At 390 px the tree keeps Prefix, Name, Status and Used.</figcaption></figure>
+<p>Purpose: the page shows the prefix tree of one VRF as an indented table. A user finds a prefix, sees how full it is, and sees where space is free. It replaces the ONA subnet list and the ONA "block" view, where free ranges were a separate page.</p>
+<h3 id="prefixes-head">Head and filter bar</h3>
+<ul>
+  <li><strong>Head.</strong> Title, the VRF, the count ("412 prefixes: 57 containers, 355 subnets") and the role of the user. Buttons: CLI toggle, Export CSV, New prefix…, and the filled Allocate….</li>
+  <li><strong>Search.</strong> A field filters the loaded rows by prefix, name, VLAN or tag. A search for a prefix such as <code>10.20.</code> opens the ancestors of each match.</li>
+  <li><strong>Family and kind.</strong> Two segmented controls: All, IPv4, IPv6 and All, Containers, Subnets. Each shows a count.</li>
+  <li><strong>Chips.</strong> Team, Tag, Fabric and Site open a picker. "Used &gt; 85 %" is a toggle. A chip with a value shows the value and a small cross.</li>
+  <li><strong>Free blocks.</strong> A toggle, on by default. It shows or hides the dashed rows.</li>
+</ul>
+<h3 id="prefixes-tree">The tree</h3>
+<p>Each row has a caret to open or close the children, the prefix (a link to the prefix page), a name, the kind, a status, the VLAN, the fabric, the site, the team, a utilisation meter with a number and the source badge. A container is in bold. A pool has a tag "pool". A subnet that has an IPv6 twin has a tag "v4+v6". The row of the prefix that is open in the next page is selected.</p>
+<table>
+<thead><tr><th>Column</th><th>Content</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>Prefix</td><td>Caret and value. Indent is 22 px per level.</td><td>A closed caret shows the number of children.</td></tr>
+<tr><td>Status</td><td><code>active</code> is calm text with a green dot. <code>planned</code>, <code>reserved</code> and <code>deprecated</code> are pills.</td><td>A pill marks a state that needs a look. The normal state is quiet.</td></tr>
+<tr><td>Used</td><td>For a subnet: used addresses divided by usable addresses. For a container: the share of its space that child prefixes take.</td><td>The meter is green below 70 %, amber from 70 to 90 %, red above 90 %. The mockup shows 92 % for <code>10.20.4.0/22</code>.</td></tr>
+<tr><td>Fabric</td><td><code>ethernet</code>, <code>ethernet-roce</code> or <code>infiniband</code>, with a small mark.</td><td>InfiniBand has a round mark, RoCEv2 a blue square.</td></tr>
+<tr><td>Source</td><td>Badge.</td><td>Hidden first when the page is narrow.</td></tr>
+</tbody></table>
+<h3 id="free-blocks">Free blocks</h3>
+<p>A free block is a CIDR block of the parent that no child covers. The server computes the blocks from the tree. They are not stored, so they are never out of date. In the story, <code>10.20.0.0/16</code> has the children <code>10.20.0.0/22</code>, <code>10.20.4.0/22</code>, <code>10.20.8.0/24</code> and <code>10.20.12.0/24</code>. Between them the tree shows <code>10.20.9.0/24</code> and <code>10.20.10.0/23</code> as free, then <code>10.20.13.0/24</code> and <code>10.20.14.0/23</code>. The algorithm splits each gap into the fewest aligned blocks. Each free row has the link "Allocate…". The link opens the Allocate dialog with this block as the target.</p>
+<aside class="callout why"><p class="callout-title">Why free blocks in the tree</p><p>ONA showed free space on a different page, and users made a list on paper before they asked for a subnet. In the tree, the gap and its neighbours are in one view. A user sees that <code>10.20.9.0/24</code> sits next to <code>osprey-gpu</code> and takes it.</p></aside>
+<h3 id="prefixes-states">States</h3>
+<ul>
+  <li><strong>Empty.</strong> A new install shows "No prefixes in VRF global" with two buttons: "New prefix…" and "Import from ONA". A filter with no result shows "No prefix matches. Clear the filters." with the filters named.</li>
+  <li><strong>Loading.</strong> The server sends the first two levels. A caret loads the children when it opens (<code>GET /v1/prefixes?within=…&amp;depth=1</code>). A row shows a thin bar while it loads.</li>
+  <li><strong>Error.</strong> A problem document (<code>application/problem+json</code>) shows as a banner with its <code>title</code> and <code>detail</code> and a "Try again" button.</li>
+  <li><strong>No permission.</strong> A user with no <code>prefix:read</code> in a subtree does not see it. The tree shows no gap and no count for it. "New prefix…" and "Allocate…" are disabled with a reason when the user has no <code>prefix:create</code> or <code>prefix:allocate</code>.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/prefixes?vrf=global&amp;family=4&amp;kind=subnet&amp;team=hpc-ops&amp;tag=role%3Dcompute&amp;used_gt=85&amp;free=1&amp;q=</code></dd>
+  <dt>API</dt><dd><code>GET /v1/prefixes?vrf=global&amp;within=10.20.0.0/16&amp;depth=1</code>, <code>GET /v1/prefixes/{id}/free</code>, <code>GET /v1/vrfs</code></dd>
+  <dt>CLI</dt><dd><code>bembel prefix ls --vrf global --tree --free</code>, <code>bembel prefix ls --used-above 85 --family 4</code>, <code>bembel prefix export --format csv</code></dd>
+  <dt>Keys</dt><dd><kbd>j</kbd> <kbd>k</kbd> move, <kbd>→</kbd> <kbd>←</kbd> open and close, <kbd>↵</kbd> open the prefix, <kbd>a</kbd> allocate here, <kbd>g</kbd> <kbd>p</kbd> go to Prefixes</dd>
+</dl>
+
+<h2 id="prefix">Prefix page and address map</h2>
+<figure class="shot"><a href="mockups/ui/prefix.html"><img src="img/ui-prefix.webp" alt="Prefix page 10.20.4.0/22 kestrel-compute with utilisation, the address map of four blocks, facts, DHCP, DNS and the address table" loading="lazy"></a><figcaption><code>10.20.4.0/22</code> kestrel-compute at 92 %. The ⋯ menu is open: Delete… says that it needs a change request.</figcaption></figure>
+<figure class="shot"><a href="mockups/ui/prefix.html"><img src="img/ui-prefix-mobile.webp" alt="Prefix page at 390 px, single column" loading="lazy"></a><figcaption>At 390 px the page is one column. The map blocks stack. The table keeps Address, Name, State and Last seen.</figcaption></figure>
+<p>Purpose: the page is the home of one subnet. It answers four questions: what is this network, how full is it, which address is free, and what does each address do.</p>
+<h3 id="prefix-head">Head</h3>
+<p>The breadcrumb is the chain of parents: <code>global › 10.0.0.0/8 › 10.20.0.0/16 › 10.20.4.0/22</code>. The title is the prefix and the name. Pills show the kind, the status, the utilisation, "dual stack", the fabric, the VLAN and the source. The buttons are:</p>
+<table>
+<thead><tr><th>Button</th><th>Place</th><th>Permission</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>Allocate address…</td><td>filled</td><td><code>address:allocate</code></td><td>Opens the <a href="#allocate">Allocate dialog</a> with this prefix.</td></tr>
+<tr><td>Edit</td><td>outline</td><td><code>prefix:update</code></td><td>Name, status, VLAN, site, team, tags. Not the CIDR.</td></tr>
+<tr><td>✦ Find stale addresses</td><td>quiet</td><td><code>address:read</code></td><td>Advisory. Lists addresses with no DHCP lease and no host activity for 90 days. The mockup finds 37.</td></tr>
+<tr><td>⋯ Split…, Add range…, Export, History</td><td>menu</td><td>by item</td><td>Split cuts the subnet into 4 × /24 and moves no address.</td></tr>
+<tr><td>⋯ Delete…</td><td>menu</td><td><code>prefix:delete</code></td><td>The line under it says "Needs a change request: 941 addresses, 1 DHCP scope". A delete of a prefix with children or addresses is always held.</td></tr>
+</tbody></table>
+<h3 id="util">Utilisation card</h3>
+<p>The card has one large number (92 %), the counts, one stacked bar and a legend. The bar has six parts in a fixed order: allocated 635, deprecated 6, reserved 38, claimed 7, dhcp-pool 255 and free 81. The sum is 1 022, the usable addresses of a /22 (the network and broadcast address are not counted). A small line chart shows used addresses over 30 days and a sentence gives the forecast: "At this rate the subnet is full in 19 days". The forecast is a linear fit of the daily counts. A second line shows the number of addresses with no DHCP lease for 90 days.</p>
+<h3 id="map">The address map</h3>
+<p>The map draws every address of the subnet as one square cell. A /22 has 1 024 addresses and so 1 024 cells. The cells are in <strong>4 blocks</strong>, one per /24. A block has 16 rows of 16 cells. The cell of an address with offset <var>n</var> in its /24 is in row <var>n</var> ÷ 16 and column <var>n</var> mod 16. The address <code>10.20.4.44</code> has offset 44: row 2, column 12 of block 1.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 760 250" role="img" aria-labelledby="mapgeo-t">
+<title id="mapgeo-t">The /22 is cut into four /24 blocks. Each block is a grid of 16 by 16 cells. The cell of the address 10.20.4.44 is in row 2 and column 12 of the first block.</title>
+<rect class="box-accent" x="16" y="20" width="728" height="40" rx="8"/><text class="t-title t-on" x="380" y="45" text-anchor="middle">10.20.4.0/22 · 1 024 addresses · 1 022 usable</text>
+<rect class="box" x="16" y="90" width="166" height="56" rx="8"/><text class="t-title" x="99" y="114" text-anchor="middle">10.20.4.0/24</text><text class="t-small t-muted" x="99" y="132" text-anchor="middle">offset 0–255 · 250 used</text>
+<rect class="box" x="204" y="90" width="166" height="56" rx="8"/><text class="t-title" x="287" y="114" text-anchor="middle">10.20.5.0/24</text><text class="t-small t-muted" x="287" y="132" text-anchor="middle">offset 256–511 · 255 used</text>
+<rect class="box" x="392" y="90" width="166" height="56" rx="8"/><text class="t-title" x="475" y="114" text-anchor="middle">10.20.6.0/24</text><text class="t-small t-muted" x="475" y="132" text-anchor="middle">offset 512–767 · 181 used</text>
+<rect class="box-info" x="580" y="90" width="164" height="56" rx="8"/><text class="t-title" x="662" y="114" text-anchor="middle">10.20.7.0/24</text><text class="t-small t-muted" x="662" y="132" text-anchor="middle">offset 768–1023 · pool</text>
+<path class="edge-accent" d="M99,60 L99,86" marker-end="url(#arrow-accent)"/><path class="edge-accent" d="M287,60 L287,86" marker-end="url(#arrow-accent)"/><path class="edge-accent" d="M475,60 L475,86" marker-end="url(#arrow-accent)"/><path class="edge-accent" d="M662,60 L662,86" marker-end="url(#arrow-accent)"/>
+<rect class="box-soft" x="16" y="176" width="728" height="56" rx="8"/>
+<text class="t-small" x="32" y="198">Cell of an address: row = offset ÷ 16, column = offset mod 16. Example 10.20.4.44: offset 44 → row 2, column 12.</text>
+<text class="t-small t-muted" x="32" y="218">Colours: allocated green, deprecated amber, reserved blue, claimed indigo, pool light blue, free empty.</text>
+</svg>
+<figcaption>Geometry of the map. A /23 has 2 blocks, a /24 has 1. A prefix larger than a /22 shows a coarser view (one cell for each /28) and no per-address cells.</figcaption>
+</figure>
+<ul>
+  <li><strong>Colours.</strong> The colour is the state of the address: <code>allocated</code> green, <code>deprecated</code> amber, <code>reserved</code> blue, <code>claimed</code> indigo, range <code>dhcp-pool</code> light blue with a border, free as an empty cell with a border, network and broadcast grey. A colour is never the only signal: the legend is in the card, and each cell has a <code>title</code>.</li>
+  <li><strong>Hover.</strong> A cell has a <code>title</code> such as "10.20.4.44 · cn-004.kestrel.example.org · allocated". A real build shows a small card with the host, the interface and the last seen time.</li>
+  <li><strong>Select.</strong> A click selects a cell. A ring marks <code>10.20.4.44</code> in the mockup. A bar under the map shows the address, the name, the state and the MAC, with the button "Open address". The key <kbd>↵</kbd> opens the <a href="#address">drawer</a>. The arrow keys move over the cells.</li>
+  <li><strong>Colour by.</strong> A segmented control changes the colour rule: State, Last seen (the age of the last DHCP lease, from fresh to stale) or Binding (bound to an interface or not).</li>
+  <li><strong>Free runs.</strong> The cells of a free run are next to each other. A user sees the run <code>10.20.6.180</code> to <code>10.20.6.254</code> (75 addresses) in the bottom left of block 3 and picks an address from it with the hint strategy.</li>
+</ul>
+<aside class="callout why"><p class="callout-title">Why one cell per address</p><p>A list of 941 addresses hides the shape. The map shows that block 4 is the DHCP pool, that the first nine addresses are reserved for infrastructure and that the free space is at the end of block 3. It costs 1 024 small elements. A page with a table of 1 024 rows costs more.</p></aside>
+<h3 id="prefix-side">Facts, DHCP and DNS</h3>
+<ul>
+  <li><strong>Facts.</strong> Parent, VRF, VLAN (<code>204</code>, domain <code>campus</code>), gateway <code>10.20.4.1</code>, fabric <code>ethernet</code> with MTU 9000, site Hall 2, team <code>hpc-ops</code>, the IPv6 twin <code>2001:db8:4200:204::/64</code>, tags, attributes, source and revision (the ETag of the object).</li>
+  <li><strong>DHCP scope.</strong> State on, lease time, failover pair <code>dhcp-a</code> (<code>dhcp1.example.org</code> primary, <code>dhcp2.example.org</code> secondary), the pool <code>10.20.7.0</code> to <code>10.20.7.254</code> with 201 leases, the number of reservations (214) and the options.</li>
+  <li><strong>DNS.</strong> The default zone <code>kestrel.example.org</code>, the reverse zones <code>20.10.in-addr.arpa</code> and the zone of the IPv6 twin, with the number of derived records and the serial.</li>
+</ul>
+<h3 id="prefix-tabs">Tabs and the address table</h3>
+<p>The tabs are Addresses (941), Ranges (3), DHCP, DNS and History. The Addresses tab has a filter bar (search, state segments, "No lease for 90 days") and a table with the columns Address, Name, Host, Interface, MAC, State, Last seen and Source. The mockup shows 19 rows, among them the gateway, the switches, <code>cn-001</code> to <code>cn-006</code>, the shared address <code>10.20.4.99</code> (VIP of <code>login</code>), two claims (<code>cn-091</code> from <code>k8s:prod-1</code>, <code>vm-build-07</code> from <code>libvirt:hv-03</code>) and three deprecated addresses with a last seen time of 94 to 121 days. "Last seen" comes from the DHCP leases that the DHCP servers report. A static address has the word "static".</p>
+<h3 id="prefix-states">States</h3>
+<ul>
+  <li><strong>Empty subnet.</strong> The map shows only empty cells. The card says "No address yet. Allocate the first address." with the filled button.</li>
+  <li><strong>Container.</strong> A container has no map. The page shows its children and its free blocks, as the tree does, and "Allocate…" opens the pool variant.</li>
+  <li><strong>Managed prefix.</strong> A prefix with <code>managed_by</code> (for example from <code>openstack:os-prod</code>) shows a banner "Managed by openstack:os-prod. Edit it there." The edit buttons are disabled.</li>
+  <li><strong>No permission.</strong> A viewer sees the page with all buttons disabled. A user with no <code>address:read</code> sees the counts and no names.</li>
+  <li><strong>Error.</strong> A call that fails shows a banner in the card that it affects. The other cards stay.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/prefixes/{id}[?tab=addresses&amp;state=claimed&amp;stale=90][&amp;address=10.20.4.44]</code></dd>
+  <dt>API</dt><dd><code>GET /v1/prefixes/{id}</code>, <code>GET /v1/prefixes/{id}/addresses?state=&amp;q=&amp;stale_days=</code>, <code>GET /v1/prefixes/{id}/free</code>, <code>GET /v1/ranges?prefix={id}</code>, <code>GET /v1/dhcp-scopes?prefix={id}</code>, <code>DELETE /v1/prefixes/{id}</code> (held as a change request)</dd>
+  <dt>CLI</dt><dd><code>bembel prefix show 10.20.4.0/22</code>, <code>bembel address ls --prefix 10.20.4.0/22 --state allocated</code>, <code>bembel prefix stale 10.20.4.0/22 --days 90</code></dd>
+  <dt>Keys</dt><dd><kbd>a</kbd> allocate, <kbd>e</kbd> edit, arrow keys move in the map, <kbd>↵</kbd> open the address, <kbd>Esc</kbd> close the drawer</dd>
+</dl>
+
+<h2 id="allocate">Allocate dialog</h2>
+<figure class="shot"><a href="mockups/ui/allocate-dialog.html"><img src="img/ui-allocate-dialog.webp" alt="Allocate dialog over the prefix page with parent prefix, strategy, DNS name, host, MAC, reservation, claim option, preview and the CLI command" loading="lazy"></a><figcaption>The Allocate dialog for one address in <code>10.20.4.0/22</code>. The preview shows <code>10.20.4.213</code>, because <code>10.20.4.212</code> went to <code>gpu-021</code> at 17:52.</figcaption></figure>
+<p>Purpose: the dialog does the allocation (<a href="allocation.html">allocation</a>). It asks for the least that bembel needs, shows what will happen, and saves it in one call. The dialog is modal, with a dark scrim. The safe button (Cancel) is on the left of the action. The body scrolls, so the title and the buttons stay on screen.</p>
+<h3 id="allocate-address">Tab Address</h3>
+<table>
+<thead><tr><th>Field</th><th>Content</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Parent prefix</td><td>A picker. It shows the prefix, the name, the free count (81), the VLAN, the site, the DHCP scope, the zone and the team. It lists only subnets where the user has <code>address:allocate</code>.</td><td>The user sees at once if the choice is right.</td></tr>
+<tr><td>Count</td><td>1 to 64.</td><td>A batch is one call, one transaction.</td></tr>
+<tr><td>Strategy</td><td><code>first</code> (default), <code>hint</code> or <code>random</code>. Hint takes an address and moves up to the next free one. Random is only for IPv6.</td><td>First free keeps the space dense. Random avoids scans in a /64.</td></tr>
+<tr><td>DNS name</td><td>A label (<code>gpu-022</code>) and a zone suffix list (<code>.kestrel.example.org</code>, <code>.example.org</code>). The default is the zone of the subnet.</td><td>The name drives the A, AAAA and PTR records.</td></tr>
+<tr><td>Host</td><td>Existing host or New host. A new host has the kind <code>physical</code> and the team of the subnet.</td><td>One dialog creates the host, the interface and the address. A user does not need three pages.</td></tr>
+<tr><td>Interface and MAC</td><td>Name (<code>eno1</code>) and MAC (<code>3c:ec:ef:7a:10:22</code>).</td><td>The MAC is the key of the DHCP reservation.</td></tr>
+<tr><td>Make a DHCP reservation</td><td>On when the subnet has a scope and a MAC is given.</td><td>Most fixed hosts need it.</td></tr>
+<tr><td>Claim only (expires in 15 min)</td><td>Off by default. A claim has no records and no reservation. It holds the address until a caller confirms it.</td><td>This is the way of the integrations (Cluster API, Neutron). A user can use it to hold an address while a ticket runs.</td></tr>
+</tbody></table>
+<p>The <strong>preview</strong> box has a blue frame and the title "Preview, nothing is saved yet". It shows the first free address, <code>10.20.4.213</code>, the name, and three lines: the A and PTR records in view <code>internal</code> (zones <code>kestrel.example.org</code> and <code>20.10.in-addr.arpa</code>), the reservation in <code>dhcp-a</code>, and a note about the IPv6 twin. The preview calls <code>GET /v1/prefixes/{id}/free</code>. It is a hint and not a reservation. Another user can take the address before the click. The real call picks the address again on the server.</p>
+<aside class="callout note"><p class="callout-title">Idempotency</p><p>The page makes an <code>Idempotency-Key</code> (a UUID) when it opens the dialog. A second click or a retry after a network error sends the same key and gets the same address. A line in the dialog says this. The CLI makes the key itself.</p></aside>
+<figure class="diagram wide">
+<svg viewBox="0 0 760 230" role="img" aria-labelledby="alloc-t">
+<title id="alloc-t">The Allocate dialog sends one call with an Idempotency-Key. The server does everything in one transaction. An event starts the exports for DNS and DHCP.</title>
+<rect class="box" x="16" y="40" width="150" height="64" rx="10"/><text class="t-title" x="91" y="66" text-anchor="middle">Allocate dialog</text><text class="t-small t-muted" x="91" y="84" text-anchor="middle">key 0195f3c2…</text>
+<rect class="box-accent" x="216" y="40" width="170" height="64" rx="10"/><text class="t-title t-on" x="301" y="66" text-anchor="middle">addresses:allocate</text><text class="t-small t-on" x="301" y="84" text-anchor="middle">POST, Idempotency-Key</text>
+<rect class="box" x="436" y="26" width="308" height="92" rx="10"/><text class="t-title" x="590" y="50" text-anchor="middle">One transaction</text><text class="t-small" x="452" y="72">pick next free address (database arbitrates)</text><text class="t-small" x="452" y="90">insert host, interface, address, reservation</text><text class="t-small" x="452" y="108">derive A, AAAA, PTR · store key and answer</text>
+<rect class="box-ok" x="216" y="150" width="170" height="56" rx="10"/><text class="t-title" x="301" y="174" text-anchor="middle">201 + address</text><text class="t-small t-muted" x="301" y="192" text-anchor="middle">200 for a repeated key</text>
+<rect class="box-soft" x="436" y="150" width="308" height="56" rx="10"/><text class="t-title" x="590" y="174" text-anchor="middle">Event → export builds</text><text class="t-small t-muted" x="590" y="192" text-anchor="middle">ns1 BIND bundle · dhcp1, dhcp2 dhcpd.conf</text>
+<path class="edge-accent" d="M166,72 L212,72" marker-end="url(#arrow-accent)"/><path class="edge-accent" d="M386,72 L432,72" marker-end="url(#arrow-accent)"/>
+<path class="edge-ok" d="M590,118 L590,146" marker-end="url(#arrow)"/><path class="edge-ok" d="M500,118 L390,160" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M216,178 L91,178 L91,108" marker-end="url(#arrow-muted)"/>
+</svg>
+<figcaption>The dialog writes nothing itself. The server does all steps in one transaction, so there is never an address without its records.</figcaption>
+</figure>
+<h3 id="allocate-pool">Tab Prefix from a pool</h3>
+<p>The second tab allocates a child prefix. The user picks a <strong>pool</strong> (a container with the tag pool, here <code>10.30.0.0/16</code> OpenStack with 44 % used), a length (<code>/24</code> to <code>/28</code>, here <code>/26</code> with 62 usable addresses), a count, a name, the kind and status (here <code>subnet</code> and <code>planned</code>), the team and an optional VLAN. The preview shows <code>10.30.64.0/26</code> and says where it starts. bembel picks an aligned block with the best-fit rule. The database refuses an overlap in the VRF, so two callers never get the same block. When the pool has no free block of this length, the answer is <code>409 prefix.exhausted</code> and the dialog shows the largest free block.</p>
+<h3 id="allocate-states">Footer, states and permissions</h3>
+<ul>
+  <li><strong>Footer.</strong> The left text names the permission: "Needs prefix:allocate. You have network-admin in global." Buttons: Cancel, Preview again, Allocate (filled).</li>
+  <li><strong>CLI.</strong> The body ends with the command and a copy button: <code>bembel address allocate --prefix 10.20.4.0/22 --name gpu-022.kestrel.example.org --mac 3c:ec:ef:7a:10:22 --reserve</code>.</li>
+  <li><strong>Validation.</strong> A field with an error shows its text under the field. A name that exists says "gpu-022.kestrel.example.org exists as a host. Choose Existing host." A MAC that another interface has says which interface.</li>
+  <li><strong>Subnet full.</strong> The preview says "No free address in 10.20.4.0/22" and offers the IPv6 twin and the next subnet of the same VLAN. The Allocate button is disabled.</li>
+  <li><strong>No permission.</strong> The dialog does not open. The button that would open it is disabled with the reason.</li>
+  <li><strong>Server error.</strong> The dialog stays open, shows the problem, and keeps the same key. A retry cannot double the allocation.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/prefixes/{id}?dialog=allocate</code>, <code>/prefixes/{pool_id}?dialog=allocate-prefix&amp;length=26</code></dd>
+  <dt>API</dt><dd><code>POST /v1/prefixes/{id}/addresses:allocate</code> with <code>Idempotency-Key</code>, <code>POST /v1/prefixes/{id}/prefixes:allocate</code>, <code>GET /v1/prefixes/{id}/free</code>, <code>GET /v1/hosts?q=</code></dd>
+  <dt>CLI</dt><dd><code>bembel address allocate --prefix … --name … --mac … --reserve [--claim 15m]</code>, <code>bembel prefix allocate --pool 10.30.0.0/16 --length 26 --name os-tenant-ml</code></dd>
+  <dt>Keys</dt><dd><kbd>a</kbd> opens the dialog, <kbd>Tab</kbd> moves, <kbd>Ctrl</kbd> <kbd>↵</kbd> allocates, <kbd>Esc</kbd> closes. No single key allocates.</dd>
+</dl>
+
+<h2 id="address">Address drawer</h2>
+<figure class="shot"><a href="mockups/ui/address.html"><img src="img/ui-address.webp" alt="The prefix page with the address drawer open for 10.20.4.44: binding, derived records, DHCP reservation, asset, history and actions" loading="lazy"></a><figcaption>The drawer for <code>10.20.4.44</code>. The page stays usable on the left. The button "Add record…" is disabled.</figcaption></figure>
+<p>Purpose: the drawer shows everything about one address in one place and lets the user act on it. It opens on the right, under the top bar, and the prefix page stays visible. Opening a drawer does not leave the page. The URL has <code>?address=10.20.4.44</code>, so the link works.</p>
+<ul>
+  <li><strong>Head.</strong> The address with a copy button, pills for the state (<code>allocated</code>) and the family, a close button, and a line with the prefix, the source and the revision.</li>
+  <li><strong>Binding.</strong> Host <code>cn-004.kestrel.example.org</code> (a link to the host page), interface <code>eno1</code> on VLAN 204, MAC <code>3c:ec:ef:12:0a:44</code>, the kind (single, or shared for a VIP bound to several interfaces), the IPv6 twin <code>2001:db8:4200:204::44</code> and the last seen time with the DHCP server that saw it.</li>
+  <li><strong>Derived records.</strong> A, AAAA and PTR with name, data and TTL, for view <code>internal</code>. A note says that bembel makes these records from the name, and that the user changes the name to change them. Manual records are on the zone page.</li>
+  <li><strong>DHCP reservation.</strong> The fixed address, the hardware address, the host name and the delivery target (<code>dhcp-a</code>, bundle <code>b-7c41e0</code>).</li>
+  <li><strong>Asset.</strong> A small rack picture with the device in U10–11 of Rack A01, then rack, position, device (links to the rack and device pages), the serial <code>SN7K4-0042</code> and the match rule. The badge <code>fnt</code> and the sync time show the source.</li>
+  <li><strong>History.</strong> The audit events of this address as a timeline. The oldest: "a.berger allocated it, first free in 10.20.4.0/22" on 2026-03-02 10:41, with the <code>Idempotency-Key</code>. Then the binding at 10:41, the reservation at 10:42 and the asset link by the sync on 2026-03-04.</li>
+  <li><strong>Actions.</strong> Edit, Move…, Release… (red outline), Add record… and a ⋯ menu. Move… changes the subnet and runs the same checks as an allocation. Release… asks for a confirmation and says what it removes: 3 records and 1 reservation.</li>
+</ul>
+<aside class="callout rule"><p class="callout-title">Allowed actions</p><p>The user in the story has <code>network-admin</code>, which has no <code>record:write</code>. "Add record…" is visible and disabled. Its <code>title</code> says: "Needs the permission record:write. Roles with it: dns-editor, admin. You have network-admin in global." A line under the buttons repeats it in plain text, so a touch user can read it too. The API call <code>POST /v1/me/permissions:check</code> gives the answer for each button. The page asks once for all buttons.</p></aside>
+<ul>
+  <li><strong>States.</strong> A <code>claimed</code> address shows a banner with the expiry time and the owner (<code>k8s:prod-1</code>) and no DNS and DHCP parts. A <code>deprecated</code> address shows the grace time and "Release now…". A <code>shared</code> address lists all bound interfaces. A managed address (an address of an OpenStack port) shows a lock and no edit buttons.</li>
+  <li><strong>Not found.</strong> A link to an address that someone released says "10.20.4.44 is free now" and shows the last history entry.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/prefixes/{id}?address=10.20.4.44</code></dd>
+  <dt>API</dt><dd><code>GET /v1/addresses?address=10.20.4.44</code>, <code>GET /v1/audit-events?object=…</code>, <code>PATCH /v1/addresses/{id}</code> (with <code>If-Match</code>), <code>POST /v1/addresses/{id}:release</code>, <code>POST /v1/me/permissions:check</code></dd>
+  <dt>CLI</dt><dd><code>bembel address show 10.20.4.44</code>, <code>bembel address release 10.20.4.44</code></dd>
+  <dt>Keys</dt><dd><kbd>Esc</kbd> close, <kbd>c</kbd> copy the address, <kbd>j</kbd> <kbd>k</kbd> previous and next address in the table</dd>
+</dl>
+
+<h2 id="hosts">Hosts and host page</h2>
+<figure class="shot"><a href="mockups/ui/hosts.html"><img src="img/ui-hosts.webp" alt="Hosts list with kind, platform, several addresses per host, interface count, asset link, team and source" loading="lazy"></a><figcaption>Hosts. The list has compute nodes, GPU nodes, hypervisors, VMs, switches and BMC entries.</figcaption></figure>
+<p>The list shows 40 987 hosts (the size after the ONA import), 28 of them on this page. The columns are Host, Kind, Platform, Addresses (one line per address, a chip for a VRF other than <code>global</code>), Interfaces, Asset (rack and U position, a link to the rack page), Team and Source. The filter bar has a search, a kind control (Physical, VM, Hypervisor, Appliance) and chips for platform, team, source and site, plus "No asset link" (1 318) and "No address" (212). A VM shows its hypervisor under the name (<code>vm-build-07</code> runs on <code>hv-03</code>, address claimed, expires in 14 min). A hypervisor shows the agent version and the number of VMs. The BMC entries from the ONA import show "merge candidate", because they share a MAC family with a host. The buttons are Prepare VM… (the <code>bembel vm prepare</code> flow), New host… and Export CSV.</p>
+<figure class="shot"><a href="mockups/ui/host.html"><img src="img/ui-host.webp" alt="Host cn-004.kestrel.example.org with interfaces eno1, ib0 and bmc, DNS names, DHCP reservations, asset card with a rack picture and history" loading="lazy"></a><figcaption>Host <code>cn-004.kestrel.example.org</code>: three interfaces in three VRFs.</figcaption></figure>
+<p>The host page has these parts:</p>
+<ul>
+  <li><strong>Interfaces.</strong> <code>eno1</code>: Ethernet, MAC <code>3c:ec:ef:12:0a:44</code>, addresses <code>10.20.4.44</code> and <code>2001:db8:4200:204::44</code>, VLAN 204. <code>ib0</code>: InfiniBand, port GUID <code>0x1070fd0300a1b2c4</code>, the 20-byte IPoIB hardware address, the LID (observed, read only), address <code>10.100.4.44</code> in VRF <code>hpc-fabric</code>, partition <code>0x8001</code>. <code>bmc</code>: MAC <code>3c:ec:ef:12:0a:45</code>, address <code>172.16.4.44</code> in VRF <code>oob</code>. The column Port shows the switch port that the asset sync found.</li>
+  <li><strong>DNS names.</strong> The derived A, AAAA and PTR records, the name of the other interfaces and one manual CNAME (<code>node44</code>, by <code>m.huber</code>).</li>
+  <li><strong>DHCP reservations.</strong> One row per interface with a reservation: scope, fixed address, identifier (the MAC, or the client identifier made from the GUID for <code>ib0</code>) and the sync state with <code>dhcp-a</code>.</li>
+  <li><strong>Asset.</strong> A rack picture (47 U) with the 2U device in U10–11 marked, rack A01, Hall 2 Row A, serial <code>SN7K4-0042</code>, the link rule, and two buttons: Open rack and Open device. The picture is a link to the rack page of the Assets area.</li>
+  <li><strong>History.</strong> The audit events of the host and its interfaces.</li>
+</ul>
+<p>States: a host without an asset link shows "No asset link" and a button "Review matches" when the sync has candidates. A VM host shows "Runs on" with a link to the hypervisor and no rack card. A managed host (from <code>libvirt:hv-03</code>) has a lock, and the edit buttons are disabled.</p>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/hosts?kind=hypervisor&amp;team=&amp;source=</code>, <code>/hosts/{id}</code></dd>
+  <dt>API</dt><dd><code>GET /v1/hosts</code>, <code>GET /v1/hosts/{id}</code>, <code>GET /v1/hosts/{id}/interfaces</code>, <code>POST /v1/hosts</code>, <code>PATCH /v1/hosts/{id}</code></dd>
+  <dt>CLI</dt><dd><code>bembel host ls --kind hypervisor</code>, <code>bembel host show cn-004.kestrel.example.org</code>, <code>bembel vm prepare --name vm-build-07 --subnet kestrel-compute --mac auto</code></dd>
+  <dt>Keys</dt><dd><kbd>g</kbd> <kbd>h</kbd> go to Hosts, <kbd>n</kbd> new host</dd>
+</dl>
+
+<h2 id="search">Search and the jump box</h2>
+<figure class="shot"><a href="mockups/ui/search.html"><img src="img/ui-search.webp" alt="Search results for the query gpu hall 2 free /24 with parsed query chips, exact matches, prefixes, hosts, semantic matches, an action card and the open jump box" loading="lazy"></a><figcaption>Search for "gpu hall 2 free /24": 37 results in 41 ms.</figcaption></figure>
+<figure class="shot"><a href="mockups/ui/search.html"><img src="img/ui-search-mobile.webp" alt="Search page at 390 px, one column" loading="lazy"></a><figcaption>At 390 px the result groups come first and the side cards follow.</figcaption></figure>
+<p>Purpose: one box finds an address, a prefix, a MAC, a host, a zone or a page, and it also takes a short description. The jump box in the top bar (key <kbd>/</kbd>) shows the best hits while the user types. <kbd>Shift</kbd> <kbd>↵</kbd> opens this page with all hits.</p>
+<h3 id="search-pipeline">How the query runs</h3>
+<figure class="diagram wide">
+<svg viewBox="0 0 760 230" role="img" aria-labelledby="srch-t">
+<title id="srch-t">The query goes through exact parsing, full-text search and vector search. Reciprocal rank fusion merges the lists. The scope filter of access control applies to every hit before the groups are shown.</title>
+<rect class="box-accent" x="16" y="30" width="130" height="56" rx="10"/><text class="t-title t-on" x="81" y="54" text-anchor="middle">Query</text><text class="t-small t-on" x="81" y="72" text-anchor="middle">gpu hall 2 free /24</text>
+<rect class="box" x="186" y="14" width="170" height="44" rx="8"/><text class="t-small" x="271" y="40" text-anchor="middle">1 exact: IP, CIDR, MAC, FQDN</text>
+<rect class="box" x="186" y="66" width="170" height="44" rx="8"/><text class="t-small" x="271" y="92" text-anchor="middle">2 full text (tsvector)</text>
+<rect class="box" x="186" y="118" width="170" height="44" rx="8"/><text class="t-small" x="271" y="144" text-anchor="middle">3 vector (pgvector)</text>
+<rect class="box-soft" x="396" y="52" width="150" height="70" rx="10"/><text class="t-title" x="471" y="78" text-anchor="middle">Merge</text><text class="t-small t-muted" x="471" y="98" text-anchor="middle">reciprocal rank fusion</text><text class="t-small t-muted" x="471" y="112" text-anchor="middle">k = 60</text>
+<rect class="box-ok" x="586" y="52" width="158" height="70" rx="10"/><text class="t-title" x="665" y="78" text-anchor="middle">Scope filter</text><text class="t-small t-muted" x="665" y="98" text-anchor="middle">only what the user</text><text class="t-small t-muted" x="665" y="112" text-anchor="middle">may read</text>
+<rect class="box-muted" x="16" y="180" width="728" height="36" rx="8"/><text class="t-small" x="380" y="203" text-anchor="middle">Without the LLM service, step 3 is off. Steps 1 and 2 give the same page, without the group "Semantic matches".</text>
+<path class="edge-accent" d="M146,58 L182,36" marker-end="url(#arrow-accent)"/><path class="edge-accent" d="M146,60 L182,88" marker-end="url(#arrow-accent)"/><path class="edge-accent" d="M146,66 L182,138" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M356,36 L392,70" marker-end="url(#arrow)"/><path class="edge" d="M356,88 L392,88" marker-end="url(#arrow)"/><path class="edge" d="M356,140 L392,106" marker-end="url(#arrow)"/>
+<path class="edge" d="M546,87 L582,87" marker-end="url(#arrow)"/>
+</svg>
+<figcaption>Hybrid search. The scope predicate applies to every hit, also to a hit from the vector index, so a vector cannot leak an object.</figcaption>
+</figure>
+<p>The parser splits the query into tokens and tests each token as an IP, CIDR, MAC, GUID, FQDN or VLAN id. An exact token goes straight to the object, and the page opens it when it is the only hit. The other tokens go to the full-text index and, when the vector part is on, to the embedding of the whole query. The parser also knows a few <strong>filters in words</strong>: a site name ("Hall 2"), a team, a VRF and an intent such as "free /24". The page shows its reading as chips under the field, so the user can check it: <code>term gpu</code>, <code>site Hall 2</code>, <code>intent free /24</code>. A chip can be removed.</p>
+<h3 id="search-groups">Result groups</h3>
+<ul>
+  <li><strong>Exact matches.</strong> None in the story: the query has no address, MAC or FQDN. The card says so in one line. It stays, so the user sees that the exact step ran.</li>
+  <li><strong>Prefixes.</strong> <code>10.20.8.0/24</code> osprey-gpu, <code>10.20.0.0/16</code> Hall 2 HPC and <code>10.20.24.0/21</code> osprey pods. The words that matched are marked.</li>
+  <li><strong>Hosts.</strong> <code>gpu-001</code> to <code>gpu-004</code> and <code>gpu-021</code>, with 3 more behind "Show all 8".</li>
+  <li><strong>Semantic matches.</strong> Hits that the vector index found: <code>10.110.8.0/24</code> osprey-roce ("400G RoCEv2 fabric for the GPU nodes"), the change request <code>cr-0031</code> ("Carve a /24 for the GPU expansion"), the runbook "Add a GPU node to Hall 2" and the planned <code>10.20.16.0/22</code> Row C. Each hit has a small bar and the value "similar 0.74". The value is a cosine similarity. A line says which model made the vectors (<code>bge-m3</code>).</li>
+</ul>
+<aside class="callout why"><p class="callout-title">Why a separate group for similar hits</p><p>A similar hit is a guess and an exact hit is a fact. If both were in one list, a user would trust the guess as much as the fact. The group has its own name, the score and the model, and it is last.</p></aside>
+<h3 id="search-action">The action card and the jump box</h3>
+<p>The words "free /24" are not text. bembel reads them as an <strong>intent</strong> and shows an action card: "Find a free /24 in <code>10.20.0.0/16</code>". The card lists the first blocks (<code>10.20.9.0/24</code> next to osprey-gpu, <code>10.20.10.0/23</code>, <code>10.20.13.0/24</code>, <code>10.20.14.0/23</code>) and has two buttons. "Allocate a /24…" opens the Allocate dialog, tab Prefix, with the length set. The advisory button "✦ Find a free /24 for hpc-ops in Hall 2" starts the assistant. It checks the team, the site and the neighbours and gives a draft. It does not allocate.</p>
+<p>The card "The jump box, open" draws the popover that hangs under the field in the top bar. The groups are Prefixes, Hosts, Similar and Actions. The first row is selected. A footer lists the keys: <kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>↵</kbd> open, <kbd>Tab</kbd> next group, <kbd>⌘</kbd> <kbd>↵</kbd> new tab, <kbd>Esc</kbd> close. The last card shows the rank of each hit in the two lists and its fused score (<code>1/(60+rank)</code> added over the lists). It is a help for the admin who asks why a hit is first.</p>
+<h3 id="search-states">States</h3>
+<ul>
+  <li><strong>No hit.</strong> "Nothing matches 'gpu hall 2 free /24'. Try fewer words." The page offers the chips to remove and the nearest page by name.</li>
+  <li><strong>Vector part off.</strong> The group "Semantic matches" is not in the HTML. A small note says "Similar search is off. The LLM service does not answer."</li>
+  <li><strong>No permission.</strong> A hit the user may not read is not in the list and not in the count. The page never says "3 hits hidden".</li>
+  <li><strong>Error.</strong> A banner with the problem title. The groups that did answer stay.</li>
+</ul>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/search?q=gpu+hall+2+free+%2F24[&amp;kind=prefix,host][&amp;similar=0]</code></dd>
+  <dt>API</dt><dd><code>GET /v1/search?q=…&amp;limit=…</code> (groups with hits, parse result and timing), <code>GET /v1/prefixes/{id}/free?length=24</code>, <code>POST /v1/me/permissions:check</code></dd>
+  <dt>CLI</dt><dd><code>bembel search 'gpu hall 2 free /24'</code>, <code>bembel prefix find-free --within 10.20.0.0/16 --length 24</code></dd>
+  <dt>Keys</dt><dd><kbd>/</kbd> focus the jump box, <kbd>↑</kbd> <kbd>↓</kbd> <kbd>↵</kbd> <kbd>Tab</kbd> <kbd>Esc</kbd> in the popover, <kbd>Shift</kbd> <kbd>↵</kbd> all results</dd>
+</dl>
+</body>
+</html>

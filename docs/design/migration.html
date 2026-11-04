@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Migration from OpenNetAdmin</title>
+<meta name="description" content="The plan to move from OpenNetAdmin to bembel: repeated imports, the parallel run of the BIND and dhcpd exports, the cutover per service and the rollback.">
+</head>
+<body>
+<h1>Migration from OpenNetAdmin</h1>
+<p class="lede">This chapter describes how the organisation moves from ONA 19.0.x to bembel without a big bang. ONA stays the writer until the cutover. bembel imports its data again and again, builds the same files as ONA, and a nightly diff proves that the files are equal. Then DNS moves first and DHCP follows. The mapping rules are in <a href="map-ona.html">map-ona.html</a>.</p>
+<ul class="keypoints">
+  <li>ONA stays the only writer until the cutover. bembel only reads ONA, as often as needed.</li>
+  <li><code>bembel import ona</code> is idempotent. Every object has the external ref <code>ona:TABLE:ID</code>, so a new run updates and never duplicates.</li>
+  <li>Each data problem is a finding with a code. The fix is a change in ONA or a rule in the map file. Then the next run closes the finding.</li>
+  <li>The parallel run builds the BIND and dhcpd files in ONA and in bembel from the same dump, normalises both and compares them every night. The exit criterion is 14 nights in a row without an unexplained difference.</li>
+  <li>The cutover is per service: freeze, last import and DNS in window A, DHCP in window B. The bembel-agent on each server switches its source.</li>
+  <li>The SOA serial of a zone never goes below the unix-time serial that ONA wrote.</li>
+  <li>Rollback means: switch the agent URL back to the ONA files. ONA stays read-only for 30 days.</li>
+</ul>
+<aside class="callout note">
+<p class="callout-title">The story in the examples</p>
+<p>The organisation runs ONA 19.0.x on MariaDB with about 41 000 hosts, 1 900 subnets and 62 000 DNS records. The DNS servers are <code>ns1.example.org</code> (primary) with <code>ns2</code> and <code>ns3</code>. The DHCP servers are <code>dhcp1.example.org</code> and <code>dhcp2.example.org</code>, a failover pair. The import run <code>imp-20261104-0912</code> finds 214 findings. Today is night 12 of 14 of the parallel run. The user <code>d.klein</code> runs the migration.</p>
+</aside>
+
+<h2 id="plan">Plan</h2>
+<p>The plan follows five rules.</p>
+<ol class="steps">
+  <li><strong>One writer.</strong> At each time only one system accepts changes. It is ONA until the freeze on 2026-11-09, then bembel.</li>
+  <li><strong>Repeat, do not rehearse once.</strong> The import runs often: by hand in the first weeks, every night during the parallel run. An error in the rules shows on the next day.</li>
+  <li><strong>Prove with files.</strong> The servers do not care about the model. They read files. If the files are equal for 14 nights, the model is right for the servers.</li>
+  <li><strong>Small steps.</strong> DNS and DHCP move in two windows. Inside a window one server moves first.</li>
+  <li><strong>Go back fast.</strong> Until the end of the read-only period, one switch returns the servers to the ONA files.</li>
+</ol>
+<h3 id="people">People</h3>
+<table>
+<thead><tr><th>User</th><th>Role in the migration</th></tr></thead>
+<tbody>
+<tr><td><code>d.klein</code></td><td>Network admin. Owns the map file, runs the imports and the cutover.</td></tr>
+<tr><td><code>m.huber</code></td><td>DNS editor and approver. Checks DNS findings and the known-differences list. Approves the cutover change request.</td></tr>
+<tr><td><code>a.berger</code></td><td>HPC ops. Checks the subnets, VLANs and fabrics of the cluster networks.</td></tr>
+<tr><td><code>s.yildiz</code></td><td>OpenStack team. Confirms that the provider networks are in the VRF <code>os-provider</code>.</td></tr>
+</tbody>
+</table>
+<h3 id="size">Size of the ONA data</h3>
+<p>The numbers come from the dump of 2026-11-04 01:30.</p>
+<table>
+<thead><tr><th>Table</th><th>Rows</th><th>Table</th><th>Rows</th></tr></thead>
+<tbody>
+<tr><td><code>hosts</code></td><td>41 037</td><td><code>dns</code></td><td>62 318</td></tr>
+<tr><td><code>devices</code></td><td>41 037</td><td><code>domains</code></td><td>163</td></tr>
+<tr><td><code>interfaces</code></td><td>47 612</td><td><code>dns_server_domains</code></td><td>311</td></tr>
+<tr><td><code>subnets</code></td><td>1 904</td><td><code>dhcp_pools</code></td><td>842</td></tr>
+<tr><td><code>blocks</code></td><td>56</td><td><code>dhcp_option_entries</code></td><td>3 960</td></tr>
+<tr><td><code>vlans</code></td><td>388</td><td><code>custom_attributes</code></td><td>2 141</td></tr>
+<tr><td><code>locations</code></td><td>19</td><td><code>users</code>, <code>auth_groups</code></td><td>38, 4</td></tr>
+</tbody>
+</table>
+
+<h2 id="phases">Phases</h2>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 340" role="img" aria-labelledby="mig-ph-t">
+<title id="mig-ph-t">Timeline from the first dry run on 2026-10-06 to the decommission on 2026-12-10</title>
+<text class="t-title" x="20" y="72">ONA</text>
+<text class="t-small t-muted" x="20" y="90">who writes the data</text>
+<text class="t-title" x="20" y="122">import</text>
+<text class="t-small t-muted" x="20" y="140">dry runs, then nightly</text>
+<text class="t-title" x="20" y="172">parallel run</text>
+<text class="t-small t-muted" x="20" y="190">exports diffed</text>
+<text class="t-title" x="20" y="222">service</text>
+<text class="t-small t-muted" x="20" y="240">who feeds the servers</text>
+<text class="t-title" x="20" y="272">safety</text>
+<text class="t-small t-muted" x="20" y="290">rollback window</text>
+<rect class="box-accent" x="232.0" y="56" width="312.8" height="40" rx="8"/>
+<text class="t-small t-on" x="388.4" y="81" text-anchor="middle">ONA is the only writer</text>
+<rect class="box-muted" x="544.8" y="56" width="276.0" height="40" rx="8"/>
+<text class="t-small" x="682.8" y="81" text-anchor="middle">ONA read-only (30 days)</text>
+<rect class="box-soft" x="232.0" y="106" width="156.4" height="40" rx="8"/>
+<text class="t-small" x="310.2" y="131" text-anchor="middle">dry runs by hand</text>
+<rect class="box" x="388.4" y="106" width="156.4" height="40" rx="8"/>
+<text class="t-small" x="466.6" y="131" text-anchor="middle">nightly import</text>
+<rect class="box-info" x="388.4" y="156" width="128.8" height="40" rx="8"/>
+<text class="t-small" x="452.8" y="181" text-anchor="middle">14 nights</text>
+<rect class="box-soft" x="232.0" y="206" width="312.8" height="40" rx="8"/>
+<text class="t-small" x="388.4" y="231" text-anchor="middle">ONA builds the files</text>
+<rect class="box-warn" x="544.8" y="206" width="18.4" height="40" rx="8"/>
+<text class="t-small" x="554.0" y="231" text-anchor="middle"></text>
+<rect class="box-accent" x="563.2" y="206" width="312.8" height="40" rx="8"/>
+<text class="t-small t-on" x="719.6" y="231" text-anchor="middle">bembel builds the files</text>
+<rect class="box-ok" x="544.8" y="256" width="276.0" height="40" rx="8"/>
+<text class="t-small" x="682.8" y="281" text-anchor="middle">rollback: switch the agent URL back</text>
+<path class="edge-accent" d="M544.8,44 L544.8,56"/>
+<path class="edge-accent" d="M563.2,296 L563.2,282"/>
+<text class="t-small t-accent" x="544.8" y="30" text-anchor="middle">2026-11-09 DNS cutover</text>
+<text class="t-small t-accent" x="567.2" y="318" text-anchor="start">2026-11-11 DHCP cutover</text>
+<text class="t-small t-accent" x="525.2" y="181">night 12 of 14: today</text>
+<rect class="box-accent" x="497.8" y="156" width="2" height="40" rx="1"/>
+<path class="edge-muted" d="M232,300 L880,300"/>
+<path class="edge-muted" d="M232.0,296 L232.0,304"/>
+<path class="edge-muted" d="M388.4,296 L388.4,304"/>
+<path class="edge-muted" d="M498.8,296 L498.8,304"/>
+<path class="edge-muted" d="M544.8,296 L544.8,304"/>
+<path class="edge-muted" d="M820.8,296 L820.8,304"/>
+<path class="edge-muted" d="M830.0,296 L830.0,304"/>
+<text class="t-small t-muted" x="232.0" y="318" text-anchor="middle">10-06</text>
+<text class="t-small t-muted" x="388.4" y="318" text-anchor="middle">10-23</text>
+<text class="t-small t-muted" x="498.8" y="318" text-anchor="middle">11-04</text>
+<text class="t-small t-muted" x="820.8" y="318" text-anchor="middle">12-09</text>
+</svg>
+<figcaption>ONA writes until the cutover. The parallel run covers 14 nights. DNS moves on 11-09 and DHCP on 11-11. ONA stays read-only until 12-09.</figcaption>
+</figure>
+<table>
+<thead><tr><th>Phase</th><th>Dates</th><th>What happens</th><th>Exit criterion</th></tr></thead>
+<tbody>
+<tr><td>0 Prepare</td><td>2026-09-28 to 10-05</td><td>Create the read-only ONA database user. Install bembel. Install the bembel-agent in <em>shadow</em> mode on <code>ns1</code> to <code>ns3</code> and <code>dhcp1</code>, <code>dhcp2</code>. Build ona-shadow.</td><td>A dump imports in a dry run without a crash.</td></tr>
+<tr><td>1 Dry runs</td><td>10-06 to 10-22</td><td>Run <code>--dry-run</code> by hand. Fix findings in ONA. Grow the map file (VRFs, fabrics, teams, host kinds). Sample-check the counts.</td><td>No finding of severity <code>error</code> without a decision. Counts match the ONA pages for 20 sampled objects.</td></tr>
+<tr><td>2 Parallel run</td><td>10-23 to 11-06</td><td>Every night: dump, import, both exports, normalise, diff. Users keep working in ONA.</td><td>14 nights in a row without an unexplained difference.</td></tr>
+<tr><td>3 Cutover</td><td>11-09 (A), 11-11 (B)</td><td>Freeze ONA. Final import. DNS first, then DHCP.</td><td>All checks of the cutover list pass on all five servers.</td></tr>
+<tr><td>4 Read-only</td><td>11-09 to 12-09</td><td>ONA stays readable for look-ups. The parallel diff still runs once a week against the ONA files of the freeze.</td><td>No rollback in 30 days.</td></tr>
+<tr><td>5 Decommission</td><td>12-10</td><td>Archive the ONA dump. Stop the web server and the cron jobs. Remove ona-shadow.</td><td>The archive checksum is stored. The change request is closed.</td></tr>
+</tbody>
+</table>
+<p>The import in phase 1 runs from a laptop or a jump host. In phase 2 it runs as a systemd timer on the host of ona-shadow. The bembel API is in Kubernetes with three replicas (<a href="operations.html#ha">operations.html#ha</a>). The import is a client of the API, so the timer needs only a service token with the role for imports.</p>
+
+<h2 id="extract">Extract</h2>
+<p>The import reads the ONA database directly with SQL. It does not use <code>dcm.pl</code> for the data. ONA has no list module. Each <code>*_display</code> call returns one object, so a full export would need 100 000 calls. The text output hides raw ids and orphans. The PHP stack may also be broken on PHP 8. <code>dcm.pl</code> only serves for sample checks.</p>
+<h3 id="access">Access</h3>
+<p>Give bembel a user that can only read. Allow only the address of the import host.</p>
+<pre><code class="language-sql">CREATE USER 'bembel_ro'@'10.30.5.20' IDENTIFIED BY '…';
+GRANT SELECT ON ona.* TO 'bembel_ro'@'10.30.5.20';
+</code></pre>
+<p>If a direct connection is not possible, take a consistent dump on the ONA host and restore it elsewhere.</p>
+<pre><code class="language-bash">mysqldump --single-transaction --skip-lock-tables \
+  --default-character-set=binary --hex-blob \
+  ona | zstd &gt; /srv/ona-dumps/ona-20261104-0130.sql.zst
+</code></pre>
+<p><code>bembel import ona --dump FILE</code> restores such a file into a throw-away MariaDB instance that it starts with a temporary data directory (it needs <code>mariadbd</code> in the path). It stops and deletes the instance at the end.</p>
+<h3 id="check">Pre-checks</h3>
+<p>The first command of a new migration is the check. It reads no data rows beyond counts.</p>
+<pre class="term">$ bembel import ona --dsn 'mysql://bembel_ro@ona-db.example.org/ona' --check
+schema      ona 19.0.3, upgrade_index 15            ok
+tables      41 found, 3 unknown (plugin tables)      warn
+columns     dns.dns_view_id present                  ok
+            dhcp_pools.ip_addr_* INT(10)             ok (IPv4 only)
+            subnets.network_role_id absent           ok
+charset     tables utf8: 38, latin1: 3               warn  (ona.encoding is likely)
+ip columns  DECIMAL(39,0): subnets, interfaces, blocks
+sequences   2 tables with seq below MAX(id)          info  (ona.sequence-drift)
+contexts    1 database in database_settings.inc.php  ok
+guest       disable_guest = 0                        warn
+</pre>
+<p>The check does these steps.</p>
+<ol class="steps">
+  <li>Read <code>sys_config.version</code> and <code>upgrade_index</code>.</li>
+  <li>Compare the columns with the expected list. A missing column of a required table stops the check.</li>
+  <li>Find the table charset. A latin1 table means mixed encodings.</li>
+  <li>Find tables that the import does not know. They are listed and ignored.</li>
+  <li>Count the databases ("contexts"). Each database needs its own run.</li>
+</ol>
+<p>Zero dates break most database drivers. The reader therefore selects every date as text. It never sets a strict SQL mode. It reads every number column as a string and converts it with a big-integer library.</p>
+<h3 id="sample">Sample check against ONA</h3>
+<p>After the first full run, compare 20 objects by hand with ONA. Use the ONA CLI, not the SQL of the import.</p>
+<pre><code class="language-bash">dcm.pl -r host_display host=cn-004.kestrel.example.org verbose=Y format=json
+bembel host get cn-004.kestrel.example.org -o json
+</code></pre>
+<p>Both outputs must show the same interfaces, addresses and records. The sample also checks the reader itself.</p>
+
+<h2 id="import">Import</h2>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 260" role="img" aria-labelledby="mig-imp-t">
+<title id="mig-imp-t">The import reads ONA, transforms in the CLI and sends batches to the API</title>
+<rect class="box-muted" x="20" y="30" width="190" height="70" rx="8"/>
+<text class="t-title" x="32" y="52">ONA database</text>
+<text class="t-small" x="32" y="72">read-only user</text>
+<text class="t-small" x="32" y="90">or a mysqldump file</text>
+<rect class="box" x="250" y="30" width="190" height="70" rx="8"/>
+<text class="t-title" x="262" y="52">reader</text>
+<text class="t-small" x="262" y="72">bytes, big integers</text>
+<text class="t-small" x="262" y="90">dates as text</text>
+<rect class="box-accent" x="480" y="30" width="190" height="70" rx="8"/>
+<text class="t-title t-on" x="492" y="52">transform</text>
+<text class="t-small t-on" x="492" y="72">10 passes, map file</text>
+<text class="t-small t-on" x="492" y="90">findings</text>
+<rect class="box" x="710" y="30" width="170" height="70" rx="8"/>
+<text class="t-title" x="722" y="52">batches</text>
+<text class="t-small" x="722" y="72">PUT /v1/imports/ID/</text>
+<text class="t-small t-mono" x="722" y="90">objects:batch</text>
+<rect class="box-accent" x="710" y="150" width="170" height="80" rx="8"/>
+<text class="t-title t-on" x="722" y="172">bembel API</text>
+<text class="t-small t-on" x="722" y="192">upsert by external</text>
+<text class="t-small t-on" x="722" y="210">ref and row hash</text>
+<rect class="box-ok" x="480" y="150" width="190" height="80" rx="8"/>
+<text class="t-title" x="492" y="172">bembel database</text>
+<text class="t-small" x="492" y="192">objects, findings</text>
+<text class="t-small" x="492" y="210">import_run</text>
+<rect class="box-soft" x="250" y="150" width="190" height="80" rx="8"/>
+<text class="t-title" x="262" y="172">report</text>
+<text class="t-small" x="262" y="192">created, updated,</text>
+<text class="t-small" x="262" y="210">unchanged, deleted</text>
+<path class="edge" d="M212,65 L246,65" marker-end="url(#arrow)"/>
+<path class="edge" d="M442,65 L476,65" marker-end="url(#arrow)"/>
+<path class="edge-accent" d="M672,65 L706,65" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M795,102 L795,146" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M706,190 L674,190" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M476,190 L444,190" marker-end="url(#arrow)"/>
+</svg>
+<figcaption>The CLI does the reading and the transform. The server stays on the public API and never sees the ONA database.</figcaption>
+</figure>
+<p>The CLI reads the ONA data, applies the rules of <a href="map-ona.html">map-ona.html</a> and sends the result to the API in batches. The server stores a <code>import_run</code> and applies each batch idempotently. A run has the id <code>imp-YYYYMMDD-HHMM</code>.</p>
+<h3 id="cli">Command</h3>
+<pre class="term">bembel import ona (--dsn URL | --dump FILE) [flags]
+bembel import ona --check
+bembel import ona --release
+bembel import findings list|show|accept
+</pre>
+<table>
+<thead><tr><th>Flag</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>--dsn URL</code></td><td>The ONA database, for example <code>mysql://bembel_ro@ona-db.example.org/ona</code>. The password comes from <code>BEMBEL_ONA_PASSWORD</code>.</td></tr>
+<tr><td><code>--dump FILE</code></td><td>A <code>mysqldump</code> file (also <code>.zst</code> or <code>.gz</code>). Use it instead of <code>--dsn</code>.</td></tr>
+<tr><td><code>--dry-run</code></td><td>Do all steps, send the batches with <code>dry_run=true</code>. The server stores the run and the findings and no objects.</td></tr>
+<tr><td><code>--since RUN|TIME</code></td><td>Show in the report only the objects that changed after that run or time. ONA has no change time on most tables, so the reader always reads all rows and the hash decides.</td></tr>
+<tr><td><code>--map-file FILE</code></td><td>The YAML map file with the rules that ONA cannot hold. The import stores a hash of the file in the run.</td></tr>
+<tr><td><code>--context NAME</code></td><td>The ONA context (a separate database). The map file can set a VRF or team for it.</td></tr>
+<tr><td><code>--fail-on error|warn|never</code></td><td>Exit code 3 if findings of that severity are open. Default <code>never</code>. The cutover uses <code>error</code>.</td></tr>
+<tr><td><code>--with-configs</code>, <code>--with-logs</code></td><td>Also import the config archive and <code>ona_logs</code> as attachments.</td></tr>
+<tr><td><code>--report FILE</code></td><td>Write the run report as JSON.</td></tr>
+<tr><td><code>--release</code></td><td>Cutover only. Remove <code>managed_by = ona-import</code> from all imported objects. Users can then edit them.</td></tr>
+</tbody>
+</table>
+<h3 id="mapfile">Map file</h3>
+<p>The map file holds what ONA cannot know and the answers to findings. It lives in git, next to the known-differences file. Every change goes through a review.</p>
+<pre><code class="language-yaml"># map.yaml for the import of ONA at example.org
+version: 1
+source: ona-import
+
+vrf:                         # ONA has one address space
+  - {cidr: 172.16.0.0/16, vrf: oob}
+  - {cidr: 10.100.0.0/16, vrf: hpc-fabric}
+  - {cidr: 10.30.0.0/16,  vrf: os-provider}
+  - {default: global}
+
+fabric:
+  - {cidr: 10.100.0.0/16, fabric: kestrel-ib}
+  - {cidr: 10.110.8.0/24, fabric: osprey-roce}
+
+teams:                       # owner by prefix or by domain
+  - {cidr: 10.20.0.0/16, team: hpc-ops}
+  - {domain: openstack.example.org, team: openstack}
+
+prefixes:                    # containers that ONA never had
+  - {cidr: 10.20.0.0/16, kind: container, name: Hall 2 HPC, site: Hall 2}
+
+hosts:
+  kind:
+    - {match: {model: "KVM guest"}, kind: vm, platform: libvirt}
+    - {match: {fqdn: '^hv-0[1-6]\.example\.org$'}, kind: hypervisor}
+
+views: {DEFAULT: internal}
+
+failover_names: {1: dhcp-a}  # ONA group id to the bembel name
+
+users:   {dklein: d.klein, mhuber: m.huber}
+groups:  {Admin: "oidc:hpc-network-admins"}
+read_all: true
+
+resolve:                     # answers to findings
+  - {finding: ona.ipv6-ambiguous, ref: "ona:interfaces:30211", family: v6}
+  - {finding: ona.dup-mac, refs: ["ona:interfaces:5120", "ona:interfaces:48802"], keep: first}
+encoding:
+  interfaces.description: latin1
+</code></pre>
+<h3 id="idempotent">Idempotent re-import</h3>
+<p>The server finds every object by <code>(source, external_ref)</code>. The reference is <code>ona:TABLE:ID</code>, for example <code>ona:hosts:8812</code>. A merged object has a list of refs. The CLI sends with each object a <em>row hash</em>, the hash of the transformed ONA rows that made it. The server decides per object.</p>
+<table>
+<thead><tr><th>Case</th><th>Action</th><th>Audit event</th></tr></thead>
+<tbody>
+<tr><td>Ref not known</td><td>Create the object.</td><td><code>created</code>, origin <code>import:ONA-RUN</code></td></tr>
+<tr><td>Ref known, hash equal</td><td>Nothing. The run counts it as <em>unchanged</em>.</td><td>none</td></tr>
+<tr><td>Ref known, hash differs</td><td>Update the fields that the import owns.</td><td><code>updated</code></td></tr>
+<tr><td>Ref known, row missing in this run</td><td>Mark the object <code>deprecated</code>. Delete it if it is missing in the next run too.</td><td><code>deprecated</code>, <code>deleted</code></td></tr>
+<tr><td>Object edited in bembel by a user</td><td>Not possible. <code>managed_by = ona-import</code> blocks edits until <code>--release</code>.</td><td>deny event</td></tr>
+</tbody>
+</table>
+<p>A mass-delete guard stops a run that would delete more than 5 % of the objects of a kind. This happens when someone points the import at an empty or wrong database. The run fails with a clear message.</p>
+<p>Fields that the import does not own survive a re-import. Tags and attributes that a user adds in bembel (when the map file allows it) stay. The map file key <code>owned_fields</code> lists the exceptions.</p>
+<h3 id="run">One run</h3>
+<pre class="term">$ bembel import ona --dsn 'mysql://bembel_ro@ona-db.example.org/ona' \
+    --map-file map.yaml --report run.json
+run         imp-20261104-0912
+reading     47 tables ... 2 min 41 s
+transform   10 passes ... 38 s
+
+object        created  updated  unchanged  deprecated
+vrf                 0        0          4           0
+prefix              0        3      1 937           0
+vlan                0        0        384           0
+zone                0        1        162           0
+host                4       12     41 004           0
+interface           7       29     52 118           0
+address             9       31     47 596           0
+record              3       88     11 410           1
+dhcp scope          0        0        611           0
+range               0        0        842           0
+…
+findings    214  (37 error, 110 warn, 67 info)   new 1, closed 6
+</pre>
+<p>The counts show that the run changed only what users changed in ONA since the last run.</p>
+
+<h2 id="findings">Findings</h2>
+<p>A finding is a data problem that the import cannot hide. It has a code (<a href="map-ona.html#problems">map-ona.html#problems</a>), a severity, the ONA ref, a text and a suggested fix. The run <code>imp-20261104-0912</code> has 214 findings in 22 of 24 codes.</p>
+<table>
+<thead><tr><th>Code</th><th>Severity</th><th>Count</th><th>Code</th><th>Severity</th><th>Count</th></tr></thead>
+<tbody>
+<tr><td><code>ona.orphan-dns</code></td><td>warn</td><td>37</td><td><code>ona.ptr-mismatch</code></td><td>warn</td><td>16</td></tr>
+<tr><td><code>ona.stale-subnet-id</code></td><td>info</td><td>29</td><td><code>ona.host-no-name</code></td><td>error</td><td>14</td></tr>
+<tr><td><code>ona.dup-mac</code></td><td>warn</td><td>21</td><td><code>ona.encoding</code></td><td>warn</td><td>11</td></tr>
+<tr><td><code>ona.zero-date</code></td><td>info</td><td>18</td><td><code>ona.orphan-interface</code></td><td>error</td><td>9</td></tr>
+<tr><td><code>ona.shared-device</code></td><td>info</td><td>8</td><td><code>ona.block-unaligned</code></td><td>info</td><td>8</td></tr>
+<tr><td><code>ona.dhcp-orphan</code></td><td>warn</td><td>7</td><td><code>ona.dup-ip</code></td><td>error</td><td>6</td></tr>
+<tr><td><code>ona.no-gateway</code></td><td>warn</td><td>6</td><td><code>ona.subnet-hostbits</code></td><td>warn</td><td>5</td></tr>
+<tr><td><code>ona.overlap</code></td><td>error</td><td>4</td><td><code>ona.cname-conflict</code></td><td>error</td><td>3</td></tr>
+<tr><td><code>ona.dup-vlan</code></td><td>warn</td><td>3</td><td><code>ona.ipv6-ambiguous</code></td><td>warn</td><td>2</td></tr>
+<tr><td><code>ona.no-zone</code></td><td>warn</td><td>2</td><td><code>ona.perm-orphan</code></td><td>info</td><td>2</td></tr>
+<tr><td><code>ona.sequence-drift</code></td><td>info</td><td>2</td><td><code>ona.bad-mask</code></td><td>error</td><td>1</td></tr>
+<tr><td><code>ona.dup-host</code></td><td>warn</td><td>0</td><td><code>ona.zone-cycle</code></td><td>error</td><td>0</td></tr>
+</tbody>
+</table>
+<p>The sum is 214: 37 errors, 110 warnings and 67 infos. The first dry run on 2026-10-06 had 538 findings. The clean-up went on in steps.</p>
+<table>
+<thead><tr><th>Run</th><th>Findings</th><th>Errors</th><th>What changed</th></tr></thead>
+<tbody>
+<tr><td><code>imp-20261006-1410</code> (dry run)</td><td>538</td><td>112</td><td>First read. No map file.</td></tr>
+<tr><td><code>imp-20261013-0905</code> (dry run)</td><td>391</td><td>81</td><td>Map file with VRFs and view names.</td></tr>
+<tr><td><code>imp-20261020-1620</code> (dry run)</td><td>305</td><td>58</td><td>86 dead DNS rows deleted in ONA by <code>m.huber</code>.</td></tr>
+<tr><td><code>imp-20261027-0131</code> (nightly)</td><td>262</td><td>44</td><td>Duplicate MACs fixed by <code>a.berger</code>.</td></tr>
+<tr><td><code>imp-20261104-0131</code> (nightly)</td><td>219</td><td>39</td><td>Encoding rule for latin1 descriptions.</td></tr>
+<tr><td><code>imp-20261104-0912</code></td><td>214</td><td>37</td><td>Five rows fixed in ONA in the morning, one rule added.</td></tr>
+</tbody>
+</table>
+<h3 id="workflow">Workflow</h3>
+<ol class="steps">
+  <li>List the open findings of the last run: <code>bembel import findings list --run imp-20261104-0912 --severity error</code>.</li>
+  <li>Open one finding. The text names the ONA rows and the suggested fix.</li>
+  <li>Choose a fix. Either change the row in ONA, or add a rule to the map file, or accept the finding with a reason.</li>
+  <li>Run the import again. The server closes the findings that are clean now and opens the new ones.</li>
+  <li>Repeat until no finding of severity <code>error</code> is open without a decision.</li>
+</ol>
+<pre class="term">$ bembel import findings show f-7c41
+f-7c41  ona.dup-mac  warn  open  imp-20261104-0912
+  ref     ona:interfaces:5120 (cn-117 eno1) and ona:interfaces:48802 (cn-311 eno1)
+  value   3c:ec:ef:12:1d:08 on 2 hosts
+  effect  both imported, the second address has no DHCP reservation
+  fix     correct the MAC in ONA, or add to map.yaml:
+            resolve: [{finding: ona.dup-mac, refs: [...], keep: first}]
+$ bembel import findings accept f-7c41 --reason "cn-311 replaced cn-117, same NIC"
+accepted by d.klein (audit evt-9a02)
+</pre>
+<p>The web UI shows the same list on the import page. The advisory button <em>Explain this finding</em> sends the finding to the assistant. The assistant reads the finding, the ONA rows and the help topic, and it explains the fix in plain words. It cannot change the map file.</p>
+<figure class="shot"><a href="mockups/ui/import.html"><img src="img/ui-import.webp" alt="The import page with the run list, the findings by code and the detail of one finding with its suggested fix" loading="lazy"></a><figcaption>The import page. The run list on the top, the findings by code on the left, the selected finding on the right.</figcaption></figure>
+<div class="callout why">
+<p class="callout-title">Why fix in ONA first</p>
+<p>ONA stays the writer until the cutover. A fix in the map file hides a problem in the import only. A fix in ONA removes it for the users and for the ONA exports too. The map file takes the cases that ONA cannot hold, such as the VRF or a family decision.</p>
+</div>
+
+<h2 id="parallel">Parallel run</h2>
+<p id="parallel-run">The parallel run compares the files that ONA builds with the files that bembel builds. It runs every night in phase 2. It is the main proof for the cutover (<a href="dns.html#compat">dns.html#compat</a>, <a href="dhcp.html#compat">dhcp.html#compat</a>).</p>
+<h3 id="setup">Set-up</h3>
+<ul>
+  <li><strong>ona-shadow.</strong> A copy of the ONA code and plugins on a scratch host, with a scratch MariaDB. The nightly job restores the dump there. The live ONA is not touched.</li>
+  <li><strong>ONA files.</strong> The ONA plugins run in ona-shadow with a changed configuration, so they write to a scratch path and do not reload a service.</li>
+  <li><strong>bembel files.</strong> The server builds the files from the imported model in <em>compat mode</em>, for the same five servers.</li>
+</ul>
+<pre><code class="language-bash"># /opt/ona-shadow/etc/build_bind.conf (excerpt)
+ONA_PATH="/srv/ona-parallel/ns1.example.org"   # zone_data/ below it
+SRV_FQDN="ns1.example.org"
+DCM_PATH="/opt/ona-shadow/bin/dcm.pl"
+CHECKCOMMAND="/bin/true"                        # no check on this host
+SYSTEMINIT="/bin/true"                          # never reload
+
+# one call per server, from the nightly script
+/opt/ona-shadow/bin/build_bind -s ns1.example.org -b
+/opt/ona-shadow/bin/build_dhcpd -s dhcp1.example.org -b -t   # -t: no restart
+</code></pre>
+<p>The ONA output is the plugin output. It is <code>named.conf.ona</code>, one file <code>zone_data/named-FQDN</code> for each zone and <code>dhcpd.conf.ona</code> for each DHCP server. The bembel command writes the same names:</p>
+<pre class="term">$ bembel export bind  --server ns1.example.org  --mode compat-ona --out /srv/bembel-parallel/ns1.example.org
+$ bembel export dhcpd --server dhcp1.example.org --mode compat-ona --out /srv/bembel-parallel/dhcp1.example.org
+</pre>
+<h3 id="modes">Compat mode and native mode</h3>
+<table>
+<thead><tr><th>Item</th><th><code>compat-ona</code></th><th><code>native</code></th></tr></thead>
+<tbody>
+<tr><td>Purpose</td><td>Byte-equal to ONA after normalisation. Used for the parallel run and for the first days after the cutover.</td><td>Clean output. The default after the migration.</td></tr>
+<tr><td>Header and file names</td><td><code>named.conf.ona</code>, <code>named-FQDN</code>, header comments with a build date.</td><td>No date in the file. A manifest has the build data.</td></tr>
+<tr><td>SOA serial</td><td>Unix time of the build (as ONA).</td><td>Counter that rises only when the zone changes.</td></tr>
+<tr><td>Record order</td><td>By type, then by the sort rule.</td><td>Canonical order: owner, type, data.</td></tr>
+<tr><td>TXT</td><td>Without quotes and without 255-byte splitting, as ONA.</td><td>Quoted, split, escaped.</td></tr>
+<tr><td>Zone type <code>forward</code></td><td>Same stanza as ONA, which is malformed (no <code>;</code>).</td><td>Valid stanza with <code>forwarders</code>.</td></tr>
+<tr><td>Host options in dhcpd</td><td>Only the first option row per host (ONA bug).</td><td>All options of the host.</td></tr>
+<tr><td>Subnet without router</td><td>Skipped with the ONA warning comment.</td><td>Written.</td></tr>
+<tr><td>Views</td><td>Not written. ONA has no output for views.</td><td>Views in <code>named.conf</code>, zone files per view.</td></tr>
+</tbody>
+</table>
+<p>Views are new. There is nothing to compare. A view is checked with <code>named-checkconf -z</code> and with <code>dig</code> probes per view.</p>
+<h3 id="normalise">Normalisation</h3>
+<p>ONA and bembel write dates and serials that change on every build. Both trees pass the same normaliser before the diff.</p>
+<ol class="steps">
+  <li>Replace the build date in the first lines with <code>&lt;DATE&gt;</code>.</li>
+  <li>Replace the serial in the SOA record with <code>&lt;SERIAL&gt;</code>.</li>
+  <li>Sort the record lines of a zone. ONA sorts by type only, and the order inside a type is open.</li>
+  <li>Sort the <code>host</code> blocks of dhcpd by IP address.</li>
+  <li>Keep the line <code>TOTAL RECORDS (count=N)</code>. It is a check by itself.</li>
+  <li>In strict mode keep the column widths. In loose mode (<code>--loose</code>) fold runs of white space.</li>
+</ol>
+<h3 id="levels">Diff levels</h3>
+<table>
+<thead><tr><th>Level</th><th>Compares</th><th>Finds</th></tr></thead>
+<tbody>
+<tr><td>L1</td><td>Normalised text, byte by byte.</td><td>Any change. Expected result: no difference.</td></tr>
+<tr><td>L2</td><td>Zones as DNS data: <code>named-compilezone -f text -F text -s unchanged</code> on both, then diff of the RRsets.</td><td>Format-only differences (order, white space, name case) versus real differences.</td></tr>
+<tr><td>L3</td><td>dhcpd as a model: the set of (subnet, pool, option, failover, host) tuples that <code>dhcpd -t</code> parses from both files.</td><td>Differences in meaning even when the text differs.</td></tr>
+<tr><td>L4</td><td>Behaviour: <code>dig</code> of all A, PTR and CNAME names against a lab named that loads each tree, and for dhcpd a replay of MAC to expected IP.</td><td>Problems that the files hide. Runs once a week and before the cutover, not every night.</td></tr>
+</tbody>
+</table>
+<h3 id="known">Known differences</h3>
+<p>Some differences are on purpose, for example the repair of an ONA fault. A known difference is a rule in a file under version control. A line that matches a rule is explained. All other lines are unexplained.</p>
+<pre><code class="language-yaml"># known-differences.yaml
+version: 1
+differences:
+  - id: KD-001
+    title: ONA writes a forward stanza without semicolon
+    files: ["*/named.conf.ona"]
+    ona:     'file "/.*/named-.*";}'
+    bembel: 'file "/.*/named-.*";};?'
+    reason: ONA fault. bembel keeps the stanza valid in compat mode.
+    owner: m.huber
+    added: 2026-10-24
+  - id: KD-002
+    title: TXT record text longer than 255 bytes
+    files: ["*/zone_data/named-*"]
+    kind: line-changed
+    ona:     'IN\s+TXT\s+"?([^"]{256,})"?$'
+    bembel: 'IN\s+TXT\s+"[^"]{1,255}" "'
+    reason: bembel splits the text in strings of 255 bytes.
+    owner: m.huber
+    added: 2026-10-27
+  - id: KD-003
+    title: DHCP host with two options
+    files: ["*/dhcpd.conf.ona"]
+    kind: line-added-in-bembel
+    bembel: '^\s+option (domain-name-servers|ntp-servers) '
+    reason: ONA repeats or drops the second option row of a host.
+    owner: d.klein
+    added: 2026-10-29
+    expires: 2026-12-10
+  - id: KD-004
+    title: Record with an ebegin in the future
+    files: ["*/zone_data/named-*"]
+    kind: line-added-in-bembel
+    reason: Both systems skip it until the date. The ONA dump is taken a few hours before the build.
+    owner: m.huber
+    added: 2026-11-01
+    expires: 2026-11-09
+</code></pre>
+<p>Each rule has an owner and may have an expiry date. A rule that expires turns its lines into unexplained lines again. The report names the rules that matched nothing for 7 nights, so users can delete them.</p>
+<h3 id="exit">Exit criterion</h3>
+<ul>
+  <li>14 nights in a row with no unexplained line, on all five servers. One unexplained line resets the counter to 0.</li>
+  <li>The 14 nights include at least one real change of each kind: add a host, change an IP, delete a host, add a subnet with a pool, change a failover setting, change an option.</li>
+  <li>Two L4 runs pass: one in week 1, one in week 2.</li>
+  <li>The known-differences file is reviewed by <code>m.huber</code> and <code>d.klein</code>.</li>
+  <li>Open findings of severity <code>error</code>: none without a decision.</li>
+</ul>
+<p>Today is night 12. Eleven earlier nights and tonight give a counter of 12. The counter was reset once, on night 3 (2026-10-26), when a zone differed in 4 lines that nobody had explained. The rule KD-001 and a fix in the compat mode closed the gap.</p>
+<h3 id="report">Report</h3>
+<p>The nightly job posts the report with <code>POST /v1/parallel-runs</code>. The Overview page shows the counter, the last 14 nights and the open lines. The page links to the files. The same report goes to <code>hostmaster@example.org</code>.</p>
+<figure class="shot"><a href="mockups/ui/export-diff.html"><img src="img/ui-export-diff.webp" alt="The export diff of night 12 between the ONA files and the bembel files, with the known differences" loading="lazy"></a><figcaption>The export diff of night 12. The lines that a known difference explains are muted. The ONA migration page (above) shows the nights as a strip.</figcaption></figure>
+<p>The advisory button <em>Why does the export diff</em> uses the export diff tool. It shows the lines, the matching rule if any, and a suggested cause. It proposes a draft for the known-differences file and does not write it.</p>
+
+<h2 id="cutover">Cutover</h2>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 340" role="img" aria-labelledby="mig-cut-t">
+<title id="mig-cut-t">Cutover in two windows: freeze, final import and DNS first; DHCP two days later</title>
+<text class="t-title" x="20" y="24">Window A: Monday 2026-11-09, data and DNS</text>
+<text class="t-title" x="20" y="200">Window B: Wednesday 2026-11-11, DHCP</text>
+<rect class="box" x="20" y="40" width="160" height="100" rx="8"/>
+<text class="t-title" x="32" y="62">1 freeze</text>
+<text class="t-small" x="32" y="82">ONA read-only</text>
+<text class="t-small" x="32" y="100">06:00</text>
+<rect class="box" x="196" y="40" width="160" height="100" rx="8"/>
+<text class="t-title" x="208" y="62">2 final import</text>
+<text class="t-small" x="208" y="82">--fail-on error</text>
+<text class="t-small" x="208" y="100">06:20</text>
+<path class="edge" d="M182,90 L194,90" marker-end="url(#arrow)"/>
+<rect class="box" x="372" y="40" width="160" height="100" rx="8"/>
+<text class="t-title" x="384" y="62">3 last diff</text>
+<text class="t-small" x="384" y="82">0 unexplained</text>
+<text class="t-small" x="384" y="100">06:50</text>
+<path class="edge" d="M358,90 L370,90" marker-end="url(#arrow)"/>
+<rect class="box-accent" x="548" y="40" width="160" height="100" rx="8"/>
+<text class="t-title t-on" x="560" y="62">4 ns1.example.org</text>
+<text class="t-small t-on" x="560" y="82">agent: apply</text>
+<text class="t-small t-on" x="560" y="100">07:10</text>
+<path class="edge" d="M534,90 L546,90" marker-end="url(#arrow)"/>
+<rect class="box-accent" x="724" y="40" width="160" height="100" rx="8"/>
+<text class="t-title t-on" x="736" y="62">5 ns2, ns3</text>
+<text class="t-small t-on" x="736" y="82">AXFR, serial check</text>
+<text class="t-small t-on" x="736" y="100">07:40</text>
+<path class="edge" d="M710,90 L722,90" marker-end="url(#arrow)"/>
+<rect class="box-accent" x="20" y="216" width="160" height="100" rx="8"/>
+<text class="t-title t-on" x="32" y="238">6 dhcp2</text>
+<text class="t-small t-on" x="32" y="258">agent: apply</text>
+<text class="t-small t-on" x="32" y="276">11-11 06:00</text>
+<rect class="box" x="196" y="216" width="160" height="100" rx="8"/>
+<text class="t-title" x="208" y="238">7 peer state</text>
+<text class="t-small" x="208" y="258">normal, 0 pending</text>
+<text class="t-small" x="208" y="276">06:15</text>
+<path class="edge" d="M182,266 L194,266" marker-end="url(#arrow)"/>
+<rect class="box-accent" x="372" y="216" width="160" height="100" rx="8"/>
+<text class="t-title t-on" x="384" y="238">8 dhcp1</text>
+<text class="t-small t-on" x="384" y="258">agent: apply</text>
+<text class="t-small t-on" x="384" y="276">06:30</text>
+<path class="edge" d="M358,266 L370,266" marker-end="url(#arrow)"/>
+<rect class="box" x="548" y="216" width="160" height="100" rx="8"/>
+<text class="t-title" x="560" y="238">9 smoke tests</text>
+<text class="t-small" x="560" y="258">lease, DDNS none</text>
+<text class="t-small" x="560" y="276">07:00</text>
+<path class="edge" d="M534,266 L546,266" marker-end="url(#arrow)"/>
+<rect class="box" x="724" y="216" width="160" height="100" rx="8"/>
+<text class="t-title" x="736" y="238">10 announce</text>
+<text class="t-small" x="736" y="258">ONA stays read-only</text>
+<text class="t-small" x="736" y="276">07:30</text>
+<path class="edge" d="M710,266 L722,266" marker-end="url(#arrow)"/>
+</svg>
+<figcaption>Each step has a check. A failed check stops the window and starts the rollback decision.</figcaption>
+</figure>
+<p>The cutover moves the writer role and the file source from ONA to bembel. A change request with the approver <code>m.huber</code> covers it (<a href="access.html#changes">access.html#changes</a>). The agents are already installed in <em>shadow</em> mode. A shadow agent pulls bundles from bembel, checks them, and keeps them, but does not activate them.</p>
+<h3 id="before">Before the windows</h3>
+<ol class="steps">
+  <li>Check the exit criterion. The parallel run ends on night 14, 2026-11-06.</li>
+  <li>Take a backup of the bembel database and a last archive dump of ONA.</li>
+  <li>Announce the freeze to all users with the time of window A.</li>
+  <li>Check that the agent on each server has a release <code>ona-final</code> prepared. It is the copy of the files that run now, so the agent can return to them.</li>
+  <li>Check that the bembel API has three ready replicas and the metrics show no alert.</li>
+</ol>
+<h3 id="window-a">Window A: data and DNS</h3>
+<table>
+<thead><tr><th>Step</th><th>Action</th><th>Check</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Freeze. The web server of ONA denies POST requests and <code>dcm.php</code> writes. The ONA database user is set to SELECT only.</td><td>A test edit in ONA fails.</td></tr>
+<tr><td>2</td><td>Final import: <code>bembel import ona --dsn … --map-file map.yaml --fail-on error</code>, then a manual build of the ONA files in ona-shadow.</td><td>Exit code 0. No open error.</td></tr>
+<tr><td>3</td><td>Last diff of the final files. L1 and L2 on the five servers.</td><td>0 unexplained lines.</td></tr>
+<tr><td>4</td><td>Release: <code>bembel import ona --release</code>. Bembel is now the writer.</td><td>A test edit in bembel works.</td></tr>
+<tr><td>5</td><td>On <code>ns1.example.org</code>: <code>bembel-agent mode apply</code>. The agent activates the pending bundle. The ONA cron job for <code>build_bind</code> is disabled.</td><td><code>named-checkconf -z</code> ok. <code>rndc reload</code> ok. The zone serials are above the old serials.</td></tr>
+<tr><td>6</td><td>On <code>ns2</code> and <code>ns3</code>: the zones come by AXFR from <code>ns1</code>. The agents on them switch the named.conf fragment.</td><td>The serial of every zone is equal on the three servers.</td></tr>
+<tr><td>7</td><td>Probes: <code>dig</code> of the L4 corpus (all A, PTR, CNAME names) at <code>ns1</code> to <code>ns3</code>, and a comparison with the answers of the day before.</td><td>No difference except changed records.</td></tr>
+</tbody>
+</table>
+<h3 id="window-b">Window B: DHCP</h3>
+<p>Between the windows the DHCP agents stay in <em>hold</em> mode. They pull and check new bundles but do not activate them. Changes of reservations wait for window B. An urgent change uses <code>bembel-agent apply --now</code> on one server and a ticket. The freeze of two days is announced with window A.</p>
+<table>
+<thead><tr><th>Step</th><th>Action</th><th>Check</th></tr></thead>
+<tbody>
+<tr><td>8</td><td>On <code>dhcp2.example.org</code> (secondary): <code>bembel-agent mode apply</code>. The agent runs <code>dhcpd -t -cf</code>, swaps the symlink and restarts dhcpd. ISC dhcpd has no reload.</td><td>dhcpd runs. The log shows the peer state <code>normal</code> or <code>communications-interrupted</code> for less than 60 s.</td></tr>
+<tr><td>9</td><td>Wait until the failover state is <code>normal</code> and there are no unacked updates.</td><td>The agent reports the state to bembel. The Overview shows green.</td></tr>
+<tr><td>10</td><td>On <code>dhcp1.example.org</code> (primary): the same as step 8.</td><td>As in step 8.</td></tr>
+<tr><td>11</td><td>Smoke tests: renew a lease on a test client in <code>kestrel-compute</code> (VLAN 204). Boot one PXE client in <code>osprey-gpu</code>.</td><td>The client gets its reserved address.</td></tr>
+<tr><td>12</td><td>Disable the ONA cron jobs for <code>build_dhcpd</code>. Announce the end of the freeze.</td><td>The change request is set to done.</td></tr>
+</tbody>
+</table>
+<h3 id="serial">SOA serial rule</h3>
+<p>ONA writes the unix time of the build as the serial. A serial of today is about 1.79 billion. For example, ONA wrote <code>1793757600</code> on 2026-11-04 at 02:00 UTC. A counter that starts at 1 would be lower. Slave servers would then refuse all updates. The rule for bembel is:</p>
+<ol class="steps">
+  <li>The import reads, for each zone, the highest serial in the ONA files of the parallel run. It stores it as the <em>floor</em> of the zone.</li>
+  <li>The first native serial is <code>max(floor, now) + 1</code>.</li>
+  <li>After that the serial rises by 1 only when the zone content changes.</li>
+  <li>The serial never goes down. The export refuses to publish a lower serial and raises an alert.</li>
+</ol>
+<p>The rule keeps the serial above the ONA serial for a long time. The serial of ONA rises by 1 each second. The serial of bembel rises by 1 per change. A rollback therefore works: the first ONA build after a rollback has the serial of the new time, which is higher than the bembel serial. The check <code>bembel export bind --check-serial-floor</code> tests this rule before each window and before a rollback.</p>
+<div class="callout why">
+<p class="callout-title">Why not a date counter</p>
+<p>A date serial like <code>2026110901</code> is smaller than the unix time serial. The rule "never lower" would block it for decades. The unix-time rule is simple, and it gives every zone a serial that all three servers accept.</p>
+</div>
+<h3 id="agent">Agent modes</h3>
+<table>
+<thead><tr><th>Mode</th><th>Pulls</th><th>Checks</th><th>Activates</th></tr></thead>
+<tbody>
+<tr><td><code>shadow</code></td><td>yes</td><td>yes, in a scratch copy</td><td>no. It sends a report.</td></tr>
+<tr><td><code>hold</code></td><td>yes</td><td>yes</td><td>no. A user or <code>apply --now</code> activates.</td></tr>
+<tr><td><code>apply</code></td><td>yes</td><td>yes</td><td>yes, with symlink swap and reload.</td></tr>
+</tbody>
+</table>
+<p>The agent keeps the last 5 releases in <code>releases/</code>, and the release <code>ona-final</code>. It reports the active bundle and its checks to bembel (<a href="dns.html#delivery">dns.html#delivery</a>).</p>
+
+<h2 id="rollback">Rollback</h2>
+<p>A rollback returns the servers to the files of ONA. It does not return the data. ONA is read-only and cannot take new data back.</p>
+<h3 id="triggers">When to roll back</h3>
+<ul>
+  <li>A zone or a DHCP scope gives wrong answers, and no fix is possible in 30 minutes.</li>
+  <li>A DHCP failover pair does not return to <code>normal</code>.</li>
+  <li>The bembel API or database is down and the servers cannot get a bundle for a change that cannot wait.</li>
+</ul>
+<h3 id="procedure">Procedure</h3>
+<ol class="steps">
+  <li>Stop the agent timer on the server: <code>systemctl stop bembel-agent.timer</code>.</li>
+  <li>Set the source URL back to the ONA files: <code>bembel-agent source set ona-final</code>. The ONA files are the release <code>ona-final</code>, and the ONA web host publishes the newest build under <code>https://ona.example.org/bundles/SERVER/</code>.</li>
+  <li>Run <code>bembel-agent rollback --to ona-final</code>. The agent checks the files, swaps the symlink and reloads. For DHCP, restart the secondary first, then the primary.</li>
+  <li>Check the serial. If a zone has a serial above the new ONA serial, run <code>rndc retransfer ZONE</code> on the secondaries.</li>
+  <li>Make ONA writable again only if the rollback lasts more than a day: restore the permissions of the web server and the database user.</li>
+  <li>List what users changed in bembel since the cutover: <code>bembel audit query --since 2026-11-09T06:00Z --origin web</code>. Enter these changes by hand in ONA.</li>
+</ol>
+<p>No automatic back-sync exists. The ONA schema cannot hold VRFs, views, fabrics or the prefix tree. A generic back-sync would lose data without notice.</p>
+<h3 id="window">Time window</h3>
+<table>
+<thead><tr><th>Period</th><th>State of ONA</th><th>Rollback</th></tr></thead>
+<tbody>
+<tr><td>2026-11-09 to 11-11</td><td>Read-only</td><td>Simple: very few changes exist in bembel.</td></tr>
+<tr><td>11-11 to 12-09</td><td>Read-only, web server on</td><td>Possible. Needs the manual entry of the changes of bembel.</td></tr>
+<tr><td>After 12-09</td><td>Stopped, dump archived</td><td>Not a rollback. A recovery from the archive and a new import.</td></tr>
+</tbody>
+</table>
+<p>ONA stays read-only for 30 days, until 2026-12-09. In this time users read it for old look-ups. The weekly diff against the files of the freeze shows if bembel drifted in a way nobody expects. On 2026-12-10 the decommission steps run. The archive of the dump is kept for the time that the data policy of the organisation sets.</p>
+
+<h2 id="explainer">One night of the parallel run</h2>
+<p>The figure follows night 12 (2026-11-03 to 11-04) step by step.</p>
+<figure class="diagram wide explainer">
+<svg viewBox="0 0 900 380" role="img" aria-labelledby="mig-night-t">
+<title id="mig-night-t">One night of the parallel run: dump, ona-shadow build, bembel import and export, normalise, diff, known differences, report</title>
+<rect class="zone" x="12" y="142" width="206" height="116" rx="12" data-f="0"/>
+<rect class="zone" x="222" y="22" width="250" height="120" rx="12" data-f="1"/>
+<rect class="zone" x="222" y="238" width="250" height="120" rx="12" data-f="2-3"/>
+<rect class="zone" x="512" y="142" width="166" height="106" rx="12" data-f="4"/>
+<rect class="zone" x="702" y="22" width="186" height="86" rx="12" data-f="5"/>
+<rect class="zone" x="702" y="100" width="186" height="80" rx="12" data-f="6"/>
+<rect class="zone" x="702" y="238" width="186" height="120" rx="12" data-f="7"/>
+<rect class="box-muted" x="20" y="150" width="190" height="100" rx="8"/>
+<text class="t-title" x="32" y="172">ONA database</text>
+<text class="t-small" x="32" y="192">41 037 hosts</text>
+<text class="t-small" x="32" y="210">1 904 subnets</text>
+<text class="t-small" x="32" y="228">62 318 DNS rows</text>
+<rect class="box" x="230" y="30" width="234" height="104" rx="8"/>
+<text class="t-title" x="242" y="52">ona-shadow (scratch)</text>
+<text class="t-small" x="242" y="72">restore of the dump</text>
+<text class="t-small" x="242" y="90">build_bind, build_dhcpd</text>
+<text class="t-small t-mono" x="242" y="112" data-f="1-7">118 zone files, dhcpd.conf.ona</text>
+<rect class="box-accent" x="230" y="246" width="234" height="104" rx="8"/>
+<text class="t-title t-on" x="242" y="268">bembel</text>
+<text class="t-small t-on" x="242" y="288">import ona --dump</text>
+<text class="t-small t-on" x="242" y="306">export bind, dhcpd</text>
+<text class="t-small t-mono t-on" x="242" y="332" data-f="2-7">imp-20261104-0131</text>
+<rect class="box" x="520" y="150" width="150" height="90" rx="8"/>
+<text class="t-title" x="532" y="172">normalise</text>
+<text class="t-small" x="532" y="192">date, serial</text>
+<text class="t-small" x="532" y="210">sort records</text>
+<rect class="box" x="710" y="30" width="170" height="70" rx="8"/>
+<text class="t-title" x="722" y="52">diff</text>
+<text class="t-small" x="722" y="72">L1 bytes, L2 zones</text>
+<rect class="box-info" x="710" y="108" width="170" height="64" rx="8"/>
+<text class="t-title" x="722" y="130">known differences</text>
+<text class="t-small" x="722" y="150">9 lines, KD-001..004</text>
+<rect class="box-ok" x="710" y="246" width="170" height="104" rx="8"/>
+<text class="t-title" x="722" y="268">Overview</text>
+<text class="t-small" x="722" y="288">night 12 of 14</text>
+<text class="t-small" x="722" y="306">0 unexplained</text>
+<text class="t-small" x="722" y="324">9 known</text>
+<text class="t-small t-accent" x="115" y="274" text-anchor="middle" data-f="0">01:30 dump</text>
+<path class="edge" d="M212,175 L228,110" marker-end="url(#arrow)"/>
+<path class="edge-accent" d="M212,175 L228,110" marker-end="url(#arrow-accent)" data-f="1"/>
+<path class="edge" d="M212,225 L228,290" marker-end="url(#arrow)"/>
+<path class="edge-accent" d="M212,225 L228,290" marker-end="url(#arrow-accent)" data-f="2"/>
+<path class="edge" d="M466,100 L518,172" marker-end="url(#arrow)"/>
+<path class="edge-accent" d="M466,100 L518,172" marker-end="url(#arrow-accent)" data-f="4"/>
+<path class="edge" d="M466,290 L518,218" marker-end="url(#arrow)"/>
+<path class="edge-accent" d="M466,290 L518,218" marker-end="url(#arrow-accent)" data-f="4"/>
+<path class="edge" d="M672,172 L708,80" marker-end="url(#arrow)"/>
+<path class="edge-accent" d="M672,172 L708,80" marker-end="url(#arrow-accent)" data-f="5"/>
+<path class="edge" d="M795,104 L795,106" marker-end="url(#arrow)"/>
+<path class="edge-accent" d="M795,104 L795,106" marker-end="url(#arrow-accent)" data-f="5"/>
+<path class="edge" d="M795,174 L795,244" marker-end="url(#arrow)"/>
+<path class="edge-accent" d="M795,174 L795,244" marker-end="url(#arrow-accent)" data-f="6"/>
+</svg>
+<script type="application/json" class="steps">["01:30. A job dumps the ONA database with mysqldump --single-transaction. The dump is the only input of the night. ONA is the writer, but nobody edits at night.", "01:40. The dump goes into a scratch copy of ONA, ona-shadow. The plugins build_bind and build_dhcpd run there with no reload. They write 118 zone files, named.conf.ona and dhcpd.conf.ona.", "01:45. bembel reads the same dump: bembel import ona --dump, run imp-20261104-0131. It writes only rows whose hash changed. It makes 219 findings. The morning run imp-20261104-0912 finds 214.", "02:10. bembel writes its own files from the model in compat mode: bembel export bind and bembel export dhcpd. The files have the ONA format with the ONA quirks.", "02:20. Both trees go through the same normaliser. It replaces the build date and the SOA serial, and it sorts the record lines. The line TOTAL RECORDS stays as a check.", "02:25. The diff runs on levels. L1 compares bytes: 114 of 118 zone files are equal. L2 compares the 4 other zones as DNS data. L3 compares the parsed dhcpd model.", "02:35. Each remaining line meets the known-differences list. 9 lines match KD-001 to KD-004. No line is without an explanation.", "02:40. The report goes to the Overview page and to hostmaster@example.org. Night 12 of 14 counts. One unexplained line would reset the counter to 0."]</script>
+<figcaption>Night 12 of 14. The ONA files and the bembel files come from the same dump, so any difference is a difference of the rules.</figcaption>
+</figure>
+<p>Two points matter. The two trees come from one dump, so nobody can blame a data change in the night. The known-differences list is data under version control, so the reason for each difference is on record.</p>
+<p>If tonight's report has one unexplained line, the page shows the line, the file and the ONA row behind it. The user opens the advisory <em>Why does the export diff</em>, adds a rule or fixes the data, and the next night counts again from 0.</p>
+</body>
+</html>

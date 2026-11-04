@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>REST API</title>
+<meta name="description" content="The bembel REST API: resource tree, conventions, examples with curl, errors, pagination, ETag, idempotency, events, webhooks, the CLI and versioning. Spec first with OpenAPI 3.1.">
+</head><body>
+<h1>REST API</h1>
+
+<p class="lede">The REST API is the product. The OpenAPI 3.1 document is reviewed first. The generators make the Go server interfaces, the Go client of the CLI and the TypeScript client of the UI from it. This chapter shows the resource tree, the rules that all endpoints share, full request examples and the CLI.</p>
+<ul class="keypoints">
+<li>Resource oriented, in the style of the Google AIP: plural collections, standard methods, custom methods with a colon (<code>:allocate</code>).</li>
+<li>JSON with <code>snake_case</code> fields. Ids are UUIDv7. Addresses and prefixes are strings.</li>
+<li>Errors are RFC 9457 <code>application/problem+json</code> with stable problem codes.</li>
+<li>Cursor pagination, strong ETags with <code>If-Match</code>, and an <code>Idempotency-Key</code> on every call that allocates.</li>
+<li>Each change makes a CloudEvent through a transactional outbox: SSE for live clients, signed webhooks for the rest.</li>
+<li><code>/v1</code> only gets additive changes. <code>oasdiff</code> in CI blocks a breaking change.</li>
+</ul>
+
+<h2 id="principles">Principles</h2>
+<ol class="steps">
+<li><strong>Spec first.</strong> A change starts as a change of <a href="api/openapi.yaml"><code>api/openapi.yaml</code></a>. The review looks at the contract. Code follows.</li>
+<li><strong>One contract, many clients.</strong> The UI, the CLI, the Neutron driver, the CAPI provider, the external-dns webhook and the assistant tools use only this API. No client has a private path.</li>
+<li><strong>Server chooses.</strong> For allocation the client never reads a free address and then writes it. The client asks for "the next free address". The database arbitrates, so races cannot give one address twice.</li>
+<li><strong>Safe to retry.</strong> Every write is safe to retry: with <code>Idempotency-Key</code>, with a client chosen name, or with <code>If-Match</code>.</li>
+<li><strong>Tell the reason.</strong> Each error has a stable code, a readable sentence and, where it helps, the next step.</li>
+<li><strong>Permissions in the data.</strong> Each object carries <code>allowed_actions</code>. Lists show only what the caller may read (<a href="access.html#evaluation">evaluation</a>).</li>
+</ol>
+<figure class="diagram wide"><svg viewBox="0 0 940 330" role="img" aria-labelledby="f-spec-t"><title id="f-spec-t">The OpenAPI document is the source of server, clients and checks</title>
+<rect class="box-accent" x="20" y="115" width="190" height="100" rx="8"/>
+<text class="t-title t-on" x="32" y="137">api/openapi.yaml</text>
+<text class="t-small t-on" x="32" y="157">OpenAPI 3.1</text>
+<text class="t-small t-on" x="32" y="174">reviewed first</text>
+<text class="t-small t-on" x="32" y="191">one pull request</text>
+<rect class="box" x="290" y="20" width="200" height="92" rx="8"/>
+<text class="t-title" x="302" y="42">ogen</text>
+<text class="t-small" x="302" y="62">Go server interfaces</text>
+<text class="t-small" x="302" y="79">Go client</text>
+<text class="t-small" x="302" y="96">request validation</text>
+<rect class="box" x="290" y="128" width="200" height="92" rx="8"/>
+<text class="t-title" x="302" y="150">openapi-typescript</text>
+<text class="t-small" x="302" y="170">types for the UI</text>
+<text class="t-small" x="302" y="187">openapi-fetch client</text>
+<rect class="box" x="290" y="236" width="200" height="74" rx="8"/>
+<text class="t-title" x="302" y="258">oasdiff (CI)</text>
+<text class="t-small" x="302" y="278">diff against main</text>
+<text class="t-small" x="302" y="295">breaking = fail</text>
+<rect class="box-ok" x="570" y="20" width="170" height="92" rx="8"/>
+<text class="t-title" x="582" y="42">bembel serve</text>
+<text class="t-small" x="582" y="62">handlers call</text>
+<text class="t-small" x="582" y="79">pgx + sqlc</text>
+<rect class="box-ok" x="570" y="128" width="170" height="92" rx="8"/>
+<text class="t-title" x="582" y="150">SvelteKit UI</text>
+<text class="t-small" x="582" y="170">static files,</text>
+<text class="t-small" x="582" y="187">embedded in Go</text>
+<rect class="box-ok" x="770" y="20" width="150" height="92" rx="8"/>
+<text class="t-title" x="782" y="42">bembel CLI</text>
+<text class="t-small" x="782" y="62">same Go client</text>
+<rect class="box-soft" x="770" y="128" width="150" height="92" rx="8"/>
+<text class="t-title" x="782" y="150">other clients</text>
+<text class="t-small" x="782" y="170">networking-bembel</text>
+<text class="t-small" x="782" y="187">CAPI, external-dns</text>
+<path class="edge-accent" d="M210,150 L288,70" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M210,165 L288,174" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" d="M210,190 L288,270" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M490,66 L568,66" marker-end="url(#arrow)"/>
+<path class="edge" d="M490,174 L568,174" marker-end="url(#arrow)"/>
+<path class="edge" d="M740,66 L768,66" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="845" y="246" text-anchor="middle">hand-written clients use</text><text class="t-small t-muted" x="845" y="264" text-anchor="middle">the same document</text>
+</svg><figcaption>Spec first. Nobody writes a handler before the contract change is reviewed. The generated code makes drift impossible.</figcaption></figure>
+<div class="callout why"><p class="callout-title">Why not JSON:API or GraphQL</p>
+<p>JSON:API adds an envelope, relationship objects and includes. Its code generation in Go and TypeScript is weak. GraphQL makes access checks and caching harder. Plain REST with OpenAPI has the best tool support. Network admins also know it from NetBox.</p></div>
+<p>The tools are: <code>ogen</code> (OpenAPI 3.1 server and client for Go), <code>openapi-typescript</code> with <code>openapi-fetch</code> (UI), and <code>oasdiff</code> (breaking changes). See <a href="architecture.html#api-first">API first</a> for the build. The coverage of OpenAPI 3.1 features in ogen is not verified for this document. A spike with the sketch is the first task (<a href="#openapi">OpenAPI</a>).</p>
+
+<h2 id="conventions">Conventions</h2>
+<dl class="facts">
+<dt>Base URL</dt><dd><code>https://bembel.example.org/v1</code>. The OpenAPI document is at <code>/openapi.yaml</code>.</dd>
+<dt>Format</dt><dd><code>Content-Type: application/json</code>. Patch bodies are <code>application/merge-patch+json</code> (RFC 7396). No JSON Patch.</dd>
+<dt>Names</dt><dd>Collections are plural and in kebab-case (<code>dhcp-scopes</code>). Fields are in <code>snake_case</code>. Enum values are lower case.</dd>
+<dt>Ids</dt><dd>UUIDv7 (time ordered). Most filters also accept the natural key: <code>?vrf=global</code>, <code>?cidr=10.20.4.0/22</code>.</dd>
+<dt>Address data</dt><dd>IPs and CIDRs are strings. IPv6 is in the short form of RFC 5952. A MAC is lower case with colons. Counts that can exceed 64 bits (IPv6) are decimal strings.</dd>
+<dt>Time</dt><dd>RFC 3339 in UTC. Durations are ISO 8601 (<code>PT10M</code>, <code>P7D</code>).</dd>
+<dt>Auth</dt><dd><code>Authorization: Bearer</code>. See <a href="access.html#login">login</a>. A browser session uses the cookie and <code>X-Bembel-Csrf</code>.</dd>
+<dt>Request id</dt><dd>The server returns <code>X-Request-Id</code> (and <code>traceparent</code>). The same id is in logs, audit events and error bodies.</dd>
+<dt>Partial answers</dt><dd><code>?fields=id,cidr,status</code> limits the fields. <code>?expand=addresses</code> inlines one level (interfaces of a host).</dd>
+</dl>
+
+<h3 id="custom-methods">Standard and custom methods</h3>
+<table>
+<thead><tr><th>Operation</th><th>Request</th><th>Success</th></tr></thead>
+<tbody>
+<tr><td>List</td><td><code>GET /v1/prefixes</code></td><td>200, page</td></tr>
+<tr><td>Get</td><td><code>GET /v1/prefixes/{id}</code></td><td>200 + <code>ETag</code></td></tr>
+<tr><td>Create</td><td><code>POST /v1/prefixes</code></td><td>201 + <code>Location</code> + <code>ETag</code></td></tr>
+<tr><td>Update</td><td><code>PATCH /v1/prefixes/{id}</code> + <code>If-Match</code></td><td>200</td></tr>
+<tr><td>Delete</td><td><code>DELETE /v1/prefixes/{id}</code> + <code>If-Match</code></td><td>204, or 202 when held for approval</td></tr>
+<tr><td>Custom</td><td><code>POST /v1/prefixes/{id}/addresses:allocate</code></td><td>201 or 200</td></tr>
+<tr><td>Batch</td><td><code>POST /v1/prefixes:batchCreate</code></td><td>200, one transaction, all or nothing</td></tr>
+<tr><td>Long run</td><td><code>POST /v1/sources/{id}:sync</code></td><td>202 + <code>/v1/operations/{id}</code></td></tr>
+</tbody></table>
+<p>A custom method is a verb with a side effect that is not a plain create. It always uses POST. A batch call has a limit of 500 items. More than 50 items need a <a href="access.html#changes">change request</a>.</p>
+
+<h2 id="resources">Resource tree</h2>
+<p>All collections live under <code>/v1</code>. The column "Permission kind" tells which <a href="access.html#permissions">permission</a> a call needs.</p>
+<table>
+<thead><tr><th>Collection</th><th>Operations</th><th>Notes</th><th>Kind</th></tr></thead>
+<tbody>
+<tr><td><code>/vrfs</code></td><td>list get create patch delete</td><td>Route distinguisher and targets are fields</td><td><code>vrf</code></td></tr>
+<tr><td><code>/prefixes</code></td><td>list get create patch delete</td><td>Filters <code>vrf contains within kind status fabric team tag</code></td><td><code>prefix</code></td></tr>
+<tr><td><code>/prefixes/{id}/addresses</code></td><td>list; <code>:allocate</code></td><td>The addresses of a subnet</td><td><code>address</code></td></tr>
+<tr><td><code>/prefixes/{id}/prefixes:allocate</code></td><td>custom</td><td>Next free child prefix of a length from a pool</td><td><code>prefix</code></td></tr>
+<tr><td><code>/prefixes/{id}/free</code></td><td>get</td><td>Preview of free ranges. Not a reservation.</td><td><code>prefix</code></td></tr>
+<tr><td><code>/addresses</code></td><td>list get patch; <code>:release</code></td><td>Across prefixes; filters <code>address mac fqdn status within</code></td><td><code>address</code></td></tr>
+<tr><td><code>/ranges</code></td><td>list get create patch delete</td><td>Role: dhcp-pool, reserved, static, infrastructure</td><td><code>range</code></td></tr>
+<tr><td><code>/claims</code></td><td>list get create delete; <code>:confirm</code></td><td>TTL reservations of integrations</td><td><code>claim</code></td></tr>
+<tr><td><code>/vlans</code>, <code>/vlan-domains</code></td><td>full</td><td>VID 1–4094, unique per domain</td><td><code>vlan</code></td></tr>
+<tr><td><code>/fabrics</code></td><td>full</td><td>ethernet, ethernet-roce, infiniband; QoS profile</td><td><code>fabric</code></td></tr>
+<tr><td><code>/ib-partitions</code></td><td>full</td><td>P_Key, membership, MTU</td><td><code>ib-partition</code></td></tr>
+<tr><td><code>/hosts</code></td><td>full</td><td>Kinds: physical, vm, hypervisor, appliance, container-node. <code>runs_on</code>, <code>platform</code></td><td><code>host</code></td></tr>
+<tr><td><code>/interfaces</code></td><td>full</td><td>MAC, GUID, addresses. Also nested: <code>/hosts/{id}/interfaces</code></td><td><code>interface</code></td></tr>
+<tr><td><code>/views</code></td><td>full</td><td>internal, external</td><td><code>view</code></td></tr>
+<tr><td><code>/zones</code></td><td>full</td><td>Delete always held</td><td><code>zone</code></td></tr>
+<tr><td><code>/zones/{id}/records</code></td><td>full</td><td>Manual records. Derived records are read only.</td><td><code>record</code></td></tr>
+<tr><td><code>/dhcp-scopes</code>, <code>/dhcp-servers</code></td><td>full</td><td>Options, pools, failover pair</td><td><code>dhcp-scope</code></td></tr>
+<tr><td><code>/exports</code></td><td>list get; <code>:build</code>; <code>/exports/{id}/artifact</code></td><td>bind, dhcpd, opensm, prefix-list, address-group. The artifact has an ETag.</td><td><code>export</code></td></tr>
+<tr><td><code>/asns</code>, <code>/static-routes</code></td><td>full</td><td>Routing data (<a href="routing.html">routing</a>)</td><td><code>asn</code></td></tr>
+<tr><td><code>/address-groups</code></td><td>full; <code>/{id}/members</code>, <code>/{id}/feed</code></td><td>Dynamic sets; feed formats nftables, firewalld, text, JSON</td><td><code>address-group</code></td></tr>
+<tr><td><code>/assets/sites</code>, <code>buildings</code>, <code>floors</code>, <code>rooms</code>, <code>rows</code>, <code>racks</code>, <code>devices</code>, <code>ports</code>, <code>links</code></td><td>list get; links also create delete</td><td>Mirror of FNT Command, read only. Links join hosts and devices.</td><td><code>asset</code></td></tr>
+<tr><td><code>/teams</code>, <code>/tags</code>, <code>/attributes</code></td><td>full</td><td>Owners, labels, custom fields per kind</td><td><code>team</code></td></tr>
+<tr><td><code>/sources</code></td><td>list get patch; <code>:sync</code></td><td>local, ona-import, fnt, openstack, k8s, libvirt</td><td><code>source</code></td></tr>
+<tr><td><code>/events</code>, <code>/events/stream</code></td><td>list; SSE</td><td>CloudEvents</td><td><code>event</code></td></tr>
+<tr><td><code>/webhooks</code></td><td>full; <code>/{id}/deliveries</code>, <code>:redeliver</code></td><td>Signed event receivers</td><td><code>webhook</code></td></tr>
+<tr><td><code>/drafts</code></td><td>list get create delete; <code>:apply</code></td><td>Change sets of the assistant</td><td><code>draft</code></td></tr>
+<tr><td><code>/search</code></td><td>get</td><td>Exact, full text, vector (<code>?q=</code>)</td><td>by hit</td></tr>
+<tr><td><code>/operations</code></td><td>get</td><td>State of long runs: imports, syncs, builds</td><td>by caller</td></tr>
+<tr><td><code>/me</code>, <code>/me/permissions</code>, <code>/me/permissions:check</code>, <code>/me/tokens</code>, <code>/roles</code>, <code>/bindings</code>, <code>/change-requests</code>, <code>/audit-events</code></td><td>see <a href="access.html#api">access API</a></td><td>Identity, rights, tokens, approvals, audit</td><td><code>role</code> ...</td></tr>
+<tr><td><code>/auth/config</code>, <code>/livez</code>, <code>/readyz</code>, <code>/openapi.yaml</code></td><td>get</td><td>No authentication</td><td>none</td></tr>
+</tbody></table>
+
+<h3 id="object">The shape of an object</h3>
+<p>Each object has the common fields of the <a href="model.html#common">model</a>. Here is a subnet.</p>
+<pre><code class="language-json">{
+  "id": "0197c0de-0001-7a00-8000-0000000420e4",
+  "kind": "prefix",
+  "cidr": "10.20.4.0/22",
+  "vrf": "global",
+  "parent_id": "0197c0de-0000-7a00-8000-000000020001",
+  "prefix_kind": "subnet",
+  "status": "active",
+  "name": "kestrel-compute",
+  "vlan": 204,
+  "gateway": "10.20.4.1",
+  "fabric": "kestrel-eth",
+  "owner": "hpc-ops",
+  "tags": {"role": "compute"},
+  "source": "local",
+  "utilisation": {"used": "941", "size": "1022", "percent": 92.1},
+  "created_at": "2026-11-02T08:14:03Z", "created_by": "kc:d.klein",
+  "updated_at": "2026-11-04T07:40:12Z", "updated_by": "kc:a.berger",
+  "revision": 12,
+  "allowed_actions": ["read", "update", "allocate"]
+}</code></pre>
+<p>The response also has <code>ETag: "12"</code>. The field <code>managed_by</code> is set when an integration owns the object. Users then get <code>409 resource.managed</code> on writes.</p>
+
+<h2 id="examples">Examples</h2>
+<p>The examples use the story data. <code>$BEMBEL_TOKEN</code> holds a token (<a href="access.html#login">login</a>). The ids are short for reading.</p>
+
+<h3 id="ex-allocate">Allocate the next free address</h3>
+<p>The call asks for the next free address in <code>10.20.4.0/22</code> and gives the DNS name and the MAC. bembel makes the address, the interface, the A, AAAA and PTR records and (with <code>reservation</code>) the DHCP reservation in one transaction.</p>
+<pre><code class="language-bash">curl -sS -X POST \
+  https://bembel.example.org/v1/prefixes/0197c0de-0001-7a00-8000-0000000420e4/addresses:allocate \
+  -H "Authorization: Bearer $BEMBEL_TOKEN" \
+  -H "Idempotency-Key: 6f1c2f1e-4f52-4a64-9d0e-0c1c8c7a5b10" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fqdn": "cn-004.kestrel.example.org",
+    "interface": {"host": "cn-004.kestrel.example.org", "name": "eno1",
+                  "mac": "3c:ec:ef:12:0a:44"},
+    "reservation": true,
+    "tags": {"role": "compute"}
+  }'</code></pre>
+<pre><code class="language-text">HTTP/1.1 201 Created
+Location: /v1/addresses/0197c3a2-5b7e-7c1d-9a40-3f6e2d81b5c4
+ETag: "1"
+X-Request-Id: req_01JAZ4KQ9T
+Content-Type: application/json</code></pre>
+<pre><code class="language-json">{
+  "id": "0197c3a2-5b7e-7c1d-9a40-3f6e2d81b5c4",
+  "kind": "address",
+  "address": "10.20.4.44",
+  "prefix_id": "0197c0de-0001-7a00-8000-0000000420e4",
+  "vrf": "global",
+  "status": "allocated",
+  "fqdn": "cn-004.kestrel.example.org",
+  "interface_id": "0197c3a2-5b7f-7a00-b1d2-9c0a44e1f001",
+  "mac": "3c:ec:ef:12:0a:44",
+  "owner": "hpc-ops",
+  "tags": {"role": "compute"},
+  "derived_records": ["A cn-004.kestrel.example.org",
+                      "PTR 44.4.20.10.in-addr.arpa"],
+  "revision": 1,
+  "allowed_actions": ["read", "update", "release"]
+}</code></pre>
+<figure class="diagram wide">
+<svg viewBox="0 0 920 408" role="img" aria-labelledby="f-alloc-t"><title id="f-alloc-t">Allocate with an idempotency key and a network failure</title>
+<line class="edge-muted" x1="90" y1="56" x2="90" y2="398"/>
+<line class="edge-muted" x1="460" y1="56" x2="460" y2="398"/>
+<line class="edge-muted" x1="830" y1="56" x2="830" y2="398"/>
+<rect class="box" x="10" y="14" width="160" height="42" rx="8"/>
+<text class="t-title" x="90" y="32" text-anchor="middle">Client</text>
+<text class="t-small" x="90" y="48" text-anchor="middle">CAPI / CLI</text>
+<rect class="box-accent" x="380" y="14" width="160" height="42" rx="8"/>
+<text class="t-title t-on" x="460" y="32" text-anchor="middle">bembel</text>
+<text class="t-small t-on" x="460" y="48" text-anchor="middle">API</text>
+<rect class="box" x="750" y="14" width="160" height="42" rx="8"/>
+<text class="t-title" x="830" y="32" text-anchor="middle">PostgreSQL</text>
+<text class="t-small" x="830" y="48" text-anchor="middle">database</text>
+<path class="edge" d="M94,82 L456,82" marker-end="url(#arrow)"/>
+<text class="t-small" x="275" y="76" text-anchor="middle">POST addresses:allocate  Idempotency-Key: 6f1c...</text>
+<path class="edge-accent" d="M464,118 L826,118" marker-end="url(#arrow-accent)"/>
+<text class="t-small" x="645" y="112" text-anchor="middle">BEGIN; pick next free; INSERT; store key + response</text>
+<path class="edge-muted" d="M826,154 L464,154" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="645" y="148" text-anchor="middle">COMMIT: 10.20.4.44</text>
+<rect class="box-soft" x="6" y="173" width="210" height="26" rx="6"/>
+<text class="t-small" x="111" y="190" text-anchor="middle">the answer is lost: timeout</text>
+<path class="edge" d="M94,226 L456,226" marker-end="url(#arrow)"/>
+<text class="t-small" x="275" y="220" text-anchor="middle">POST addresses:allocate  Idempotency-Key: 6f1c... (retry)</text>
+<path class="edge-accent" d="M464,262 L826,262" marker-end="url(#arrow-accent)"/>
+<text class="t-small" x="645" y="256" text-anchor="middle">SELECT stored response for key + subject</text>
+<path class="edge-muted" d="M456,298 L94,298" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="275" y="292" text-anchor="middle">201 Created: 10.20.4.44  Idempotent-Replayed: true</text>
+<path class="edge" d="M94,334 L456,334" marker-end="url(#arrow)"/>
+<text class="t-small" x="275" y="328" text-anchor="middle">same key, other body</text>
+<path class="edge-muted" d="M456,370 L94,370" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="275" y="364" text-anchor="middle">422 idempotency.mismatch</text>
+</svg>
+<figcaption>The retry gets the same address. A new address would be a leak. The key is kept for 24 hours per subject.</figcaption></figure>
+<p>The call is safe to repeat (<a href="#idempotency">idempotency</a>). To take one named address, send <code>"address": "10.20.4.44"</code>. If it is taken, the answer is <code>409 address.conflict</code>.</p>
+
+<h3 id="ex-prefix">Allocate a /26 from a pool</h3>
+<p>The prefix <code>10.30.0.0/16</code> is a container marked as pool. The call gives a child prefix of length 26.</p>
+<pre><code class="language-bash">curl -sS -X POST \
+  https://bembel.example.org/v1/prefixes/0197c0de-0002-7a00-8000-00000030a001/prefixes:allocate \
+  -H "Authorization: Bearer $BEMBEL_TOKEN" \
+  -H "Idempotency-Key: 0b8d2b1c-7c0e-4a39-bf0a-6a5d1a7c2e21" \
+  -H "Content-Type: application/json" \
+  -d '{"length": 26, "name": "tenant-genomics-a", "kind": "subnet",
+       "status": "planned", "owner": "openstack",
+       "tags": {"project": "genomics"}}'</code></pre>
+<pre><code class="language-json">{
+  "id": "0197c3b0-1c22-7e10-8a55-2b7f0c9d4e10",
+  "kind": "prefix",
+  "cidr": "10.30.4.0/26",
+  "vrf": "global",
+  "parent_id": "0197c0de-0002-7a00-8000-00000030a001",
+  "prefix_kind": "subnet",
+  "status": "planned",
+  "name": "tenant-genomics-a",
+  "owner": "openstack",
+  "revision": 1
+}</code></pre>
+<p>If the pool has no free /26, the answer is <code>409 prefix.exhausted</code> with the largest free block in the body.</p>
+
+<h3 id="ex-claim">Claim, confirm and release</h3>
+<p>A claim holds an address for a short time. It fits a flow where another system must finish first, such as <code>bembel vm prepare</code> or the Neutron driver. <code>owner_ref</code> makes the call idempotent by name: a second call with the same <code>owner_ref</code> returns the open claim.</p>
+<pre><code class="language-bash"># 1. claim for 10 minutes
+curl -sS -X POST https://bembel.example.org/v1/claims \
+  -H "Authorization: Bearer $BEMBEL_TOKEN" \
+  -H "Idempotency-Key: 3d52f0aa-96b1-4a0c-8f0e-77d2c1d0a9e4" \
+  -H "Content-Type: application/json" \
+  -d '{"prefix_id": "0197c0de-0003-7a00-8000-000000202401",
+       "ttl": "PT10M", "owner_ref": "vm-build-07",
+       "mac": "52:54:00:8a:3c:07",
+       "fqdn": "vm-build-07.kestrel.example.org"}'</code></pre>
+<pre><code class="language-json">{
+  "id": "0197c3c4-0a10-7b00-9e11-1a2b3c4d5e6f",
+  "state": "open",
+  "address": "10.20.20.37",
+  "owner_ref": "vm-build-07",
+  "mac": "52:54:00:8a:3c:07",
+  "expires_at": "2026-11-04T09:32:11Z"
+}</code></pre>
+<pre><code class="language-bash"># 2. confirm after the domain is defined
+curl -sS -X POST https://bembel.example.org/v1/claims/0197c3c4-0a10-7b00-9e11-1a2b3c4d5e6f:confirm \
+  -H "Authorization: Bearer $BEMBEL_TOKEN" \
+  -H "Idempotency-Key: 9a1c77e0-0f3e-4b0b-8f64-53a1c1e7d002" \
+  -H "Content-Type: application/json" -d '{}'
+# 200 OK: the address 10.20.20.37 has status "allocated" and its DNS records exist.
+# After the TTL the reaper releases an unconfirmed claim. A late confirm gives 409 claim.expired.
+
+# 3. release after the VM is gone; keep the address 7 days as "deprecated"
+curl -sS -X POST https://bembel.example.org/v1/addresses/0197c3c4-0a11-7b00-9e11-1a2b3c4d5e70:release \
+  -H "Authorization: Bearer $BEMBEL_TOKEN" \
+  -H "Idempotency-Key: c1e9a1d4-52a2-4b7b-9c9a-0d9e2f6a4b11" \
+  -H "If-Match: \"2\"" \
+  -H "Content-Type: application/json" -d '{"grace": "P7D"}'</code></pre>
+
+<h3 id="ex-list">Filter and search</h3>
+<pre><code class="language-bash"># which prefixes contain this address, in the VRF global?
+curl -sS "https://bembel.example.org/v1/prefixes?vrf=global&amp;contains=10.20.4.44" \
+  -H "Authorization: Bearer $BEMBEL_TOKEN"
+
+# addresses of login nodes in a subtree, 50 per page
+curl -sS "https://bembel.example.org/v1/addresses?within=10.20.0.0/16&amp;tag=role:login&amp;page_size=50" \
+  -H "Authorization: Bearer $BEMBEL_TOKEN"
+
+# the jump box: one query for anything
+curl -sS "https://bembel.example.org/v1/search?q=3c:ec:ef:12:0a:44" \
+  -H "Authorization: Bearer $BEMBEL_TOKEN"</code></pre>
+<pre><code class="language-json">{
+  "items": [
+    {"kind": "interface", "id": "0197c3a2-5b7f-7a00-b1d2-9c0a44e1f001",
+     "title": "cn-004.kestrel.example.org eno1 3c:ec:ef:12:0a:44", "match": "exact"},
+    {"kind": "address", "id": "0197c3a2-5b7e-7c1d-9a40-3f6e2d81b5c4",
+     "title": "10.20.4.44 cn-004.kestrel.example.org", "match": "exact"}
+  ]
+}</code></pre>
+
+<h3 id="filters">Filter syntax</h3>
+<table>
+<thead><tr><th>Rule</th><th>Example</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>Different parameters: AND</td><td><code>?vrf=global&amp;status=active</code></td><td>both must match</td></tr>
+<tr><td>Comma in one value: OR</td><td><code>?status=active,reserved</code></td><td>either value</td></tr>
+<tr><td>Repeat <code>tag</code>: AND</td><td><code>?tag=role:login&amp;tag=site:hall2</code></td><td>both tags</td></tr>
+<tr><td><code>tag=key:value</code></td><td><code>?tag=role:login</code></td><td>exact tag; <code>tag=role</code> means any value</td></tr>
+<tr><td><code>contains</code></td><td><code>?contains=10.20.4.44</code></td><td>prefixes that contain an address or prefix (<code>&gt;&gt;=</code>)</td></tr>
+<tr><td><code>within</code></td><td><code>?within=10.20.0.0/16</code></td><td>objects inside a CIDR at any depth (<code>&lt;&lt;=</code>)</td></tr>
+<tr><td><code>q</code></td><td><code>?q=kestrel</code></td><td>text search in names and descriptions</td></tr>
+<tr><td><code>order_by</code></td><td><code>?order_by=cidr</code>, <code>-updated_at</code></td><td>sort; a minus sign is descending; the id is the tie breaker</td></tr>
+<tr><td><code>filter</code></td><td>reserved</td><td>A later AIP-160 expression; not in v1</td></tr>
+</tbody></table>
+<p>An unknown parameter gives <code>400 request.invalid</code>. A client then notices a misspelt filter instead of getting all rows.</p>
+
+<h2 id="errors">Errors</h2>
+<p>An error is <code>application/problem+json</code> (RFC 9457). The member <code>type</code> is a stable URN. The member <code>code</code> repeats the end of it and is easier to match in code. Extra members give the details for machines. The same codes are help topics: <code>bembel help problem prefix.exhausted</code>.</p>
+<pre><code class="language-text">HTTP/1.1 409 Conflict
+Content-Type: application/problem+json
+X-Request-Id: req_01JAZ4KQ9T</code></pre>
+<pre><code class="language-json">{
+  "type": "urn:bembel:problem:prefix.exhausted",
+  "code": "prefix.exhausted",
+  "title": "No free block of the requested size",
+  "status": 409,
+  "detail": "The pool 10.30.0.0/16 has no free /26. The largest free block is a /27.",
+  "instance": "/v1/prefixes/0197c0de-0002-7a00-8000-00000030a001/prefixes:allocate",
+  "request_id": "req_01JAZ4KQ9T",
+  "requested_length": 26,
+  "largest_free": "10.30.255.224/27"
+}</code></pre>
+<pre><code class="language-json">{
+  "type": "urn:bembel:problem:permission.denied",
+  "code": "permission.denied",
+  "title": "Permission denied",
+  "status": 403,
+  "detail": "You can read this prefix, but you cannot delete it.",
+  "request_id": "req_01JAZ4M2XD",
+  "required_permission": "prefix:delete"
+}</code></pre>
+<table>
+<thead><tr><th>Code</th><th>Status</th><th>When</th><th>Extra members</th></tr></thead>
+<tbody>
+<tr><td><code>request.invalid</code></td><td>400</td><td>Bad JSON, unknown parameter, bad format</td><td><code>errors[]</code> with JSON pointers</td></tr>
+<tr><td><code>validation.failed</code></td><td>422</td><td>Valid JSON, wrong content (cidr host bits, VID range)</td><td><code>errors[]</code></td></tr>
+<tr><td><code>auth.required</code></td><td>401</td><td>No credentials</td><td><code>WWW-Authenticate</code></td></tr>
+<tr><td><code>auth.invalid-token</code></td><td>401</td><td>Bad signature, issuer, audience or expiry</td><td>no reason in the body</td></tr>
+<tr><td><code>permission.denied</code></td><td>403</td><td>The caller can read the object but lacks the permission</td><td><code>required_permission</code></td></tr>
+<tr><td><code>resource.not-found</code></td><td>404</td><td>No such object, or the caller cannot read it</td><td></td></tr>
+<tr><td><code>address.conflict</code></td><td>409</td><td>The address is taken</td><td><code>holder</code> (id, if readable)</td></tr>
+<tr><td><code>prefix.overlap</code></td><td>409</td><td>The prefix overlaps another in the VRF (exclusion constraint)</td><td><code>conflicting_prefix_id</code></td></tr>
+<tr><td><code>prefix.exhausted</code></td><td>409</td><td>No free block or address of the size</td><td><code>largest_free</code></td></tr>
+<tr><td><code>claim.expired</code></td><td>409</td><td>Confirm after the TTL</td><td><code>expired_at</code></td></tr>
+<tr><td><code>dependency.exists</code></td><td>409</td><td>Delete of an object that others use</td><td><code>dependents</code> (counts)</td></tr>
+<tr><td><code>resource.managed</code></td><td>409</td><td>An integration owns the object</td><td><code>managed_by</code></td></tr>
+<tr><td><code>record.derived</code></td><td>409</td><td>Direct write to an A, AAAA or PTR record</td><td><code>address_id</code></td></tr>
+<tr><td><code>change-request.required</code></td><td>409</td><td>The action is held and the client sent <code>Bembel-Change-Request: never</code></td><td><code>action</code>, <code>reason</code></td></tr>
+<tr><td><code>idempotency.in-progress</code></td><td>409</td><td>The first call with this key still runs</td><td><code>Retry-After</code></td></tr>
+<tr><td><code>precondition.failed</code></td><td>412</td><td><code>If-Match</code> does not equal the ETag</td><td><code>current_etag</code></td></tr>
+<tr><td><code>precondition.required</code></td><td>428</td><td>A write without <code>If-Match</code></td><td></td></tr>
+<tr><td><code>idempotency.mismatch</code></td><td>422</td><td>Same key, other body or path</td><td></td></tr>
+<tr><td><code>bulk.too-large</code></td><td>422</td><td>More than 500 items in a batch</td><td><code>limit</code></td></tr>
+<tr><td><code>rate.limited</code></td><td>429</td><td>Too many calls from the subject</td><td><code>Retry-After</code></td></tr>
+<tr><td><code>server.unavailable</code></td><td>503</td><td>Database down or not ready</td><td><code>Retry-After</code></td></tr>
+<tr><td><code>server.error</code></td><td>500</td><td>A fault. The log has the <code>request_id</code>.</td><td></td></tr>
+</tbody></table>
+<p>The answer <code>202 Accepted</code> is not an error. It means that a <a href="access.html#changes">change request</a> holds the action. The body is the change request.</p>
+
+<h2 id="pagination">Pagination</h2>
+<p>A list is a page: <code>{"items": [...], "next_page_token": "..."}</code>. The token is an opaque cursor. It holds the last sort key and the id (keyset), and a hash of the filter. There is no offset, so a page is cheap at any depth and stable when rows change.</p>
+<pre><code class="language-bash">curl -sS "https://bembel.example.org/v1/prefixes?within=10.0.0.0/8&amp;page_size=100" -H "Authorization: Bearer $BEMBEL_TOKEN"
+# ...
+curl -sS "https://bembel.example.org/v1/prefixes?within=10.0.0.0/8&amp;page_size=100&amp;page_token=eyJrIjoiMTAuMjAuNC4wLzIyIiwiaSI6IjAxOTdj..." -H "Authorization: Bearer $BEMBEL_TOKEN"</code></pre>
+<ul>
+<li><code>page_size</code>: default 100, maximum 1 000.</li>
+<li>The token is valid for 24 hours. With another filter or order it gives <code>400 request.invalid</code>.</li>
+<li>The last page has <code>"next_page_token": null</code>.</li>
+<li>There is no total by default, because a count is slow on big sets. <code>?count=estimate</code> adds <code>total_estimate</code> from the planner. <code>?count=exact</code> adds <code>total</code>.</li>
+<li>The access predicate is part of the query, so the pages contain no hole that hidden rows would make.</li>
+</ul>
+
+<h2 id="concurrency">Concurrency</h2>
+<h3 id="etag">ETag and If-Match</h3>
+<p>Each object has a strong <code>ETag</code>. It is the <code>revision</code>. A write that changes or deletes an object needs <code>If-Match</code>. This stops two users from overwriting each other.</p>
+<table>
+<thead><tr><th>Case</th><th>Answer</th></tr></thead>
+<tbody>
+<tr><td><code>If-Match</code> equals the current ETag</td><td>The change runs. New <code>ETag</code> in the answer.</td></tr>
+<tr><td><code>If-Match</code> differs</td><td><code>412 precondition.failed</code> with <code>current_etag</code>. The client reads and merges.</td></tr>
+<tr><td>No <code>If-Match</code> on PATCH, PUT, DELETE</td><td><code>428 precondition.required</code></td></tr>
+<tr><td><code>If-Match: *</code></td><td>Allowed for DELETE of an object that must exist</td></tr>
+<tr><td><code>If-None-Match: *</code> on create</td><td>Create only if the name is new (<code>412</code> otherwise)</td></tr>
+<tr><td>GET with <code>If-None-Match</code></td><td><code>304</code> when the ETag is equal. BIND servers use this on the export artifact.</td></tr>
+</tbody></table>
+<pre><code class="language-bash">curl -sS -X PATCH https://bembel.example.org/v1/prefixes/0197c0de-0001-7a00-8000-0000000420e4 \
+  -H "Authorization: Bearer $BEMBEL_TOKEN" \
+  -H "If-Match: \"12\"" \
+  -H "Content-Type: application/merge-patch+json" \
+  -d '{"description": "kestrel compute nodes, VLAN 204", "tags": {"role": "compute", "gen": null}}'
+# In a merge patch, null removes a key.</code></pre>
+
+<h3 id="idempotency">Idempotency-Key</h3>
+<p>A call that allocates, claims, confirms or releases needs the header <code>Idempotency-Key</code> (8–255 characters; a UUID is best). Other POST calls may send it.</p>
+<ol class="steps">
+<li>bembel hashes the method, the path and the body. It looks up the key for the caller.</li>
+<li>New key: it runs the call and stores the key, the hash and the answer in the same transaction as the change.</li>
+<li>Known key, same hash: it returns the stored answer with <code>Idempotent-Replayed: true</code>. Nothing runs again.</li>
+<li>Known key, other hash: <code>422 idempotency.mismatch</code>.</li>
+<li>Known key, first call still running: <code>409 idempotency.in-progress</code> with <code>Retry-After</code>.</li>
+</ol>
+<p>Rules: the key is scoped to the subject. The record lives 24 hours. A 5xx answer is not stored, so a retry runs again. The <a href="allocation.html#idempotency">allocation chapter</a> shows the table. A controller should also use a stable name (<code>owner_ref</code>), so that a lost key does not duplicate work.</p>
+
+<h2 id="events">Events</h2>
+<p>Each change writes an event row in the same transaction. A dispatcher (any replica, claimed with <code>FOR UPDATE SKIP LOCKED</code>) sends it on. An event has a gap-free order number <code>bembelseq</code>.</p>
+<figure class="diagram wide"><svg viewBox="0 0 940 300" role="img" aria-labelledby="f-ev-t"><title id="f-ev-t">Events leave the database through an outbox</title>
+<rect class="box" x="16" y="100" width="200" height="110" rx="8"/>
+<text class="t-title" x="28" y="122">write transaction</text>
+<text class="t-small" x="28" y="142">change the row</text>
+<text class="t-small" x="28" y="159">+ insert outbox row</text>
+<text class="t-small" x="28" y="176">+ audit event</text>
+<rect class="box-accent" x="286" y="100" width="170" height="110" rx="8"/>
+<text class="t-title t-on" x="298" y="122">dispatcher</text>
+<text class="t-small t-on" x="298" y="142">all replicas listen</text>
+<text class="t-small t-on" x="298" y="159">NOTIFY wakes them</text>
+<text class="t-small t-on" x="298" y="176">one claims a batch</text>
+<rect class="box" x="526" y="20" width="200" height="76" rx="8"/>
+<text class="t-title" x="538" y="42">SSE stream</text>
+<text class="t-small" x="538" y="62">GET /v1/events/stream</text>
+<text class="t-small" x="538" y="79">Last-Event-ID resume</text>
+<rect class="box" x="526" y="112" width="200" height="76" rx="8"/>
+<text class="t-title" x="538" y="134">webhooks</text>
+<text class="t-small" x="538" y="154">HMAC signed POST</text>
+<text class="t-small" x="538" y="171">retry with backoff</text>
+<rect class="box-soft" x="526" y="204" width="200" height="76" rx="8"/>
+<text class="t-title" x="538" y="226">later</text>
+<text class="t-small" x="538" y="246">NATS, Kafka</text>
+<text class="t-small" x="538" y="263">same outbox</text>
+<rect class="box-ok" x="790" y="20" width="134" height="76" rx="8"/>
+<text class="t-title" x="802" y="42">UI, controllers</text>
+<text class="t-small" x="802" y="62">live updates</text>
+<rect class="box-ok" x="790" y="112" width="134" height="76" rx="8"/>
+<text class="t-title" x="802" y="134">receivers</text>
+<text class="t-small" x="802" y="154">Ansible, chat</text>
+<path class="edge-accent" d="M216,155 L284,155" marker-end="url(#arrow-accent)"/>
+<text class="t-small t-muted" x="250" y="146" text-anchor="middle">COMMIT</text>
+<path class="edge" d="M456,130 L524,60" marker-end="url(#arrow)"/>
+<path class="edge" d="M456,155 L524,150" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M456,180 L524,238" marker-end="url(#arrow-muted)"/>
+<path class="edge" d="M726,58 L788,58" marker-end="url(#arrow)"/>
+<path class="edge" d="M726,150 L788,150" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="360" y="240" text-anchor="middle">FOR UPDATE SKIP LOCKED</text>
+</svg><figcaption>The event exists only if the change committed. A restart or a failover does not lose it.</figcaption></figure>
+<p>The envelope is CloudEvents 1.0 in JSON. The type is <code>org.example.bembel.&lt;kind&gt;.&lt;verb&gt;</code>. The prefix is the reversed domain of the site (<code>events.type_prefix</code>).</p>
+<pre><code class="language-json">{
+  "specversion": "1.0",
+  "id": "evt_0197c3a2-5c01-7e00-8b11-4d5e6f708192",
+  "source": "https://bembel.example.org",
+  "type": "org.example.bembel.address.allocated",
+  "subject": "/v1/addresses/0197c3a2-5b7e-7c1d-9a40-3f6e2d81b5c4",
+  "time": "2026-11-04T09:12:41.213Z",
+  "datacontenttype": "application/json",
+  "bembelseq": 482913,
+  "actor": "kc:a.berger",
+  "data": {
+    "address": "10.20.4.44",
+    "prefix": "10.20.4.0/22",
+    "vrf": "global",
+    "fqdn": "cn-004.kestrel.example.org",
+    "revision": 1
+  }
+}</code></pre>
+<table>
+<thead><tr><th>Type (suffix)</th><th>When</th></tr></thead>
+<tbody>
+<tr><td><code>prefix.created</code>, <code>.updated</code>, <code>.deleted</code>, <code>.allocated</code></td><td>Prefix changes; <code>allocated</code> for a child from a pool</td></tr>
+<tr><td><code>address.allocated</code>, <code>.released</code>, <code>.updated</code></td><td>Address life</td></tr>
+<tr><td><code>claim.created</code>, <code>.confirmed</code>, <code>.expired</code></td><td>Claim life</td></tr>
+<tr><td><code>record.changed</code>, <code>zone.changed</code></td><td>DNS data; the export builder also listens</td></tr>
+<tr><td><code>dhcp-scope.changed</code></td><td>DHCP data</td></tr>
+<tr><td><code>export.built</code>, <code>export.failed</code></td><td>Export builds</td></tr>
+<tr><td><code>change-request.created</code>, <code>.approved</code>, <code>.executed</code></td><td>Four-eyes flow</td></tr>
+<tr><td><code>sync.finished</code>, <code>finding.created</code></td><td>Integrations and import</td></tr>
+</tbody></table>
+<h3 id="sse">SSE stream</h3>
+<p><code>GET /v1/events/stream?types=org.example.bembel.address.*</code> keeps the connection open. Each frame has the order number as <code>id</code>. A client that reconnects sends <code>Last-Event-ID</code> and gets the events it missed. The server sends a comment line every 15 seconds. The stream applies the same read predicate as a list: a client sees only events of objects it may read.</p>
+<pre><code class="language-text">id: 482913
+event: bembel
+data: {"specversion":"1.0","id":"evt_0197c3a2-5c01-7e00-8b11-4d5e6f708192","type":"org.example.bembel.address.allocated", ... }
+</code></pre>
+<p>A reconnect with an id older than the retention (default 30 days) gets <code>410 Gone</code>. The client then does a full list.</p>
+
+<h2 id="webhooks">Webhooks</h2>
+<p>A webhook is a registered URL that receives events of chosen types. The scheme follows the Standard Webhooks specification.</p>
+<pre><code class="language-bash">curl -sS -X POST https://bembel.example.org/v1/webhooks \
+  -H "Authorization: Bearer $BEMBEL_TOKEN" -H "Content-Type: application/json" \
+  -d '{"url": "https://hooks.example.org/bembel",
+       "types": ["org.example.bembel.address.*", "org.example.bembel.export.failed"]}'
+# 201: {"id": "...", "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw", ...}  (shown once)</code></pre>
+<pre><code class="language-text">POST /bembel HTTP/1.1
+Content-Type: application/cloudevents+json
+webhook-id: evt_0197c3a2-5c01-7e00-8b11-4d5e6f708192
+webhook-timestamp: 1793783561
+webhook-signature: v1,K5oZfzN95Z9UkAYgAt1V0QnCyH3uZ1b2KE8tJc0lYV4=</code></pre>
+<ul>
+<li><strong>Signature.</strong> HMAC-SHA256 over <code>webhook-id "." webhook-timestamp "." body</code> with the secret. The receiver rejects a timestamp older than 5 minutes. The secret can rotate, and both secrets are valid for 24 hours.</li>
+<li><strong>Success.</strong> Any 2xx within 10 seconds.</li>
+<li><strong>Retries.</strong> After a failure, bembel retries 8 times with growing delay: 5 s, 30 s, 2 min, 10 min, 30 min, 2 h, 6 h, 24 h. Then the delivery is <code>failed</code>. After 50 failed deliveries in a row, the endpoint is disabled and an event <code>webhook.disabled</code> goes to the owner.</li>
+<li><strong>At least once.</strong> A receiver uses <code>webhook-id</code> to drop duplicates. Order is by <code>bembelseq</code>; a retry may arrive late.</li>
+<li><strong>Delivery log.</strong> <code>GET /v1/webhooks/{id}/deliveries</code> lists attempts with status code, duration and the first 1 KB of the answer. <code>POST /v1/webhooks/{id}/deliveries/{did}:redeliver</code> sends an event again.</li>
+<li><strong>Safety.</strong> The URL must be https. bembel blocks private ranges unless <code>events.webhook.allow_private</code> lists them.</li>
+</ul>
+
+<h2 id="cli">CLI</h2>
+<p>The CLI is the same binary as the server. It is a thin shell over the generated Go client. It adds output formats, the device login, shell completion and the help system (<a href="assistant.html#help">help</a>). Global flags: <code>--server</code>, <code>-o table|json|yaml|name</code>, <code>--no-color</code>, <code>--idempotency-key</code>. Settings come from <code>~/.config/bembel/config.yaml</code>, then <code>BEMBEL_SERVER</code> and <code>BEMBEL_TOKEN</code>.</p>
+<table>
+<thead><tr><th>Command</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td><code>bembel login</code> / <code>logout</code> / <code>whoami</code></td><td>Device login, forget tokens, show <code>/v1/me</code></td></tr>
+<tr><td><code>bembel prefix ls|show|create|edit|rm|free</code></td><td>Prefixes. <code>ls --vrf --within --contains --status --tag</code></td></tr>
+<tr><td><code>bembel prefix allocate PARENT --length N --name NAME</code></td><td>Child prefix from a pool</td></tr>
+<tr><td><code>bembel address ls|show|allocate|release|edit</code></td><td>Addresses. <code>allocate --prefix CIDR --name FQDN --mac MAC --reservation</code></td></tr>
+<tr><td><code>bembel claim ls|create|confirm|rm</code></td><td>Claims with <code>--ttl</code></td></tr>
+<tr><td><code>bembel host ls|show|create|edit|rm</code></td><td>Hosts and interfaces. <code>--kind vm --runs-on hv-03</code></td></tr>
+<tr><td><code>bembel zone ls|show|create|rm</code></td><td>Zones. <code>rm</code> opens a change request</td></tr>
+<tr><td><code>bembel record ls|add|edit|rm ZONE</code></td><td>Manual records. <code>add ZONE login CNAME cn-004 --ttl 300</code></td></tr>
+<tr><td><code>bembel export bind|dhcpd|opensm|prefix-list|address-group</code></td><td>Build or fetch an export. See below.</td></tr>
+<tr><td><code>bembel import ona|netbox</code></td><td>Import from a MariaDB dump, an ONA API or a NetBox API. <code>--dry-run</code> makes findings only.</td></tr>
+<tr><td><code>bembel sync fnt</code></td><td>Start and watch an FNT sync</td></tr>
+<tr><td><code>bembel vm prepare</code></td><td>Claim address, DNS, DHCP and print cloud-init network config</td></tr>
+<tr><td><code>bembel access check|roles|bindings|tokens</code></td><td>Explain rights, manage bindings and tokens</td></tr>
+<tr><td><code>bembel change ls|show|approve|reject</code></td><td>Change requests</td></tr>
+<tr><td><code>bembel events tail</code></td><td>Follow the SSE stream</td></tr>
+<tr><td><code>bembel api METHOD PATH [-d JSON]</code></td><td>Raw call with auth, like <code>gh api</code></td></tr>
+<tr><td><code>bembel help [TOPIC]</code></td><td>Help topics (same text as the UI help pane)</td></tr>
+<tr><td><code>bembel mcp</code></td><td>MCP server for agents, over stdio or HTTP</td></tr>
+<tr><td><code>bembel serve</code></td><td>Run the server: API, UI, workers (<a href="architecture.html#deployment">deployment</a>)</td></tr>
+<tr><td><code>bembel migrate up|down|status</code></td><td>Database migrations (goose, embedded)</td></tr>
+</tbody></table>
+<p>Exit codes: 0 ok, 1 error from the server, 2 usage, 3 not found, 4 denied, 5 held for approval (the change request id is printed).</p>
+
+<h3 id="cli-examples">Terminal examples</h3>
+<p>Login, then look at the tree of Hall 2.</p>
+<pre class="term">$ bembel login
+Open https://id.example.org/realms/main/device and enter the code WXYZ-1234
+Waiting for approval... done.
+Logged in as kc:a.berger (groups: kc:hpc-ops), token valid 5 min, refresh 8 h.
+
+$ bembel prefix ls --vrf global --within 10.20.0.0/16
+CIDR            KIND       STATUS   NAME              VLAN  USED   OWNER
+10.20.0.0/16    container  active   Hall 2 HPC          -     -    hpc-ops
+10.20.4.0/22    subnet     active   kestrel-compute    204   92%   hpc-ops
+10.20.12.0/24   subnet     active   ceph-public        212   n/a   hpc-ops
+10.20.16.0/22   subnet     planned  -                    -    0%   hpc-ops
+4 prefixes (a.berger sees only owner hpc-ops; 1 prefix hidden)</pre>
+<p>Allocate an address for a compute node.</p>
+<pre class="term">$ bembel address allocate --prefix 10.20.4.0/22 \
+    --name cn-004.kestrel.example.org --host cn-004.kestrel.example.org \
+    --interface eno1 --mac 3c:ec:ef:12:0a:44 --reservation
+Allocated 10.20.4.44 in 10.20.4.0/22 (global)
+  fqdn          cn-004.kestrel.example.org
+  interface     eno1  3c:ec:ef:12:0a:44
+  dns           A, PTR (zone kestrel.example.org, 20.10.in-addr.arpa)
+  dhcp          reservation in scope kestrel-compute (dhcp-a)
+  idempotency   6f1c2f1e-4f52-4a64-9d0e-0c1c8c7a5b10
+
+$ bembel address allocate --prefix 10.20.8.0/24 --name gpu-009.osprey.example.org
+error: prefix 10.20.8.0/24 not found  (resource.not-found, req_01JAZ4P7QF)
+$ echo $?
+3</pre>
+<p>Prepare a VM on a Debian hypervisor, then build a BIND export for a check.</p>
+<pre class="term">$ bembel vm prepare --name vm-build-07 --subnet kestrel-services --mac auto --hypervisor hv-03
+Claimed 10.20.20.37 for vm-build-07.kestrel.example.org (expires in 10 min)
+MAC            52:54:00:8a:3c:07
+claim          0197c3c4-0a10-7b00-9e11-1a2b3c4d5e6f
+cloud-init network-config (NoCloud):
+  version: 2
+  ethernets:
+    enp1s0:
+      match: {macaddress: "52:54:00:8a:3c:07"}
+      addresses: ["10.20.20.37/24"]
+      routes: [{to: default, via: 10.20.20.1}]
+      nameservers: {addresses: [10.20.0.53, 10.20.0.54], search: [kestrel.example.org]}
+Define the domain with this MAC. The hook confirms the claim on "prepare".
+
+$ bembel export bind --server ns1.example.org --view internal --out /var/tmp/bind --check
+Built 4 zones, 62 118 records, serial 2026110401 (etag "9c1e...")
+named-checkzone: 4 zones ok
+Wrote /var/tmp/bind/named.conf.bembel and 4 zone files</pre>
+
+<h2 id="versioning">Versioning</h2>
+<ul>
+<li>The path has the major version: <code>/v1</code>. Inside <code>/v1</code> bembel only adds: new endpoints, new optional fields, new enum values, new problem codes. A client must ignore unknown fields and handle unknown enum values.</li>
+<li>A breaking change needs <code>/v2</code>. Both versions run side by side for at least 12 months.</li>
+<li><code>oasdiff</code> runs in CI against the OpenAPI document of <code>main</code>. It fails on a removed field, a new required field, a narrowed type or a removed status code. A deliberate break needs the label <code>api-break</code> and a review.</li>
+<li>A deprecated endpoint or field has <code>deprecated: true</code> in the document and these headers in each answer: <code>Deprecation: @1793750400</code> (RFC 9745), <code>Sunset: Tue, 04 Nov 2027 00:00:00 GMT</code> (RFC 8594) and <code>Link: &lt;https://dennisklein.github.io/bembel/design/api.html#versioning&gt;; rel="deprecation"</code>. The metric <code>bembel_deprecated_calls_total{route,subject}</code> shows who still calls it.</li>
+<li>Server and client versions: <code>GET /v1/me</code> and each answer carry <code>X-Bembel-Version</code>. The CLI warns when the server is older than the client by more than one minor.</li>
+</ul>
+
+<h2 id="openapi">OpenAPI document</h2>
+<p>The sketch is <a href="api/openapi.yaml"><code>api/openapi.yaml</code></a> (OpenAPI 3.1). It shows the security schemes, the shared parameters (<code>Idempotency-Key</code>, <code>If-Match</code>, <code>page_token</code>), the problem response, the schemas of the main objects and the paths of the examples above. The real document grows with each chapter.</p>
+<pre><code class="language-bash">mise run api:lint      # redocly/vacuum lint of api/openapi.yaml
+mise run api:gen       # ogen -> internal/api, openapi-typescript -> ui/src/lib/api.d.ts
+mise run api:breaking  # oasdiff breaking origin/main:api/openapi.yaml api/openapi.yaml</code></pre>
+<div class="callout warn"><p class="callout-title">Risks to check in the first spike</p>
+<p>ogen covers most of OpenAPI 3.1, but not every feature (not verified for this sketch). Check these: path templates with a colon after a parameter (<code>/addresses/{id}:release</code>), type arrays with <code>null</code>, <code>allOf</code> with generic pages, and <code>text/event-stream</code>. If a router limit appears, the fallback is a fixed path like <code>/addresses/{id}/release</code> with the same meaning, decided once for all custom methods.</p></div>
+</body></html>

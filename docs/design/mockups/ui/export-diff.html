@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ONA and bembel diff: ns1 · bembel</title>
+<link rel="stylesheet" href="../assets/bembel.css">
+<link rel="stylesheet" href="../assets/shell.css">
+<link rel="stylesheet" href="../assets/dns.css">
+</head>
+<body data-page="export-diff">
+<a class="skip" href="#main">Skip to content</a>
+<div class="app">
+<!-- SHELL: top bar. Copy it unchanged to each page; change only aria-current in the sidebar and the VRF in the switcher. -->
+<header class="topbar">
+  <a class="icon-btn nav-toggle" href="#nav" aria-controls="nav" aria-expanded="false" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></a>
+  <a class="brand" href="overview.html" aria-label="bembel: overview"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M12.6 7h6.8M13.6 7v2.6C9.9 11 8.4 13.6 8.4 16.8c0 3.2 1.4 5.7 3.1 7.2h9c1.7-1.5 3.1-4 3.1-7.2 0-3.2-1.5-5.8-5.2-7.2V7M19.4 8.3c4.4-.3 6.9 1.4 6.9 4.4 0 2.3-1.1 3.9-2.5 4.8M9.4 15.6h13.2"/></svg></span><span class="brand-name">bembel</span></a>
+  <details class="set-menu vrf-menu">
+    <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+    <div class="set-pop">
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+    </div>
+  </details>
+  <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
+    <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
+  <span class="spacer"></span>
+  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
+  <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
+  <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
+    <div class="more-pop" role="menu">
+      <div class="um-head"><b>Dennis Klein</b><span class="mono">d.klein · id.example.org</span><span class="muted small">groups netops, hpc-ops</span></div>
+      <a href="#" role="menuitem">My access</a><a href="#" role="menuitem">Tokens</a><a href="#" role="menuitem">Sign out</a></div></details>
+  <button class="icon-btn" type="button" data-help aria-label="Help (?)">?</button>
+  <button class="icon-btn" type="button" data-theme-toggle aria-label="Theme: auto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/></svg></button>
+</header>
+<!-- SHELL: sidebar. Groups and icons follow the glossary domains (docs/assets/glossary-data.js). -->
+<nav class="sidebar" id="nav" aria-label="Navigation">
+  <a class="nav-item" href="overview.html" data-key="o"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview<span class="count attn">6</span></a>
+  <div class="nav-label" data-domain="addr"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 1.8h3v3h-3Z M2 11.2h3v3H2Z M11 11.2h3v3h-3Z M8 4.8v3.2 M3.5 11.2V8h9v3.2"/></svg>Addressing</div>
+  <a class="nav-item" data-domain="addr" href="prefixes.html" data-key="p"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v4H4zM4 16h6v4H4zM14 10h6v4h-6z"/><path d="M7 8v8M10 12h4"/></svg>Prefixes</a>
+  <a class="nav-item" data-domain="addr" href="hosts.html" data-key="h"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>Hosts</a>
+  <a class="nav-item" data-domain="addr" href="vlans.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/><path d="M8 3v18"/></svg>VLANs and partitions</a>
+  <a class="nav-item" data-domain="addr" href="fabrics.html" data-key="f"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8M7.5 7.5l9 9"/></svg>Fabrics</a>
+  <a class="nav-item" data-domain="addr" href="routing.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h4a4 4 0 004-4V8"/></svg>Routing and groups</a>
+  <div class="nav-label" data-domain="dns"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 1 0 0 12.4A6.2 6.2 0 0 0 8 1.8Z M1.8 8h12.4 M8 1.8C6 3.8 5.4 5.8 5.4 8S6 12.2 8 14.2 M8 1.8c2 2 2.6 4 2.6 6.2S10 12.2 8 14.2"/></svg>DNS and DHCP</div>
+  <a class="nav-item" data-domain="dns" href="zones.html" data-key="z"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-2.5 2.6-3.5 5.6-3.5 9s1 6.4 3.5 9M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9"/></svg>Zones</a>
+  <a class="nav-item" data-domain="dhcp" href="dhcp.html" data-key="d"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12l4 5-4 5H3z"/><path d="M7 12h5"/></svg>DHCP scopes</a>
+  <a class="nav-item" data-domain="integ" href="exports.html" data-key="e" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Exports<span class="count attn">1 diff</span></a>
+  <div class="nav-label" data-domain="assets"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 1.8h8.8v12.4H3.6Z M3.6 5h8.8 M3.6 8.2h8.8 M3.6 11.4h8.8 M5.6 3.4h1.2 M5.6 6.6h1.2 M5.6 9.8h1.2"/></svg>Assets</div>
+  <a class="nav-item" data-domain="assets" href="floor.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 3v16M15 5v16"/></svg>Floor map</a>
+  <a class="nav-item" data-domain="assets" href="rack.html" data-key="r"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="1.5"/><path d="M5 8h14M5 13.5h14M8 5.3h2M8 10.8h2M8 16.5h2"/></svg>Racks</a>
+  <a class="nav-item" data-domain="assets" href="sync-review.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0114-5.3L20 9M20 12a8 8 0 01-14 5.3L4 15"/><path d="M20 4v5h-5M4 20v-5h5"/></svg>Sync review<span class="count attn">4</span></a>
+  <div class="nav-label" data-domain="access"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 3.6v4.1c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.6Z M5.9 8l1.5 1.5 2.8-3"/></svg>Access</div>
+  <a class="nav-item" data-domain="access" href="bindings.html" data-key="b"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.4c1.8.9 3 2.9 3 5.6"/></svg>Roles and bindings</a>
+  <a class="nav-item" data-domain="access" href="changes.html" data-key="c"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg>Change requests<span class="count attn">2</span></a>
+  <a class="nav-item" data-domain="access" href="audit.html" data-key="a"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Audit log</a>
+  <div class="nav-label" data-domain="integ"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h9 M8.6 2.6 11 5 8.6 7.4 M14 11H5 M7.4 8.6 5 11l2.4 2.4"/></svg>Integrations</div>
+  <a class="nav-item" data-domain="integ" href="integrations.html" data-key="i"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0z"/><path d="M12 16v5"/></svg>Sources and syncs</a>
+  <a class="nav-item" data-domain="integ" href="import.html" data-key="m"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6M9 15l2.5 2.5L16 13"/></svg>ONA migration<span class="count attn">214</span></a>
+  <div class="side-foot">bembel v0.1.0 · api v1</div>
+</nav>
+<!-- /SHELL -->
+
+<main class="main" id="main">
+<div class="banner err offline" role="alert"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M2 8.5a15 15 0 0120 0M5 12a10 10 0 0114 0M8.5 15.5a5 5 0 017 0M12 19h.01M3 3l18 18"/></svg>
+  <div class="grow"><b>Offline.</b> <span data-why>The event stream of bembel stopped. The page shows old data.</span> The page tries again every 5 s.</div>
+  <button class="btn btn-sm" type="button" onclick="location.reload()">Reload</button></div>
+
+
+<div class="crumbs"><a href="exports.html">Exports</a><span class="sep">/</span><a href="exports.html#t-ns1">ns1</a><span class="sep">/</span><span>Parallel run diff</span></div>
+<div class="page-head">
+  <div><div class="zhead"><h1>ONA and bembel: ns1 BIND</h1><span class="pill st-warn">2 unexplained</span></div>
+    <div class="sub"><span>Night <b>12 of 14</b>, 4 November 2026</span><span class="sep">·</span><span>ONA export of 04:00 against bembel bundle <span class="id" title="sha256:7c41e0">b-7c41e0</span> of 17:57</span><span class="sep">·</span><span>mode <span class="mode compat">compat</span></span></div></div>
+  <div class="actions">
+    <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
+      <div class="cli-pop"><span class="c"># the same diff in the terminal</span>
+bembel export diff ns1 --against ona:/srv/ona/zone_data --normalize
+<span class="c"># accept the TXT line as a known difference</span>
+bembel export diff accept ns1 --line db.kestrel.example.org:34 \
+  --note "TXT: semicolon escaped, same data" --until cutover</div></details>
+    <button class="btn btn-agent" type="button" data-assistant="explain-diff" title="Runs the assistant with the advisory explain-diff. Tools: read only. It changes nothing.">Explain diff</button>
+    <a class="btn btn-primary" href="#accept">Accept as known difference…</a>
+  </div>
+</div>
+
+<section class="card sumcard" aria-labelledby="sm-t">
+  <div class="card-head"><h2 id="sm-t">Summary of the night</h2><span class="right">186 412 lines compared in 41 files · after normalisation</span></div>
+  <div class="sum-grid">
+    <div class="sum-main">
+      <div class="sum-nums">
+        <div><b class="big">3</b><span>differing lines<br><span class="muted">in 2 of 41 files</span></span></div>
+        <div class="k"><b class="big">1</b><span>known difference<br><span class="muted">kd-1, accepted by m.huber</span></span></div>
+        <div class="u"><b class="big">2</b><span>unexplained<br><span class="muted">both about cn-011</span></span></div>
+      </div>
+      <div class="progress lg" role="img" aria-label="1 known, 2 unexplained"><i class="p-current" style="flex:1"></i><i class="p-blocked" style="flex:2"></i></div>
+      <div class="legend"><span><i class="lg-k"></i>known difference</span><span><i class="lg-u"></i>unexplained</span><span class="muted">39 files identical to ONA</span></div>
+      <p class="small muted sum-rule"><a class="gl" href="../../glossary.html#cutover" data-gl="cutover" data-domain="integ">Cutover</a> rule: the diff is empty or fully explained on the last 3 nights. Two nights remain.</p>
+    </div>
+    <div class="nights"><div class="nights-h">Unexplained lines per night</div><ol class="bars" aria-label="Unexplained lines per night, night 1 to 14"><li style="--h:101" title="Night 1: 412 unexplained lines"><i></i><span>1</span></li><li style="--h:69" title="Night 2: 188 unexplained lines"><i></i><span>2</span></li><li style="--h:49" title="Night 3: 96 unexplained lines"><i></i><span>3</span></li><li style="--h:32" title="Night 4: 40 unexplained lines"><i></i><span>4</span></li><li style="--h:23" title="Night 5: 21 unexplained lines"><i></i><span>5</span></li><li style="--h:17" title="Night 6: 11 unexplained lines"><i></i><span>6</span></li><li style="--h:15" title="Night 7: 9 unexplained lines"><i></i><span>7</span></li><li style="--h:12" title="Night 8: 6 unexplained lines"><i></i><span>8</span></li><li style="--h:10" title="Night 9: 4 unexplained lines"><i></i><span>9</span></li><li style="--h:9" title="Night 10: 3 unexplained lines"><i></i><span>10</span></li><li style="--h:5" title="Night 11: 1 unexplained lines"><i></i><span>11</span></li><li class="now" style="--h:7" title="Night 12: 2 unexplained lines"><i></i><span>12</span></li><li class="fut"><i></i><span>13</span></li><li class="fut"><i></i><span>14</span></li></ol></div>
+  </div>
+</section>
+
+<div class="dfcols">
+<aside class="dtree">
+<section class="card" aria-labelledby="ft-t">
+  <div class="card-head"><h2 id="ft-t">Files</h2><span class="right">41 · <b>2</b> differ</span></div>
+  <div class="toolbar"><div class="chips"><a class="chip on" href="#" aria-pressed="true">Differ <span class="n">2</span></a><a class="chip" href="#">All <span class="n">41</span></a></div></div>
+  <ul class="ftree" role="tree" aria-label="Files of the bundle of ns1">
+    <li class="dir" role="treeitem" aria-expanded="true"><span class="nm"><i class="fi d"></i>ns1</span>
+      <ul role="group">
+        <li role="treeitem"><a class="f" href="#"><i class="fi"></i><span class="nm mono">named.conf.ona</span><span class="st same">identical</span></a></li>
+        <li class="dir" role="treeitem" aria-expanded="true"><span class="nm"><i class="fi d"></i>views/internal</span>
+          <ul role="group">
+            <li role="treeitem"><a class="f" href="#"><i class="fi"></i><span class="nm mono">db.example.org</span><span class="st same">identical</span></a></li>
+            <li role="treeitem"><a class="f sel" href="#db-kestrel-example-org" aria-current="true"><i class="fi"></i><span class="nm mono">db.kestrel.example.org</span><span class="st chg">2 lines</span></a></li>
+            <li role="treeitem"><a class="f" href="#db-20-10-in-addr-arpa"><i class="fi"></i><span class="nm mono">db.20.10.in-addr.arpa</span><span class="st chg">1 line</span></a></li>
+            <li role="treeitem"><a class="f" href="#"><i class="fi"></i><span class="nm mono">db.osprey.example.org</span><span class="st same">identical</span></a></li>
+            <li role="treeitem"><span class="more-f">31 more, all identical</span></li>
+          </ul></li>
+        <li class="dir" role="treeitem" aria-expanded="false"><span class="nm"><i class="fi d c"></i>views/external <span class="muted small">5 files, identical</span></span></li>
+        <li class="dir" role="treeitem" aria-expanded="false"><span class="nm"><i class="fi d c"></i>views/fabric <span class="muted small">2 files, identical</span></span></li>
+      </ul></li>
+  </ul>
+  <div class="card-foot"><span class="small muted">ONA writes no views. Its single set is compared with view internal. External and fabric zones have no ONA twin yet.</span></div>
+</section>
+<section class="card" aria-labelledby="nz-t">
+  <div class="card-head"><h2 id="nz-t">Normalised before the diff</h2></div>
+  <ul class="rows mini"><li><span class="t">SOA serial and the date in line 1</span><span class="s">ONA uses the time of the build. bembel uses the <a class="gl" href="../../glossary.html#zone" data-gl="zone" data-domain="dns">zone</a> revision.</span></li>
+    <li><span class="t">Order of record lines</span><span class="s">ONA sorts by type only. Both sides sort by name, type, data.</span></li></ul>
+</section>
+</aside>
+
+<div class="dmain2">
+<section class="card agent-card" aria-labelledby="ex-t">
+  <div class="card-head"><h2 id="ex-t"><span class="spk" aria-hidden="true">✦</span> Explain diff</h2><span class="right">assistant · 18:02 · qwen3-coder-30b</span></div>
+  <div class="card-body ag-body">
+    <p class="v">The <a class="gl" href="../../glossary.html#export" data-gl="export" data-domain="integ">export</a> is safe to cut over on these lines. One line is a <a class="gl" href="../../glossary.html#known-difference" data-gl="known-difference" data-domain="integ">known difference</a>. Two lines are new data.</p>
+    <ol class="fixes">
+      <li><b>TXT of <span class="fqdn">kestrel.example.org</span>.</b> bembel escapes the semicolon in <span class="mono">site=hall2; owner=hpc-ops</span>. ONA does not. The data is the same: <span class="mono">named-compilezone</span> dumps both zones the same. This is <a href="#known">kd-1</a>.</li>
+      <li><b>A and PTR of <span class="fqdn">cn-011</span>.</b> a.berger allocated <a class="ip" href="address.html">10.20.4.51</a> at 16:12. ONA is read only since 2026-10-20 and cannot have it. The two lines are correct.</li>
+    </ol>
+    <p class="proof"><span class="ok">✓</span> The L2 check (canonical <a class="gl" href="../../glossary.html#zone" data-gl="zone" data-domain="dns">zone</a> dump) finds 0 differences in data other than the 2 new <a class="gl" href="../../glossary.html#record" data-gl="record" data-domain="dns">records</a>.</p>
+    <details class="fold tools"><summary><b>Tools used</b><span class="sum">export.diff · address.get · audit.query</span></summary><div class="fold-body">3 calls with your permissions, 1.4 s. <a href="#">Show the calls</a></div></details>
+    <div class="ag-acts" id="accept"><a class="btn btn-sm btn-primary" href="#">Accept 2 lines as known difference…</a><span class="why">The assistant cannot accept. You review the note and apply it.</span></div>
+  </div>
+</section>
+<section class="card fdiff" id="db-kestrel-example-org" aria-labelledby="db-kestrel-example-org-t">
+  <div class="card-head"><h2 id="db-kestrel-example-org-t" class="mono">ns1/views/internal/db.kestrel.example.org</h2><span class="right"><span class="chg">2 lines: 1 known, 1 unexplained</span><a class="btn btn-sm" href="#">Raw</a></span></div>
+  <pre class="log dif" tabindex="0"><span class="dl meta"><span class="ln"></span><span class="ln"></span><span class="sg"></span>--- ona/ns1/views/internal/db.kestrel.example.org</span><span class="dl meta"><span class="ln"></span><span class="ln"></span><span class="sg"></span>+++ bembel/ns1/views/internal/db.kestrel.example.org</span><span class="dl hunk"><span class="ln"></span><span class="ln"></span><span class="sg"></span>@@ -31,7 +31,7 @@ kestrel.example.org</span><span class="dl"><span class="ln">31</span><span class="ln">31</span><span class="sg"> </span>kestrel.example.org.                          IN  NS    ns2.example.org.</span><span class="dl"><span class="ln">32</span><span class="ln">32</span><span class="sg"> </span>kestrel.example.org.                          IN  NS    ns3.example.org.</span><span class="dl"><span class="ln">33</span><span class="ln">33</span><span class="sg"> </span>kestrel.example.org.                          IN  MX    10 mail.example.org.</span><span class="dl del"><span class="ln">34</span><span class="ln"></span><span class="sg">-</span>kestrel.example.org.                          IN  TXT   "site=hall2; owner=hpc-ops"</span><span class="dl add"><span class="ln"></span><span class="ln">34</span><span class="sg">+</span>kestrel.example.org.                          IN  TXT   "site=hall2\; owner=hpc-ops"<span class="kdw"><a class="kd" href="#known" title="Known difference kd-1: ONA does not escape a semicolon in TXT data">known kd-1</a></span></span><span class="dl"><span class="ln">35</span><span class="ln">35</span><span class="sg"> </span>_ldap._tcp.kestrel.example.org.               IN  SRV   0 100 389 ldap1.example.org.</span><span class="dl"><span class="ln">36</span><span class="ln">36</span><span class="sg"> </span>_ldap._tcp.kestrel.example.org.               IN  SRV   10 100 389 ldap2.example.org.</span><span class="dl"><span class="ln">37</span><span class="ln">37</span><span class="sg"> </span>_slurmctld._tcp.kestrel.example.org.          IN  SRV   10 0 6817 ctl01.kestrel.example.org.</span><span class="dl hunk"><span class="ln"></span><span class="ln"></span><span class="sg"></span>@@ -1203,6 +1203,7 @@ kestrel.example.org</span><span class="dl"><span class="ln">1203</span><span class="ln">1203</span><span class="sg"> </span>cn-009.kestrel.example.org.                   IN  A     10.20.4.49</span><span class="dl"><span class="ln">1204</span><span class="ln">1204</span><span class="sg"> </span>cn-010.kestrel.example.org.                   IN  A     10.20.4.50</span><span class="dl add"><span class="ln"></span><span class="ln">1205</span><span class="sg">+</span>cn-011.kestrel.example.org.                   IN  A     10.20.4.51<span class="kdw"><span class="unx">unexplained</span></span></span><span class="dl"><span class="ln">1205</span><span class="ln">1206</span><span class="sg"> </span>cn-012.kestrel.example.org.                   IN  A     10.20.4.52</span><span class="dl"><span class="ln">1206</span><span class="ln">1207</span><span class="sg"> </span>cn-004.kestrel.example.org.                   IN  AAAA  2001:db8:4200:204::44</span><span class="dl"><span class="ln">1207</span><span class="ln">1208</span><span class="sg"> </span>cn-005.kestrel.example.org.                   IN  AAAA  2001:db8:4200:204::45</span></pre>
+  <div class="card-foot"><span></span><span class="right"><a class="btn btn-sm" href="#">Accept as known difference…</a></span></div>
+</section><section class="card fdiff" id="db-20-10-in-addr-arpa" aria-labelledby="db-20-10-in-addr-arpa-t">
+  <div class="card-head"><h2 id="db-20-10-in-addr-arpa-t" class="mono">ns1/views/internal/db.20.10.in-addr.arpa</h2><span class="right"><span class="chg">1 line: unexplained</span><a class="btn btn-sm" href="#">Raw</a></span></div>
+  <pre class="log dif" tabindex="0"><span class="dl meta"><span class="ln"></span><span class="ln"></span><span class="sg"></span>--- ona/ns1/views/internal/db.20.10.in-addr.arpa</span><span class="dl meta"><span class="ln"></span><span class="ln"></span><span class="sg"></span>+++ bembel/ns1/views/internal/db.20.10.in-addr.arpa</span><span class="dl hunk"><span class="ln"></span><span class="ln"></span><span class="sg"></span>@@ -812,6 +812,7 @@ 20.10.in-addr.arpa</span><span class="dl"><span class="ln">812</span><span class="ln">812</span><span class="sg"> </span>50.4.20.10.in-addr.arpa.                      IN  PTR   cn-010.kestrel.example.org.</span><span class="dl add"><span class="ln"></span><span class="ln">813</span><span class="sg">+</span>51.4.20.10.in-addr.arpa.                      IN  PTR   cn-011.kestrel.example.org.<span class="kdw"><span class="unx">unexplained</span></span></span><span class="dl"><span class="ln">813</span><span class="ln">814</span><span class="sg"> </span>52.4.20.10.in-addr.arpa.                      IN  PTR   cn-012.kestrel.example.org.</span><span class="dl"><span class="ln">814</span><span class="ln">815</span><span class="sg"> </span>53.4.20.10.in-addr.arpa.                      IN  PTR   cn-013.kestrel.example.org.</span></pre>
+  <div class="card-foot"><span></span><span class="right"><a class="btn btn-sm" href="#">Accept as known difference…</a></span></div>
+</section>
+<section class="card" id="known" aria-labelledby="kd-t">
+  <div class="card-head"><h2 id="kd-t">Known differences</h2><span class="right">3 rules · expire at cutover</span></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Id</th><th>What differs</th><th>Why it is fine</th><th>Accepted</th><th class="num">Lines tonight</th></tr></thead>
+    <tbody>
+      <tr><td><b class="mono">kd-1</b></td><td>TXT data with a semicolon: bembel writes <span class="mono">\;</span></td><td>BIND reads both forms as the same data. Always escaped, also in compat mode.</td><td>m.huber · 2026-10-22</td><td class="num"><b>1</b></td></tr>
+      <tr><td><b class="mono">kd-2</b></td><td>TXT longer than 255 bytes: bembel splits into strings</td><td>ONA writes one string that BIND refuses.</td><td>m.huber · 2026-10-22</td><td class="num">0</td></tr>
+      <tr><td><b class="mono">kd-3</b></td><td>SRV target without final dot in ONA data, with dot in bembel</td><td>Same name after BIND adds the origin.</td><td>d.klein · 2026-10-27</td><td class="num">0</td></tr>
+    </tbody></table></div>
+  <div class="card-foot"><span>A rule matches by zone, type and a pattern. A new difference never matches an old rule by accident.</span><span class="right"><a class="btn btn-sm" href="#">Add rule…</a></span></div>
+</section>
+</div>
+</div>
+
+</main>
+</div>
+
+<dialog id="help" class="dlg" aria-labelledby="help-t">
+  <header><h2 id="help-t">Keyboard shortcuts</h2><span class="step-n">Esc closes</span></header>
+  <div class="body"><table class="keys">
+    <tr><td><kbd>g</kbd> <kbd>o</kbd></td><td>Overview</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>p</kbd></td><td>Prefixes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>h</kbd></td><td>Hosts</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>z</kbd></td><td>Zones</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>d</kbd></td><td>DHCP scopes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>e</kbd></td><td>Exports</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>r</kbd></td><td>Racks</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>c</kbd></td><td>Change requests</td></tr>
+    <tr><td><kbd>/</kbd></td><td>Jump to an IP, prefix, MAC, host, zone or page</td></tr>
+    <tr><td><kbd>Shift</kbd> <kbd>A</kbd></td><td>Open the assistant</td></tr>
+    <tr><td><kbd>?</kbd></td><td>Help for the element under the pointer, else for this page</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Close a dialog, a menu or a pane</td></tr>
+  </table><p class="muted">No key <a class="gl" href="../../glossary.html#allocate" data-gl="allocate" data-domain="addr">allocates</a>, deletes or <a class="gl" href="../../glossary.html#approve" data-gl="approve" data-domain="access">approves</a>.</p></div>
+  <footer><form method="dialog"><button class="btn">Close</button></form></footer>
+</dialog>
+<script src="../assets/shell.js"></script>
+<script src="../../../assets/glossary-data.js"></script>
+<script src="../../../assets/glossary.js"></script>
+</body>
+</html>

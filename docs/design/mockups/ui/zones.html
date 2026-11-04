@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zones · bembel</title>
+<link rel="stylesheet" href="../assets/bembel.css">
+<link rel="stylesheet" href="../assets/shell.css">
+<link rel="stylesheet" href="../assets/dns.css">
+</head>
+<body data-page="zones">
+<a class="skip" href="#main">Skip to content</a>
+<div class="app">
+<!-- SHELL: top bar. Copy it unchanged to each page; change only aria-current in the sidebar and the VRF in the switcher. -->
+<header class="topbar">
+  <a class="icon-btn nav-toggle" href="#nav" aria-controls="nav" aria-expanded="false" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></a>
+  <a class="brand" href="overview.html" aria-label="bembel: overview"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M12.6 7h6.8M13.6 7v2.6C9.9 11 8.4 13.6 8.4 16.8c0 3.2 1.4 5.7 3.1 7.2h9c1.7-1.5 3.1-4 3.1-7.2 0-3.2-1.5-5.8-5.2-7.2V7M19.4 8.3c4.4-.3 6.9 1.4 6.9 4.4 0 2.3-1.1 3.9-2.5 4.8M9.4 15.6h13.2"/></svg></span><span class="brand-name">bembel</span></a>
+  <details class="set-menu vrf-menu">
+    <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+    <div class="set-pop">
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
+      <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+    </div>
+  </details>
+  <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
+    <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
+  <span class="spacer"></span>
+  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
+  <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
+  <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
+    <div class="more-pop" role="menu">
+      <div class="um-head"><b>Dennis Klein</b><span class="mono">d.klein · id.example.org</span><span class="muted small">groups netops, hpc-ops</span></div>
+      <a href="#" role="menuitem">My access</a><a href="#" role="menuitem">Tokens</a><a href="#" role="menuitem">Sign out</a></div></details>
+  <button class="icon-btn" type="button" data-help aria-label="Help (?)">?</button>
+  <button class="icon-btn" type="button" data-theme-toggle aria-label="Theme: auto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/></svg></button>
+</header>
+<!-- SHELL: sidebar. Groups and icons follow the glossary domains (docs/assets/glossary-data.js). -->
+<nav class="sidebar" id="nav" aria-label="Navigation">
+  <a class="nav-item" href="overview.html" data-key="o"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview<span class="count attn">6</span></a>
+  <div class="nav-label" data-domain="addr"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 1.8h3v3h-3Z M2 11.2h3v3H2Z M11 11.2h3v3h-3Z M8 4.8v3.2 M3.5 11.2V8h9v3.2"/></svg>Addressing</div>
+  <a class="nav-item" data-domain="addr" href="prefixes.html" data-key="p"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v4H4zM4 16h6v4H4zM14 10h6v4h-6z"/><path d="M7 8v8M10 12h4"/></svg>Prefixes</a>
+  <a class="nav-item" data-domain="addr" href="hosts.html" data-key="h"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>Hosts</a>
+  <a class="nav-item" data-domain="addr" href="vlans.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/><path d="M8 3v18"/></svg>VLANs and partitions</a>
+  <a class="nav-item" data-domain="addr" href="fabrics.html" data-key="f"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8M7.5 7.5l9 9"/></svg>Fabrics</a>
+  <a class="nav-item" data-domain="addr" href="routing.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h4a4 4 0 004-4V8"/></svg>Routing and groups</a>
+  <div class="nav-label" data-domain="dns"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 1 0 0 12.4A6.2 6.2 0 0 0 8 1.8Z M1.8 8h12.4 M8 1.8C6 3.8 5.4 5.8 5.4 8S6 12.2 8 14.2 M8 1.8c2 2 2.6 4 2.6 6.2S10 12.2 8 14.2"/></svg>DNS and DHCP</div>
+  <a class="nav-item" data-domain="dns" href="zones.html" data-key="z" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c-2.5 2.6-3.5 5.6-3.5 9s1 6.4 3.5 9M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9"/></svg>Zones</a>
+  <a class="nav-item" data-domain="dhcp" href="dhcp.html" data-key="d"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12l4 5-4 5H3z"/><path d="M7 12h5"/></svg>DHCP scopes</a>
+  <a class="nav-item" data-domain="integ" href="exports.html" data-key="e"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Exports<span class="count attn">1 diff</span></a>
+  <div class="nav-label" data-domain="assets"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 1.8h8.8v12.4H3.6Z M3.6 5h8.8 M3.6 8.2h8.8 M3.6 11.4h8.8 M5.6 3.4h1.2 M5.6 6.6h1.2 M5.6 9.8h1.2"/></svg>Assets</div>
+  <a class="nav-item" data-domain="assets" href="floor.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 3v16M15 5v16"/></svg>Floor map</a>
+  <a class="nav-item" data-domain="assets" href="rack.html" data-key="r"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="1.5"/><path d="M5 8h14M5 13.5h14M8 5.3h2M8 10.8h2M8 16.5h2"/></svg>Racks</a>
+  <a class="nav-item" data-domain="assets" href="sync-review.html"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0114-5.3L20 9M20 12a8 8 0 01-14 5.3L4 15"/><path d="M20 4v5h-5M4 20v-5h5"/></svg>Sync review<span class="count attn">4</span></a>
+  <div class="nav-label" data-domain="access"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 3.6v4.1c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.6Z M5.9 8l1.5 1.5 2.8-3"/></svg>Access</div>
+  <a class="nav-item" data-domain="access" href="bindings.html" data-key="b"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.4c1.8.9 3 2.9 3 5.6"/></svg>Roles and bindings</a>
+  <a class="nav-item" data-domain="access" href="changes.html" data-key="c"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg>Change requests<span class="count attn">2</span></a>
+  <a class="nav-item" data-domain="access" href="audit.html" data-key="a"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Audit log</a>
+  <div class="nav-label" data-domain="integ"><svg class="nav-dom" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h9 M8.6 2.6 11 5 8.6 7.4 M14 11H5 M7.4 8.6 5 11l2.4 2.4"/></svg>Integrations</div>
+  <a class="nav-item" data-domain="integ" href="integrations.html" data-key="i"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0z"/><path d="M12 16v5"/></svg>Sources and syncs</a>
+  <a class="nav-item" data-domain="integ" href="import.html" data-key="m"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6M9 15l2.5 2.5L16 13"/></svg>ONA migration<span class="count attn">214</span></a>
+  <div class="side-foot">bembel v0.1.0 · api v1</div>
+</nav>
+<!-- /SHELL -->
+
+<main class="main" id="main">
+<div class="banner err offline" role="alert"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M2 8.5a15 15 0 0120 0M5 12a10 10 0 0114 0M8.5 15.5a5 5 0 017 0M12 19h.01M3 3l18 18"/></svg>
+  <div class="grow"><b>Offline.</b> <span data-why>The event stream of bembel stopped. The page shows old data.</span> The page tries again every 5 s.</div>
+  <button class="btn btn-sm" type="button" onclick="location.reload()">Reload</button></div>
+
+
+<div class="page-head">
+  <div><h1>Zones</h1>
+    <div class="sub"><span><b>41</b> zones in <b>3</b> views</span><span class="sep">·</span><span>23 forward, 18 reverse</span><span class="sep">·</span><span>14 359 records, 96 % derived from addresses</span><span class="sep">·</span><span>Your access: <a href="#">dns-editor</a> in <span class="scope"><span>zone</span><span>example.org</span></span></span></div></div>
+  <div class="actions">
+    <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
+      <div class="cli-pop"><span class="c"># the same list in the terminal</span>
+bembel zone ls --under example.org --view internal
+bembel zone ls --kind reverse --status problem
+<span class="c"># one zone, as a BIND zone file</span>
+bembel zone show kestrel.example.org --view internal --format zone</div></details>
+    <button class="btn btn-agent" type="button" data-assistant="check-zones" title="Runs the assistant with the advisory check-zones. Tools: read only. It changes nothing.">Check all zones</button>
+    <a class="btn btn-primary" href="#">New zone…</a>
+  </div>
+</div>
+
+<div class="banner warn" role="status"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M12 3 2.5 20h19Z M12 10v4.5M12 17.5h.01"/></svg>
+  <div class="grow"><b>lab.example.org has 5 orphan records.</b> The ONA import found names with no address and no host. A user must keep them as manual records or delete them.</div>
+  <div class="acts"><a class="btn btn-sm" href="import.html">Open findings</a></div></div>
+
+<section class="card zones" aria-labelledby="zl-t">
+  <div class="card-head"><h2 id="zl-t">All zones</h2><span class="right">Updated 18:01 · <a href="exports.html">export state</a></span></div>
+  <div class="toolbar">
+    <label class="search zsearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" name="q" placeholder="Filter by name, prefix, team or server" aria-label="Filter zones"><kbd>f</kbd></label>
+    <div class="chips" role="group" aria-label="Filters">
+      <a class="chip on" href="#" aria-pressed="true">All <span class="n">41</span></a>
+      <a class="chip" href="#">Forward <span class="n">23</span></a>
+      <a class="chip" href="#">Reverse <span class="n">18</span></a>
+      <span class="chip-sep" aria-hidden="true"></span>
+      <a class="chip" href="#"><span class="dot" style="color:var(--d-dns)" aria-hidden="true"></span>internal <span class="n">37</span></a>
+      <a class="chip" href="#"><span class="dot" style="color:var(--d-dns)" aria-hidden="true"></span>external <span class="n">9</span></a>
+      <a class="chip" href="#"><span class="dot" style="color:var(--d-dns)" aria-hidden="true"></span>fabric <span class="n">3</span></a>
+      <span class="chip-sep" aria-hidden="true"></span>
+      <a class="chip" href="#">hpc-ops <span class="n">14</span></a>
+      <a class="chip" href="#">Needs a look <span class="n">1</span></a>
+    </div>
+    <span class="seg" role="group" aria-label="Layout"><button type="button" aria-pressed="true">Tree</button><button type="button">Flat</button></span>
+  </div>
+  <div class="table-wrap"><table class="table zt">
+    <thead><tr><th>Zone</th><th>Views</th><th class="num">Records</th><th>Derived and manual</th><th>Serial</th><th>DNS servers</th><th>Team</th><th>Last export</th><th>Status</th></tr></thead>
+    <tbody>
+<tr class="grp"><th colspan="9" scope="colgroup"><span class="g-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>Forward zones <span class="muted">23</span></th></tr>
+<tr><td class="zn"><div class="zname"><a class="fqdn" href="zone.html">example.org</a><span class="zsub"><span class="src">local</span> 4 child zones</span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">internal</span><span class="dchip" data-domain="dns">external</span></div></td><td class="num">3 412</td><td><div class="mixc"><span class="mix" style="--v:91" aria-hidden="true"></span><span class="mix-t"><b>3 100</b> derived · <b>312</b> manual</span></div></td><td class="mono">2026110412</td><td><div class="chips-s"><span class="tag p">ns1</span><span class="tag">ns2</span><span class="tag">ns3</span></div></td><td>netops</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="qs ok">ok</span></td></tr>
+<tr class="child"><td class="zn"><div class="zname"><span class="tw d1" aria-hidden="true"></span><a class="fqdn" href="zone.html">kestrel.example.org</a><span class="zsub">Hall 2 compute · vrf <b class="mono">global</b></span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">internal</span><span class="dchip" data-domain="dns">external</span></div></td><td class="num">1 846</td><td><div class="mixc"><span class="mix" style="--v:98" aria-hidden="true"></span><span class="mix-t"><b>1 802</b> derived · <b>44</b> manual</span></div></td><td class="mono">2026110417</td><td><div class="chips-s"><span class="tag p">ns1</span><span class="tag">ns2</span><span class="tag">ns3</span></div></td><td>hpc-ops</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="qs ok">ok</span></td></tr>
+<tr class="child"><td class="zn"><div class="zname"><span class="tw d1" aria-hidden="true"></span><a class="fqdn" href="zone.html">osprey.example.org</a><span class="zsub">GPU cluster, RoCEv2</span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">internal</span></div></td><td class="num">612</td><td><div class="mixc"><span class="mix" style="--v:98" aria-hidden="true"></span><span class="mix-t"><b>598</b> derived · <b>14</b> manual</span></div></td><td class="mono">2026110301</td><td><div class="chips-s"><span class="tag p">ns1</span><span class="tag">ns2</span><span class="tag">ns3</span></div></td><td>hpc-ops</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="qs ok">ok</span></td></tr>
+<tr class="child"><td class="zn"><div class="zname"><span class="tw d1" aria-hidden="true"></span><a class="fqdn" href="zone.html">ceph.example.org</a><span class="zsub">storage cluster</span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">internal</span></div></td><td class="num">96</td><td><div class="mixc"><span class="mix" style="--v:94" aria-hidden="true"></span><span class="mix-t"><b>90</b> derived · <b>6</b> manual</span></div></td><td class="mono">2026102805</td><td><div class="chips-s"><span class="tag p">ns1</span><span class="tag">ns2</span><span class="tag">ns3</span></div></td><td>hpc-ops</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="qs ok">ok</span></td></tr>
+<tr class="child"><td class="zn"><div class="zname"><span class="tw d1" aria-hidden="true"></span><a class="fqdn" href="zone.html">oob.example.org</a><span class="zsub">BMC · vrf <b class="mono">oob</b></span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">internal</span></div></td><td class="num">1 204</td><td><div class="mixc"><span class="mix" style="--v:100" aria-hidden="true"></span><span class="mix-t"><b>1 198</b> derived · <b>6</b> manual</span></div></td><td class="mono">2026110401</td><td><div class="chips-s"><span class="tag p">ns1</span><span class="tag">ns2</span></div></td><td>netops</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="qs ok">ok</span></td></tr>
+<tr class="child"><td class="zn"><div class="zname"><span class="tw d1" aria-hidden="true"></span><a class="fqdn" href="zone.html">os.example.org</a><span class="zsub"><span class="src managed">openstack:os-prod</span></span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">internal</span><span class="dchip" data-domain="dns">external</span></div></td><td class="num">2 540</td><td><div class="mixc"><span class="mix" style="--v:100" aria-hidden="true"></span><span class="mix-t"><b>2 538</b> derived · <b>2</b> manual</span></div></td><td class="mono">2026110418</td><td><div class="chips-s"><span class="tag p">ns1</span><span class="tag">ns2</span><span class="tag">ns3</span></div></td><td>openstack</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="qs ok">ok</span></td></tr>
+<tr class="child"><td class="zn"><div class="zname"><span class="tw d1" aria-hidden="true"></span><a class="fqdn" href="zone.html">lab.example.org</a><span class="zsub"><span class="src">ona-import</span> from the import run</span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">internal</span></div></td><td class="num">38</td><td><div class="mixc"><span class="mix" style="--v:0" aria-hidden="true"></span><span class="mix-t"><b>0</b> derived · <b>38</b> manual</span></div></td><td class="mono">2026102001</td><td><div class="chips-s"><span class="tag p">ns1</span></div></td><td>netops</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="pill st-warn">5 orphans</span></td></tr>
+<tr class="grp"><th colspan="9" scope="colgroup"><span class="g-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></span>Reverse zones <span class="muted">18 · computed from subnets</span></th></tr>
+<tr><td class="zn"><div class="zname"><a class="fqdn" href="zone.html">20.10.in-addr.arpa</a><span class="zsub"><a class="pfx" href="prefix.html">10.20.0.0<span class="len">/16</span></a> Hall 2 HPC</span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">internal</span></div></td><td class="num">2 118</td><td><div class="mixc"><span class="mix" style="--v:100" aria-hidden="true"></span><span class="mix-t"><b>2 118</b> derived · <b>0</b> manual</span></div></td><td class="mono">2026110417</td><td><div class="chips-s"><span class="tag p">ns1</span><span class="tag">ns2</span><span class="tag">ns3</span></div></td><td>hpc-ops</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="qs ok">ok</span></td></tr>
+<tr><td class="zn"><div class="zname"><a class="fqdn" href="zone.html">30.10.in-addr.arpa</a><span class="zsub"><a class="pfx" href="prefix.html">10.30.0.0<span class="len">/16</span></a> OpenStack</span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">internal</span></div></td><td class="num">1 302</td><td><div class="mixc"><span class="mix" style="--v:100" aria-hidden="true"></span><span class="mix-t"><b>1 302</b> derived · <b>0</b> manual</span></div></td><td class="mono">2026110415</td><td><div class="chips-s"><span class="tag p">ns1</span><span class="tag">ns2</span><span class="tag">ns3</span></div></td><td>openstack</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="qs ok">ok</span></td></tr>
+<tr><td class="zn"><div class="zname"><a class="fqdn" href="zone.html">100.10.in-addr.arpa</a><span class="zsub"><a class="pfx" href="prefix.html">10.100.0.0<span class="len">/16</span></a> · vrf <b class="mono">hpc-fabric</b></span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">fabric</span></div></td><td class="num">884</td><td><div class="mixc"><span class="mix" style="--v:100" aria-hidden="true"></span><span class="mix-t"><b>884</b> derived · <b>0</b> manual</span></div></td><td class="mono">2026110209</td><td><div class="chips-s"><span class="tag p">ns1</span><span class="tag">ns2</span></div></td><td>hpc-ops</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="qs ok">ok</span></td></tr>
+<tr><td class="zn"><div class="zname"><a class="fqdn" href="zone.html">4.172.in-addr.arpa</a><span class="zsub"><a class="pfx" href="prefix.html">172.16.4.0<span class="len">/22</span></a> · vrf <b class="mono">oob</b></span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">internal</span></div></td><td class="num">1 138</td><td><div class="mixc"><span class="mix" style="--v:100" aria-hidden="true"></span><span class="mix-t"><b>1 138</b> derived · <b>0</b> manual</span></div></td><td class="mono">2026110401</td><td><div class="chips-s"><span class="tag p">ns1</span><span class="tag">ns2</span></div></td><td>netops</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="qs ok">ok</span></td></tr>
+<tr><td class="zn"><div class="zname"><a class="fqdn" href="zone.html">100.51.198.in-addr.arpa</a><span class="zsub"><a class="pfx" href="prefix.html">198.51.100.0<span class="len">/24</span></a> public</span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">external</span></div></td><td class="num">14</td><td><div class="mixc"><span class="mix" style="--v:86" aria-hidden="true"></span><span class="mix-t"><b>12</b> derived · <b>2</b> manual</span></div></td><td class="mono">2026101404</td><td><div class="chips-s"><span class="tag p">ns1</span><span class="tag">ns2</span><span class="tag">ns3</span></div></td><td>netops</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="qs ok">ok</span></td></tr>
+<tr class="child"><td class="zn"><div class="zname"><span class="tw d1" aria-hidden="true"></span><a class="fqdn" href="zones.html">128-255.100.51.198.in-addr.arpa</a><span class="zsub">classless child, 198.51.100.128/25</span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">external</span></div></td><td class="num">4</td><td><div class="mixc"><span class="mix" style="--v:100" aria-hidden="true"></span><span class="mix-t"><b>4</b> derived · <b>0</b> manual</span></div></td><td class="mono">2026101404</td><td><div class="chips-s"><span class="tag p">ns1</span></div></td><td>netops</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="pill st-info">RFC 2317</span></td></tr>
+<tr><td class="zn"><div class="zname"><a class="fqdn" href="zone.html">4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa</a><span class="zsub"><a class="pfx" href="prefix.html">2001:db8:4200:204::<span class="len">/64</span></a> dual stack</span></div></td><td><div class="chips-s"><span class="dchip" data-domain="dns">internal</span></div></td><td class="num">612</td><td><div class="mixc"><span class="mix" style="--v:100" aria-hidden="true"></span><span class="mix-t"><b>612</b> derived · <b>0</b> manual</span></div></td><td class="mono">2026110417</td><td><div class="chips-s"><span class="tag p">ns1</span><span class="tag">ns2</span><span class="tag">ns3</span></div></td><td>hpc-ops</td><td class="exp">17:58 <span class="id" title="sha256:7c41e0">b-7c41e0</span></td><td><span class="qs ok">ok</span></td></tr>
+    </tbody></table></div>
+  <details class="fold-rest"><summary class="rest"><b>26 more zones</b> <span class="muted">all current: 9 forward, 11 reverse, 6 classless children</span></summary>
+    <div class="rest-body">Open the list with the filter "All". The tree shows 15 of 41 zones at first.</div></details>
+  <div class="card-foot"><span>41 zones · 14 359 records · 38 manual-only names in <span class="mono">lab.example.org</span></span>
+    <span class="right"><span class="legend"><span><i class="lg-d"></i>derived from addresses</span><span><i class="lg-m"></i>manual</span></span></span></div>
+</section>
+
+<section class="card" aria-labelledby="sv-t">
+  <div class="card-head"><h2 id="sv-t">DNS servers and views</h2><span class="right"><a href="exports.html">Delivery targets</a></span></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Server</th><th>Role</th><th>Views it serves</th><th class="num">Zones</th><th>Serial of kestrel.example.org</th><th>Last pull</th></tr></thead>
+    <tbody>
+      <tr><td><b class="mono">ns1.example.org</b></td><td><span class="tag p">primary</span> BIND 9.20</td><td><span class="dchip" data-domain="dns">internal</span><span class="dchip" data-domain="dns">external</span><span class="dchip" data-domain="dns">fabric</span></td><td class="num">41</td><td class="mono">2026110417</td><td>17:58 · <span class="qs ok">current</span></td></tr>
+      <tr><td><b class="mono">ns2.example.org</b></td><td><span class="tag">secondary</span> BIND 9.20</td><td><span class="dchip" data-domain="dns">internal</span><span class="dchip" data-domain="dns">external</span><span class="dchip" data-domain="dns">fabric</span></td><td class="num">41</td><td class="mono">2026110417</td><td>17:58 · <span class="qs ok">current</span></td></tr>
+      <tr><td><b class="mono">ns3.example.org</b></td><td><span class="tag">secondary</span> BIND 9.20</td><td><span class="dchip" data-domain="dns">internal</span><span class="dchip" data-domain="dns">external</span></td><td class="num">38</td><td class="mono">2026110417</td><td>17:58 · <span class="qs ok">current</span></td></tr>
+    </tbody></table></div>
+</section>
+
+</main>
+</div>
+
+<dialog id="help" class="dlg" aria-labelledby="help-t">
+  <header><h2 id="help-t">Keyboard shortcuts</h2><span class="step-n">Esc closes</span></header>
+  <div class="body"><table class="keys">
+    <tr><td><kbd>g</kbd> <kbd>o</kbd></td><td>Overview</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>p</kbd></td><td>Prefixes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>h</kbd></td><td>Hosts</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>z</kbd></td><td>Zones</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>d</kbd></td><td>DHCP scopes</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>e</kbd></td><td>Exports</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>r</kbd></td><td>Racks</td></tr>
+    <tr><td><kbd>g</kbd> <kbd>c</kbd></td><td>Change requests</td></tr>
+    <tr><td><kbd>/</kbd></td><td>Jump to an IP, prefix, MAC, host, zone or page</td></tr>
+    <tr><td><kbd>Shift</kbd> <kbd>A</kbd></td><td>Open the assistant</td></tr>
+    <tr><td><kbd>?</kbd></td><td>Help for the element under the pointer, else for this page</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Close a dialog, a menu or a pane</td></tr>
+  </table><p class="muted">No key <a class="gl" href="../../glossary.html#allocate" data-gl="allocate" data-domain="addr">allocates</a>, deletes or <a class="gl" href="../../glossary.html#approve" data-gl="approve" data-domain="access">approves</a>.</p></div>
+  <footer><form method="dialog"><button class="btn">Close</button></form></footer>
+</dialog>
+<script src="../assets/shell.js"></script>
+<script src="../../../assets/glossary-data.js"></script>
+<script src="../../../assets/glossary.js"></script>
+</body>
+</html>
