@@ -17,18 +17,18 @@
   <details class="set-menu vrf-menu">
     <summary class="set-switch" aria-label="Switch VRF"><span class="vrf-k">VRF</span>global<svg viewBox="0 0 24 24" class="caret" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
     <div class="set-pop">
-      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · RD 65010:1</span></a>
+      <a href="overview.html" aria-current="page"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>global</b><span class="qs">412 prefixes</span><span class="path">campus routing domain · default table</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>hpc-fabric</b><span class="qs">38 prefixes</span><span class="path">cluster internal, InfiniBand and RoCEv2</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>oob</b><span class="qs">61 prefixes</span><span class="path">BMC and management</span></a>
       <a href="#"><span class="dot" style="color:var(--d-addr)" aria-hidden="true"></span><b>os-provider</b><span class="qs">24 prefixes</span><span class="path">OpenStack provider networks</span></a>
-      <hr><a href="#"><span></span><span>All VRFs</span><kbd>g v</kbd></a>
+      <hr><a href="#"><span></span><span>All VRFs</span><kbd>v</kbd></a>
     </div>
   </details>
   <label class="jump"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr-only">Jump to</span>
     <input type="search" name="q" placeholder="Jump to an IP, prefix, MAC, host, zone or page" autocomplete="off"><kbd>/</kbd></label>
   <span class="spacer"></span>
-  <a class="cr-chip" href="#" title="2 change requests wait for an approver with your scope. 1 is yours.">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">2<span class="w"> to approve</span></span></a>
+  <a class="cr-chip" href="#" title="1 change request waits for your approval. 1 more is yours and needs another approver.">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5.5c0 4.4-3.2 8.1-8 9.5-4.8-1.4-8-5.1-8-9.5V6Z"/><path d="m8.8 12 2.2 2.2 4.4-4.4"/></svg><span class="n">1<span class="w"> to approve</span></span></a>
   <button class="btn btn-sm asst-btn" type="button" data-assistant aria-label="Assistant (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.9 4.6 2.6 6.4 8.2 8.2-5.6 1.8-7.3 3.6-8.2 8.2-.9-4.6-2.6-6.4-8.2-8.2C9.4 8.9 11.1 7.1 12 2.5Z"/></svg><span class="w">Assistant</span></button>
   <span class="live" role="status" title="Live updates"><span class="dot" aria-hidden="true"></span><span class="t">offline</span></span>
   <details class="more user-menu"><summary class="who" aria-label="Account d.klein">d.klein</summary>
@@ -77,9 +77,9 @@
     <div class="sub"><span>Requested by <b class="mono">a.berger</b> today 17:41</span><span class="sep">·</span><span>Action <code>prefix:delete</code></span><span class="sep">·</span><span>Expires in 6 d 23 h</span></div></div>
   <div class="actions">
     <details class="cli-toggle"><summary class="btn btn-ghost" aria-label="CLI commands of this page">CLI</summary>
-      <div class="cli-pop">bembel changes show cr-0042
-bembel changes approve cr-0042 --comment "Checked with facility."
-bembel changes reject cr-0042 --comment "Keep the plan."</div></details>
+      <div class="cli-pop">bembel change show cr-0042
+bembel change approve cr-0042 --comment "Checked with facility."
+bembel change reject cr-0042 --comment "Keep the plan."</div></details>
     <button class="btn btn-agent" type="button" data-assistant="review-change" title="Runs the assistant with the advisory review-change. Tools: read only. It changes nothing.">Review with assistant</button>
   </div>
 </div>
@@ -98,7 +98,7 @@ bembel changes reject cr-0042 --comment "Keep the plan."</div></details>
     <div class="tr gone l2" role="treeitem" aria-level="2"><span class="mk">−</span><span class="pfx">10.20.18.0<span class="len">/23</span></span><span class="nm">row-c-storage</span><span class="pill st-pending">planned</span><span class="meter-t">0 addresses</span></div>
     <div class="tr keep" role="treeitem" aria-level="1"><span class="mk">·</span><span class="pfx">10.20.12.0<span class="len">/24</span></span><span class="nm">ceph-public</span><span class="muted small">stays</span></div>
   </div>
-  <div class="card-foot"><span>The change request holds the operation <code>DELETE /v1/prefixes/pfx-01JC3F7Q?recursive=true</code>. bembel runs it with the identity of <span class="mono">a.berger</span> and records you as approver.</span></div>
+  <div class="card-foot"><span>The change request holds the operation <code>DELETE /v1/prefixes/0197c0de-0016-7a00-8000-000000201600?recursive=true</code>. On approve, bembel first checks again that <span class="mono">a.berger</span> still has <code>prefix:delete</code> here (binding <span class="id">b-0010</span>). Then it runs the operation with the identity of <span class="mono">a.berger</span> and records you as approver. If the rights of a.berger or the prefixes changed, the request fails and nothing changes.</span></div>
 </section>
 
 <section class="card" id="impact" aria-labelledby="imp-t">
@@ -142,7 +142,7 @@ bembel changes reject cr-0042 --comment "Keep the plan."</div></details>
     <p class="v"><b>Low risk. I found nothing that speaks against <a class="gl" href="../../glossary.html#approve" data-gl="approve" data-domain="access">approval</a>.</b></p>
     <ul class="why-list">
       <li>The 4 prefixes are <span class="pill st-pending">planned</span> and hold 0 addresses. No host, VLAN or route points at them.</li>
-      <li>The audit log shows no allocation in them since they were created on 2026-03-02.</li>
+      <li>The audit log shows no allocation in them since they were created.</li>
       <li>One note: <span class="pfx">10.20.16.0<span class="len">/22</span></span> is the only planned block in Hall 2. A later subnet there needs a new plan.</li>
     </ul>
     <p class="model">qwen3-coder-30b on llm.example.org · local · 4 tool calls · you decide</p>
@@ -161,10 +161,10 @@ bembel changes reject cr-0042 --comment "Keep the plan."</div></details>
   <div class="card-body"><dl class="kv">
     <dt>Id</dt><dd><span class="mono">cr-0042</span></dd>
     <dt>Held by</dt><dd>rule <code>prefix.delete-with-children</code></dd>
-    <dt>Requester</dt><dd>a.berger <span class="id">b-0004</span></dd>
+    <dt>Requester</dt><dd>a.berger <span class="id" title="planner in prefix 10.20.16.0/22">b-0010</span></dd>
     <dt>Approvers</dt><dd>d.klein, m.huber (2 <a class="gl" href="../../glossary.html#subject" data-gl="subject" data-domain="access">subjects</a> can <a class="gl" href="../../glossary.html#approve" data-gl="approve" data-domain="access">approve</a>)</dd>
     <dt>State</dt><dd>pending, expires 2026-11-11 17:41</dd>
-    <dt>API</dt><dd><code>POST /v1/changes/cr-0042:approve</code></dd></dl></div>
+    <dt>API</dt><dd><code>POST /v1/change-requests/cr-0042:approve</code></dd></dl></div>
 </section>
 </aside>
 </div>
