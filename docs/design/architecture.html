@@ -9,11 +9,11 @@
 <h1>Architecture and stack</h1>
 <p class="lede">bembel is one Go binary with an embedded web UI, and one PostgreSQL 18 database. Agents on the DNS, DHCP and InfiniBand servers pull signed export bundles. Integrations use the same public API as the web UI. This chapter describes the parts and gives the reasons for each technology choice.</p>
 <ul class="keypoints">
-<li>The OpenAPI 3.1 document <code>api/openapi.yaml</code> is the contract. The server stubs and all clients are generated from it.</li>
+<li>The OpenAPI 3.1 document <code>api/openapi.yaml</code> is the contract. The server stubs and all clients are generated from it. Today it is a sketch that grows with each chapter (<a href="api.html#openapi">REST API</a>).</li>
 <li>Go, not Rust: one language for the server, the CLI, the Kubernetes controllers, the Cluster API provider and the external-dns webhook. PostgreSQL does the heavy IP work, so the speed of Rust buys little.</li>
 <li>PostgreSQL 18 enforces the model: <code>inet</code> and <code>cidr</code>, GiST exclusion against overlaps, <code>ltree</code>, <code>uuidv7()</code>, pgvector.</li>
 <li>SvelteKit with Svelte 5, built to static files and embedded in the binary. No Node.js at run time.</li>
-<li>The server is stateless. Three or more replicas run behind one service. Workers coordinate through PostgreSQL locks.</li>
+<li>The server is stateless. Three or more replicas run behind one service. Workers coordinate through PostgreSQL locks and lease rows.</li>
 <li>mise pins all tools. <code>mise run</code> is the only entry point for builds, tests and docs.</li>
 </ul>
 
@@ -67,7 +67,7 @@
 <thead><tr><th>Component</th><th>Form</th><th>Task</th></tr></thead>
 <tbody>
 <tr><td><code>bembel serve</code></td><td>Go binary, container image, .deb, .rpm</td><td>REST API, OIDC login (BFF), embedded web UI, event stream, workers.</td></tr>
-<tr><td><code>bembel</code> CLI</td><td>same binary</td><td>Client commands (<code>bembel prefix list</code>, <code>bembel allocate</code>), <code>bembel migrate</code>, <code>bembel import ona</code>, <code>bembel help</code>.</td></tr>
+<tr><td><code>bembel</code> CLI</td><td>same binary</td><td>Client commands (<code>bembel prefix ls</code>, <code>bembel address allocate</code>), <code>bembel migrate</code>, <code>bembel import ona</code>, <code>bembel help</code>.</td></tr>
 <tr><td><code>bembel-agent</code></td><td>small Go binary, systemd unit</td><td>Pulls export bundles, checks the signature, runs <code>named-checkconf</code> or <code>dhcpd -t</code>, installs, reloads, reports. On a libvirt hypervisor it also reports VMs (<a href="vms.html#agent">vms.html#agent</a>).</td></tr>
 <tr><td><code>networking-bembel</code></td><td>Python package</td><td>Neutron IPAM driver. Neutron loads Python entry points, so this part is Python. It calls only the REST API (<a href="openstack.html#driver">openstack.html#driver</a>).</td></tr>
 <tr><td><code>bembel-k8s</code></td><td>Go, controller-runtime</td><td>Cluster API IPAM provider, LB pool sync, external-dns webhook (<a href="kubernetes.html">kubernetes.html</a>).</td></tr>
@@ -117,7 +117,7 @@
 <p>The decision is Go 1.27. Rust is a good choice too, and nothing blocks it. The main libraries:</p>
 <dl class="facts">
 <dt>HTTP and API</dt><dd><code>net/http</code> ServeMux, ogen handlers, RFC 9457 problem details for errors.</dd>
-<dt>Database</dt><dd>pgx v5 (pool, <code>LISTEN</code>), sqlc for queries, goose for migrations (embedded in the binary).</dd>
+<dt>Database</dt><dd>pgx v5 (pool through PgBouncer; one direct connection per pod for <code>LISTEN</code>), sqlc for queries, goose for migrations (embedded in the binary, run on the direct connection).</dd>
 <dt>Identity</dt><dd><code>coreos/go-oidc</code> v3 and <code>golang.org/x/oauth2</code>.</dd>
 <dt>IP</dt><dd><code>net/netip</code>, <code>go4.org/netipx</code>.</dd>
 <dt>Logs, metrics, traces</dt><dd><code>log/slog</code> JSON, <code>prometheus/client_golang</code>, OpenTelemetry SDK.</dd>
@@ -135,8 +135,8 @@
 <tr><td><code>uuidv7()</code> (new in 18)</td><td>Ids that sort by time and keep B-tree locality.</td></tr>
 <tr><td><code>ltree</code></td><td>DNS names (labels reversed) and location paths for subtree scopes.</td></tr>
 <tr><td><code>tstzrange</code>, <code>WITHOUT OVERLAPS</code> (new in 18)</td><td>History tables with valid ranges.</td></tr>
-<tr><td><code>FOR UPDATE SKIP LOCKED</code>, advisory locks</td><td>Work queues for the workers, one worker per job across replicas.</td></tr>
-<tr><td><code>LISTEN</code> / <code>NOTIFY</code></td><td>A wake-up signal for the outbox worker. The outbox table holds the data.</td></tr>
+<tr><td><code>FOR UPDATE SKIP LOCKED</code>, transaction advisory locks, lease rows</td><td>Work queues for the workers, one worker per job across replicas (<a href="operations.html#workers">Operations</a>).</td></tr>
+<tr><td><code>LISTEN</code> / <code>NOTIFY</code></td><td>A wake-up signal for the outbox stamper and delivery, and for the binding cache. Each pod holds one direct connection for <code>LISTEN</code>, outside the PgBouncer pool. The outbox table holds the data.</td></tr>
 <tr><td><code>tsvector</code>, <code>pg_trgm</code></td><td>Full-text and fuzzy name search.</td></tr>
 <tr><td>pgvector</td><td>Embeddings for the hybrid search and the assistant (<a href="assistant.html#embeddings">assistant.html#embeddings</a>).</td></tr>
 </tbody>
@@ -147,11 +147,11 @@
 </aside>
 
 <h2 id="frontend">Frontend: SvelteKit</h2>
-<p>The web UI is SvelteKit 3 with Svelte 5 runes, TypeScript and <code>adapter-static</code>. The build output goes into the Go binary with <code>go:embed</code>. The server serves the files and the API on one origin, so the browser needs no CORS and the session cookie is <code>SameSite=Strict</code>.</p>
+<p>The web UI is SvelteKit 3 with Svelte 5 runes, TypeScript and <code>adapter-static</code>. The build output goes into the Go binary with <code>go:embed</code>. The server serves the files and the API on one origin, so the browser needs no CORS, and the session cookie is <code>SameSite=Lax</code>, with the <code>X-Bembel-Csrf</code> header and an Origin check on write calls (see <a href="access.html#login">Access control</a>).</p>
 <ul>
 <li>API calls: <code>openapi-fetch</code> with types from <code>openapi-typescript</code>.</li>
 <li>Tables: TanStack Table (sort, filter, virtual rows for 40 000 hosts).</li>
-<li>Live updates: the event stream (<code>/v1/events</code>, server-sent events) refreshes open lists.</li>
+<li>Live updates: the event stream (<code>/v1/events/stream</code>, server-sent events) refreshes open lists.</li>
 <li>Help texts: the same embedded files as <code>bembel help</code> (<a href="assistant.html#help">assistant.html#help</a>).</li>
 <li>Tests: Vitest for logic, Playwright for end-to-end flows and screenshots.</li>
 </ul>
@@ -192,7 +192,7 @@ run = "node tools/site/shots.mjs"</code></pre>
 <rect class="box-accent" x="240" y="56" width="150" height="48" rx="8"/><text class="t-small t-on" x="252" y="78">bembel pod 1</text><text class="t-small t-on" x="252" y="94">zone a</text>
 <rect class="box-accent" x="240" y="116" width="150" height="48" rx="8"/><text class="t-small t-on" x="252" y="138">bembel pod 2</text><text class="t-small t-on" x="252" y="154">zone b</text>
 <rect class="box-accent" x="240" y="176" width="150" height="48" rx="8"/><text class="t-small t-on" x="252" y="198">bembel pod 3</text><text class="t-small t-on" x="252" y="214">zone c</text>
-<rect class="box-soft" x="240" y="236" width="150" height="34" rx="8"/><text class="t-small" x="252" y="258">migrate Job (pre-upgrade)</text>
+<rect class="box-soft" x="240" y="236" width="150" height="34" rx="8"/><text class="t-small" x="252" y="258">migrate Job (Helm hook)</text>
 <rect class="box" x="450" y="56" width="200" height="48" rx="8"/><text class="t-small" x="462" y="78">CloudNativePG primary</text><text class="t-small t-muted" x="462" y="94">PostgreSQL 18 + pgvector</text>
 <rect class="box" x="450" y="116" width="200" height="48" rx="8"/><text class="t-small" x="462" y="138">sync replica</text><text class="t-small t-muted" x="462" y="154">quorum commit</text>
 <rect class="box" x="450" y="176" width="200" height="48" rx="8"/><text class="t-small" x="462" y="198">async replica</text><text class="t-small t-muted" x="462" y="214">read pool</text>
@@ -226,7 +226,7 @@ run = "node tools/site/shots.mjs"</code></pre>
 <tr><td>Addresses</td><td>about 55 000</td><td>1 000 000</td><td>GiST and B-tree indexes per VRF.</td></tr>
 <tr><td>DNS records</td><td>62 000</td><td>1 000 000</td><td>Export bundles build incrementally per zone.</td></tr>
 <tr><td>API writes</td><td>a few per minute</td><td>50 per second (CI, Neutron)</td><td>One lock per parent prefix; no global lock.</td></tr>
-<tr><td>Allocation latency</td><td>n/a</td><td>p99 &lt; 50 ms</td><td>Metric <code>bembel_allocate_duration_seconds</code>.</td></tr>
+<tr><td>Allocation latency</td><td>n/a</td><td>p99 &lt; 50 ms at 50 writes/s</td><td>Metric <code>bembel_allocation_duration_seconds</code>.</td></tr>
 </tbody>
 </table>
 

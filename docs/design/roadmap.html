@@ -18,70 +18,84 @@
 
 <h2 id="timeline">Timeline</h2>
 <figure class="diagram wide">
-<svg viewBox="0 0 900 380" role="img" aria-labelledby="tl-t">
+<svg viewBox="0 0 900 428" role="img" aria-labelledby="tl-t">
 <title id="tl-t">Timeline of bembel: v1 in six milestones, then v1.1 and v2</title>
-<rect class="zone" x="12" y="12" width="876" height="176" rx="12"/>
+<rect class="zone" x="12" y="12" width="876" height="228" rx="12"/>
 <text class="t-title" x="28" y="38">v1: replace OpenNetAdmin</text>
-<rect class="box" x="28" y="56" width="132" height="110" rx="8"/>
+<rect class="box" x="28" y="56" width="132" height="166" rx="8"/>
 <text class="t-title" x="40" y="80">M1</text>
-<text class="t-small" x="40" y="100">Core model</text>
-<text class="t-small" x="40" y="118">schema, constraints</text>
-<text class="t-small" x="40" y="136">allocate, REST API</text>
-<text class="t-small t-muted" x="40" y="154">OpenAPI contract</text>
-<rect class="box" x="168" y="56" width="132" height="110" rx="8"/>
+<text class="t-small" x="40" y="98">Core model</text>
+<text class="t-small" x="40" y="114">schema, constraints</text>
+<text class="t-small" x="40" y="130">allocate, REST API</text>
+<text class="t-small" x="40" y="146">fabrics, IB</text>
+<text class="t-small" x="40" y="162">partitions, GUIDs</text>
+<text class="t-small t-muted" x="40" y="178">OpenAPI contract</text>
+<rect class="box" x="168" y="56" width="132" height="166" rx="8"/>
 <text class="t-title" x="180" y="80">M2</text>
-<text class="t-small" x="180" y="100">Access and UI</text>
-<text class="t-small" x="180" y="118">OIDC, roles, audit</text>
-<text class="t-small" x="180" y="136">web UI, CLI</text>
-<text class="t-small t-muted" x="180" y="154">help system</text>
-<rect class="box" x="308" y="56" width="132" height="110" rx="8"/>
+<text class="t-small" x="180" y="98">Access and UI</text>
+<text class="t-small" x="180" y="114">OIDC, roles, audit</text>
+<text class="t-small" x="180" y="130">web UI, CLI</text>
+<text class="t-small t-muted" x="180" y="146">help system</text>
+<rect class="box" x="308" y="56" width="132" height="166" rx="8"/>
 <text class="t-title" x="320" y="80">M3</text>
-<text class="t-small" x="320" y="100">Exports</text>
-<text class="t-small" x="320" y="118">BIND, dhcpd</text>
-<text class="t-small" x="320" y="136">OpenSM, checks</text>
-<text class="t-small t-muted" x="320" y="154">pull delivery</text>
-<rect class="box-warn" x="448" y="56" width="132" height="110" rx="8"/>
+<text class="t-small" x="320" y="98">Exports, operations</text>
+<text class="t-small" x="320" y="114">BIND, dhcpd, OpenSM</text>
+<text class="t-small" x="320" y="130">checks, Helm chart</text>
+<text class="t-small" x="320" y="146">HA, CloudNativePG</text>
+<text class="t-small" x="320" y="162">backup and PITR</text>
+<text class="t-small" x="320" y="178">metrics, alerts</text>
+<text class="t-small t-muted" x="320" y="194">pull delivery,</text>
+<text class="t-small t-muted" x="320" y="210">JSON logs</text>
+<rect class="box-warn" x="448" y="56" width="132" height="166" rx="8"/>
 <text class="t-title" x="460" y="80">M4</text>
-<text class="t-small" x="460" y="100">ONA import</text>
-<text class="t-small" x="460" y="118">findings, parallel</text>
-<text class="t-small" x="460" y="136">run, nightly diff</text>
-<text class="t-small t-muted" x="460" y="154">cutover</text>
-<rect class="box" x="588" y="56" width="132" height="110" rx="8"/>
+<text class="t-small" x="460" y="98">ONA import</text>
+<text class="t-small" x="460" y="114">findings, parallel</text>
+<text class="t-small" x="460" y="130">run, nightly diff</text>
+<text class="t-small t-muted" x="460" y="146">cutover</text>
+<rect class="box" x="588" y="56" width="132" height="166" rx="8"/>
 <text class="t-title" x="600" y="80">M5</text>
 <text class="t-small" x="600" y="98">FNT mirror</text>
-<text class="t-small" x="600" y="116">libvirt agent</text>
-<text class="t-small" x="600" y="134">assistant (read)</text>
-<text class="t-small t-muted" x="600" y="152">fabrics, routing</text>
-<rect class="box-accent" x="728" y="56" width="148" height="110" rx="8"/>
+<text class="t-small" x="600" y="114">libvirt agent</text>
+<text class="t-small" x="600" y="130">assistant (read)</text>
+<text class="t-small t-muted" x="600" y="146">routing</text>
+<rect class="box-accent" x="728" y="56" width="148" height="166" rx="8"/>
 <text class="t-title t-on" x="740" y="80">M6 = v1</text>
-<text class="t-small t-on" x="740" y="100">Helm chart, HA</text>
-<text class="t-small t-on" x="740" y="118">metrics, logs</text>
-<text class="t-small t-on" x="740" y="136">backup, signing</text>
-<text class="t-small t-on" x="740" y="154">release</text>
-<path class="edge" d="M160,111 L164,111" marker-end="url(#arrow)"/>
-<path class="edge" d="M300,111 L304,111" marker-end="url(#arrow)"/>
-<path class="edge" d="M440,111 L444,111" marker-end="url(#arrow)"/>
-<path class="edge" d="M580,111 L584,111" marker-end="url(#arrow)"/>
-<path class="edge" d="M720,111 L724,111" marker-end="url(#arrow)"/>
-<rect class="zone" x="12" y="204" width="426" height="164" rx="12"/>
-<text class="t-title" x="28" y="230">v1.1: integrations that read, plus Kea</text>
-<text class="t-small" x="28" y="256">Cluster API IPAM provider</text>
-<text class="t-small" x="28" y="276">Terraform and OpenTofu provider</text>
-<text class="t-small" x="28" y="296">load-balancer pool sync (MetalLB, Cilium)</text>
-<text class="t-small" x="28" y="316">OpenStack read-only sync</text>
-<text class="t-small" x="28" y="336">Kea export, DNS catalog zones, address group feeds</text>
-<rect class="zone" x="462" y="204" width="426" height="164" rx="12"/>
-<text class="t-title" x="478" y="230">v2: integrations that write, and policy</text>
-<text class="t-small" x="478" y="256">Neutron IPAM driver (networking-bembel)</text>
-<text class="t-small" x="478" y="276">external-dns webhook provider</text>
-<text class="t-small" x="478" y="296">RFC 2136 and PowerDNS delivery</text>
-<text class="t-small" x="478" y="316">deny rules with Cedar</text>
-<text class="t-small" x="478" y="336">NetBox exchange (only if needed)</text>
-<path class="edge-accent" d="M802,166 L802,184 L225,184 L225,200" marker-end="url(#arrow-accent)"/>
-<path class="edge" d="M438,286 L458,286" marker-end="url(#arrow)"/>
+<text class="t-small t-on" x="740" y="98">dashboard, traces</text>
+<text class="t-small t-on" x="740" y="114">packages</text>
+<text class="t-small t-on" x="740" y="130">SBOM, signing</text>
+<text class="t-small t-on" x="740" y="146">release</text>
+<path class="edge" d="M160,139 L164,139" marker-end="url(#arrow)"/>
+<path class="edge" d="M300,139 L304,139" marker-end="url(#arrow)"/>
+<path class="edge" d="M440,139 L444,139" marker-end="url(#arrow)"/>
+<path class="edge" d="M580,139 L584,139" marker-end="url(#arrow)"/>
+<path class="edge" d="M720,139 L724,139" marker-end="url(#arrow)"/>
+<rect class="zone" x="12" y="252" width="426" height="164" rx="12"/>
+<text class="t-title" x="28" y="278">v1.1: integrations that read, plus Kea</text>
+<text class="t-small" x="28" y="304">Cluster API IPAM provider</text>
+<text class="t-small" x="28" y="324">Terraform and OpenTofu provider</text>
+<text class="t-small" x="28" y="344">load-balancer pool sync (MetalLB, Cilium)</text>
+<text class="t-small" x="28" y="364">OpenStack read-only sync</text>
+<text class="t-small" x="28" y="384">Kea export, DNS catalog zones, address group feeds</text>
+<rect class="zone" x="462" y="252" width="426" height="164" rx="12"/>
+<text class="t-title" x="478" y="278">v2: integrations that write, and policy</text>
+<text class="t-small" x="478" y="304">Neutron IPAM driver (networking-bembel)</text>
+<text class="t-small" x="478" y="324">external-dns webhook provider</text>
+<text class="t-small" x="478" y="344">RFC 2136 and PowerDNS delivery</text>
+<text class="t-small" x="478" y="364">deny rules with Cedar</text>
+<text class="t-small" x="478" y="384">NetBox exchange (only if needed)</text>
+<path class="edge-accent" d="M802,222 L802,232 L225,232 L225,248" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M438,334 L458,334" marker-end="url(#arrow)"/>
 </svg>
-<figcaption>The release path. M4 is the milestone that ends OpenNetAdmin. M6 is the first public release.</figcaption>
+<figcaption>The release path. M4 is the milestone that ends OpenNetAdmin. The operational baseline is in M3, so the cutover runs on a tested HA setup with backup and alerts. M6 is the first public release.</figcaption>
 </figure>
+<h3 id="m4-entry">Entry criteria of the M4 cutover</h3>
+<p>The cutover from ONA starts only when these criteria hold. They come from the v1 exit criteria, but they must hold before the cutover, not only at the release.</p>
+<ol class="steps">
+  <li><strong>HA works.</strong> First check the placement: one bembel pod and one PostgreSQL instance per zone. Then the kill tests of one pod, one zone and the PostgreSQL primary pass (<a href="operations.html#ha">Operations</a>).</li>
+  <li><strong>Restore works.</strong> One point-in-time restore drill into a new cluster passes (<a href="operations.html#restore">Operations</a>).</li>
+  <li><strong>Alerts are tested.</strong> The alerts <code>BembelReplicasLow</code>, <code>BembelExportStale</code>, <code>BembelExportNotPulled</code> and <code>BembelOutboxLag</code> have passing promtool tests (<a href="operations.html#alerts">Operations</a>).</li>
+</ol>
+<p>The CloudNativePG image contains pgvector from M3, so the first production cluster needs no image change later.</p>
 
 <h2 id="v1">v1</h2>
 <p>v1 is complete when the organisation can switch off OpenNetAdmin and run its network from bembel. The scope below is the whole v1. A feature that is not in the list is not in v1.</p>
@@ -107,9 +121,9 @@
 <thead><tr><th>Criterion</th><th>Measure</th></tr></thead>
 <tbody>
 <tr><td>Parallel run is clean</td><td>The BIND and dhcpd exports of ONA and bembel differ only in explained items, for 14 nights in a row.</td></tr>
-<tr><td>Import is complete</td><td>The import run of ~41 000 hosts, 1 900 subnets and 62 000 records finishes. All findings (214 in the test run <code>imp-20261104-0912</code>) have a state: fixed, accepted or open with an owner.</td></tr>
-<tr><td>Allocation is correct</td><td>A test with 200 concurrent callers on one subnet gives no duplicate address, and a retry with the same key gives the same address. The p95 latency is under 50 ms.</td></tr>
-<tr><td>HA works</td><td>Killing one pod, one zone and the PostgreSQL primary each causes no failed write after 60 seconds. A rolling upgrade has no failed request.</td></tr>
+<tr><td>Import is complete</td><td>The import run of ~41 000 hosts, 1 900 subnets and 62 000 records finishes. All findings (214 in the test run <code>imp-20261104-0912</code>) have a state: closed, accepted or open with an owner.</td></tr>
+<tr><td>Allocation is correct</td><td>A test with 200 concurrent callers on one subnet gives no duplicate address, and a retry with the same key gives the same address. p99 of <code>bembel_allocation_duration_seconds</code> is under 50 ms at the design load of 50 writes/s (a separate load test).</td></tr>
+<tr><td>HA works</td><td>First check the placement: one bembel pod and one PostgreSQL instance per zone. Then killing one pod, one zone and the PostgreSQL primary each causes no failed write after 60 seconds. A rolling upgrade has no failed request. These tests already pass before the M4 cutover (<a href="#m4-entry">entry criteria</a>).</td></tr>
 <tr><td>Restore works</td><td>A restore into a new cluster, with point in time, passes in the monthly drill.</td></tr>
 <tr><td>Access is verified</td><td>The permission tests for every role and scope pass. No endpoint is open without a check (a test lists all routes).</td></tr>
 <tr><td>Exports are safe</td><td>No export is published when its check fails (<code>named-checkzone</code>, <code>named-checkconf</code>, <code>dhcpd -t</code>). The servers keep the last good file.</td></tr>
@@ -120,7 +134,7 @@
 </table>
 <div class="callout why">
 <p class="callout-title">Why the cutover is in the middle</p>
-<p>The parallel run needs the exports (M3) and the import (M4), and nothing else. It starts as early as possible and lasts for weeks. So the later milestones (FNT, agent, assistant, HA) develop while the real data already flows through bembel. Problems in the model show up when the change is still cheap.</p>
+<p>The parallel run needs the exports (M3) and the import (M4), and nothing else. It starts as early as possible and lasts for weeks. So the later milestones (FNT, agent, assistant, routing) develop while the real data already flows through bembel. Problems in the model show up when the change is still cheap. The cutover itself also needs HA, backup and alerts, so these come in M3 with the exports, not at the end.</p>
 </div>
 
 <h2 id="v1-1">v1.1</h2>
@@ -128,9 +142,9 @@
 <table>
 <thead><tr><th>Item</th><th>Scope</th><th>Exit criteria</th></tr></thead>
 <tbody>
-<tr><td>Cluster API IPAM provider</td><td>Controller (controller-runtime) for <code>IPAddressClaim</code> and <code>IPAddress</code> with a pool kind that points to a bembel subnet. One claim in bembel per <code>IPAddressClaim</code>, confirmed when the address is bound.</td><td>A test cluster creates and deletes 50 machines. No leaked address after the reaper time. A controller restart creates no duplicate. (<a href="kubernetes.html#capi">Kubernetes</a>)</td></tr>
+<tr><td>Cluster API IPAM provider</td><td>Controller (controller-runtime) for <code>IPAddressClaim</code> and <code>IPAddress</code> with a pool kind that points to a bembel subnet. One allocated bembel address per <code>IPAddressClaim</code>, found again by <code>external_ref</code> (namespace/name).</td><td>A test cluster creates and deletes 50 machines. No leaked address after the release grace time. A controller restart creates no duplicate. (<a href="kubernetes.html#capi">Kubernetes</a>)</td></tr>
 <tr><td>Terraform and OpenTofu provider</td><td>Generated base from OpenAPI. Resources: prefix, next-free address, host, record, VRF.</td><td>A plan with no change after apply. An allocation resource keeps its address on re-apply.</td></tr>
-<tr><td>Load-balancer pool sync</td><td>Controller that writes MetalLB and Cilium pools from a bembel prefix, with an owner label and a drift report.</td><td>Edit of a pool by hand is reverted and shown as drift.</td></tr>
+<tr><td>Load-balancer pool sync</td><td>Controller that reserves <code>lb-pool</code> ranges in a bembel subnet and writes MetalLB and Cilium pools from them, with an owner label and a drift report.</td><td>Edit of a pool by hand is reverted and shown as drift.</td></tr>
 <tr><td>OpenStack read-only sync</td><td>Poll Neutron networks, subnets, ports and floating IPs, and Ironic ports. Keystone project to team mapping. Objects have <code>source=openstack:&lt;cloud&gt;</code>.</td><td>The sync runs against the production cloud for 2 weeks. The report of differences is understood. (<a href="openstack.html#sync">OpenStack</a>)</td></tr>
 <tr><td>Kea export</td><td><code>bembel export kea</code> writes Kea DHCPv4/v6 JSON (subnets, pools, reservations, options). A check with <code>kea-dhcp4 -t</code>. A comparison with the output of <code>keama</code>.</td><td>One test scope runs on Kea. The normalised sets of subnets, pools and reservations equal the dhcpd export. (<a href="dhcp.html#kea">DHCP</a>)</td></tr>
 <tr><td>Catalog zones</td><td>BIND catalog zone (RFC 9432) so that secondary servers add zones themselves.</td><td>ns3 gets a new zone without a config change on ns3.</td></tr>
@@ -143,7 +157,7 @@
 <table>
 <thead><tr><th>Item</th><th>Scope</th><th>Exit criteria</th></tr></thead>
 <tbody>
-<tr><td>Neutron IPAM driver</td><td>Python package <code>networking-bembel</code>. It claims and confirms through the REST API with idempotency. Keystone project to team mapping stays.</td><td>The Neutron test suite for the IPAM interface passes. A bembel outage makes Neutron fail the request cleanly and leak nothing. (<a href="openstack.html#driver">OpenStack</a>)</td></tr>
+<tr><td>Neutron IPAM driver</td><td>Python package <code>networking-bembel</code>. It claims through the REST API with idempotency. The sync confirms. Keystone project to team mapping stays.</td><td>The Neutron test suite for the IPAM interface passes. A bembel outage makes Neutron fail the request cleanly and leak nothing. (<a href="openstack.html#driver">OpenStack</a>)</td></tr>
 <tr><td>external-dns webhook provider</td><td>A webhook provider so that external-dns writes <code>manual records</code> for Services and Ingresses into owned zones.</td><td>Records of one cluster appear and disappear with the Service. Ownership by <code>managed_by</code> stops a clash with humans.</td></tr>
 <tr><td>RFC 2136 and PowerDNS delivery</td><td>Dynamic update push to BIND, and the PowerDNS API as a delivery target, besides the pull export.</td><td>A change shows on the server in under 10 seconds. A failed push is retried and reported. (<a href="dns.html#delivery">DNS</a>)</td></tr>
 <tr><td>Deny rules with Cedar</td><td>Optional deny policies on top of the allow-only bindings. Policy test tool.</td><td>The evaluation of lists still uses the SQL filter. A policy change can be tried in a dry run on the audit log.</td></tr>
@@ -162,9 +176,9 @@
 <tr><td><strong>ISC dhcpd end of life.</strong></td><td>ISC has ended the development of ISC DHCP (since 2022). v1 exports dhcpd because ONA does and because the parallel run needs the same format. When does the organisation move its servers to Kea? The answer sets the date of the Kea export and the end of the dhcpd export.</td><td>Plan of v1.1</td></tr>
 <tr><td><strong>LLM model choice.</strong></td><td>The examples use <code>gpt-oss-20b</code> or <code>qwen3-coder-30b</code> for chat and <code>bge-m3</code> or <code>nomic-embed-text</code> for embeddings, on <code>llm.example.org</code>. The choice depends on the GPU of the host, the quality of tool calls and the language of the users. An evaluation set of 50 questions about the story data decides. Embedding model changes need a full re-embed.</td><td>M5</td></tr>
 <tr><td><strong>NetBox exchange need.</strong></td><td>No team uses NetBox today. If a partner site or a tool (a NetBox-based automation) needs the model, the exchange moves up. If not, it stays out.</td><td>Plan of v2</td></tr>
-<tr><td><strong>IPv6 SLAAC policy.</strong></td><td>bembel only observes SLAAC and EUI-64 addresses. Open: how long does an observed address stay after the last report, does it count in utilisation, and does a privacy address (RFC 8981) create a host entry? The default proposal: keep for 30 days, count by the number, ignore privacy addresses.</td><td>M3 (fabrics) and M5 (agent)</td></tr>
+<tr><td><strong>IPv6 SLAAC policy.</strong></td><td>bembel only observes SLAAC and EUI-64 addresses. Open: how long does an observed address stay after the last report, does it count in utilisation, and does a privacy address (RFC 8981) create a host entry? The default proposal: keep for 30 days, count by the number, ignore privacy addresses.</td><td>M1 (fabrics) and M5 (agent)</td></tr>
 <tr><td><strong>Level trigger.</strong></td><td>The exclusion constraint on prefixes uses a computed level (<a href="allocation.html#level">Allocation</a>). The trigger and its cost on 10<sup>5</sup> prefixes need a prototype.</td><td>M1</td></tr>
-<tr><td><strong>pgvector in CloudNativePG.</strong></td><td>How the extension gets into the image (own image, or an extension image volume) depends on the operator version. Verify on the target cluster.</td><td>M6</td></tr>
+<tr><td><strong>pgvector in CloudNativePG.</strong></td><td>How the extension gets into the image (own image, or an extension image volume) depends on the operator version. Verify on the target cluster. The first production cluster in M3 already needs it.</td><td>M3</td></tr>
 <tr><td><strong>Rack numbering.</strong></td><td>Does FNT number U from the bottom or the top for each rack, and does it differ by rack? The model has a field per rack. Verify with the tenant export.</td><td>M5</td></tr>
 </tbody>
 </table>
