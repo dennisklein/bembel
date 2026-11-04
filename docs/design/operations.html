@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deployment and operations</title>
+<meta name="description" content="How bembel runs: a highly available Helm deployment on Kubernetes with CloudNativePG, packages for VMs, configuration, backup, Prometheus metrics, Loki-compatible logs, traces, upgrades and security.">
+</head>
+<body>
+<h1>Deployment and operations</h1>
+<p class="lede">This chapter specifies how an admin runs bembel: the Helm chart for a highly available deployment on Kubernetes, the packages for plain VMs, the configuration, the backup, the metrics, logs and traces, the upgrade path and the security settings.</p>
+<ul class="keypoints">
+  <li>One static binary and one container image. The API server is stateless: at least 3 replicas behind a Service.</li>
+  <li>Background workers run in the same binary in every replica. They coordinate with PostgreSQL locks and <code>SKIP LOCKED</code>. No leader election service is needed.</li>
+  <li>PostgreSQL 18 with the extension pgvector. The recommended HA setup is a CloudNativePG cluster with 3 instances, a synchronous replica and point-in-time recovery to S3.</li>
+  <li>Migrations run as a Helm pre-upgrade Job. They follow expand and contract, so old and new pods run together.</li>
+  <li>Prometheus metrics on port 9090, JSON logs on stdout that Loki accepts, optional OpenTelemetry traces. The chart ships a ServiceMonitor, a PrometheusRule and a Grafana dashboard.</li>
+  <li>Plain Debian and RPM packages with a systemd unit exist for sites without Kubernetes.</li>
+</ul>
+
+<h2 id="deploy">Deployment</h2>
+<p>Three forms exist. They run the same binary. The chart is the main form.</p>
+<table>
+<thead><tr><th>Form</th><th>For</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Helm chart <code>bembel</code> (OCI, signed)</td><td>Kubernetes (the organisation's clusters)</td><td>HA by default. Needs a PostgreSQL: a CloudNativePG <code>Cluster</code> that the chart can create, or an external one.</td></tr>
+<tr><td>Container image <code>ghcr.io/dennisklein/bembel</code></td><td>Compose, Nomad, other</td><td>Distroless, non-root, read-only root file system. Same flags and environment as the chart.</td></tr>
+<tr><td>Packages <code>bembel_&lt;v&gt;_amd64.deb</code>, <code>.rpm</code></td><td>VMs and bare metal</td><td>The package installs <code>/usr/bin/bembel</code>, <code>/etc/bembel/bembel.yaml</code> and the unit <code>bembel.service</code>. For HA, run 2 or 3 hosts behind a load balancer and share one PostgreSQL.</td></tr>
+</tbody>
+</table>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 520" role="img" aria-labelledby="tp-t">
+<title id="tp-t">Kubernetes deployment topology: ingress, three bembel pods in three zones, a CloudNativePG cluster with three instances, S3 backup, and the monitoring stack</title>
+<rect class="zone" x="12" y="12" width="640" height="496" rx="12"/>
+<text class="t-small t-muted" x="26" y="32">namespace bembel</text>
+<rect class="box-muted" x="30" y="50" width="150" height="56" rx="8"/>
+<text class="t-title" x="105" y="74" text-anchor="middle">Ingress</text>
+<text class="t-small t-muted" x="105" y="94" text-anchor="middle">TLS, bembel.example.org</text>
+<rect class="box" x="230" y="50" width="150" height="56" rx="8"/>
+<text class="t-title" x="305" y="74" text-anchor="middle">Service bembel</text>
+<text class="t-small t-muted" x="305" y="94" text-anchor="middle">:8443 api, :9090 metrics</text>
+<path class="edge" d="M180,78 L226,78" marker-end="url(#arrow)"/>
+<rect class="box-accent" x="30" y="150" width="190" height="86" rx="8"/>
+<text class="t-title t-on" x="125" y="176" text-anchor="middle">bembel-0 (zone a)</text>
+<text class="t-small t-on" x="125" y="196" text-anchor="middle">api + workers</text>
+<text class="t-small t-on" x="125" y="214" text-anchor="middle">/livez /readyz</text>
+<rect class="box-accent" x="235" y="150" width="190" height="86" rx="8"/>
+<text class="t-title t-on" x="330" y="176" text-anchor="middle">bembel-1 (zone b)</text>
+<text class="t-small t-on" x="330" y="196" text-anchor="middle">api + workers</text>
+<text class="t-small t-on" x="330" y="214" text-anchor="middle">/livez /readyz</text>
+<rect class="box-accent" x="440" y="150" width="190" height="86" rx="8"/>
+<text class="t-title t-on" x="535" y="176" text-anchor="middle">bembel-2 (zone c)</text>
+<text class="t-small t-on" x="535" y="196" text-anchor="middle">api + workers</text>
+<text class="t-small t-on" x="535" y="214" text-anchor="middle">/livez /readyz</text>
+<path class="edge" d="M305,106 L305,128 L125,128 L125,146" marker-end="url(#arrow)"/>
+<path class="edge" d="M305,106 L305,146" marker-end="url(#arrow)"/>
+<path class="edge" d="M305,106 L305,128 L535,128 L535,146" marker-end="url(#arrow)"/>
+<rect class="box-warn" x="440" y="50" width="190" height="56" rx="8"/>
+<text class="t-title" x="535" y="74" text-anchor="middle">Job migrate (hook)</text>
+<text class="t-small t-muted" x="535" y="94" text-anchor="middle">pre-upgrade, bembel migrate up</text>
+<rect class="zone" x="30" y="290" width="440" height="200" rx="12"/>
+<text class="t-small t-muted" x="44" y="310">CloudNativePG Cluster bembel-db (3 instances)</text>
+<rect class="box-ok" x="46" y="326" width="120" height="70" rx="8"/>
+<text class="t-title" x="106" y="352" text-anchor="middle">primary</text>
+<text class="t-small t-muted" x="106" y="372" text-anchor="middle">bembel-db-1</text>
+<text class="t-small t-muted" x="106" y="388" text-anchor="middle">rw service</text>
+<rect class="box" x="176" y="326" width="120" height="70" rx="8"/>
+<text class="t-title" x="236" y="352" text-anchor="middle">sync replica</text>
+<text class="t-small t-muted" x="236" y="372" text-anchor="middle">bembel-db-2</text>
+<text class="t-small t-muted" x="236" y="388" text-anchor="middle">RPO 0</text>
+<rect class="box" x="306" y="326" width="148" height="70" rx="8"/>
+<text class="t-title" x="380" y="352" text-anchor="middle">replica</text>
+<text class="t-small t-muted" x="380" y="372" text-anchor="middle">bembel-db-3</text>
+<text class="t-small t-muted" x="380" y="388" text-anchor="middle">ro service (reports)</text>
+<path class="edge-ok" d="M166,361 L172,361" marker-end="url(#arrow)"/>
+<path class="edge-ok" d="M296,361 L302,361" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="46" y="424">WAL streaming, synchronous: any 1</text>
+<text class="t-small t-muted" x="46" y="444">pgvector in the image, extensions: btree_gist, ltree, pg_trgm</text>
+<text class="t-small t-muted" x="46" y="464">pgbouncer pooler (transaction mode) in front of rw</text>
+<path class="edge" d="M330,236 L330,262 L106,262 L106,322" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="210" y="256">SQL (pgx pool)</text>
+<rect class="box-muted" x="680" y="50" width="208" height="56" rx="8"/>
+<text class="t-title" x="784" y="74" text-anchor="middle">S3 bucket</text>
+<text class="t-small t-muted" x="784" y="94" text-anchor="middle">barman-cloud: base + WAL</text>
+<path class="edge-muted" d="M470,340 L520,340 L520,270 L660,270 L660,78 L676,78" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="540" y="262">archive (PITR)</text>
+<rect class="box-info" x="680" y="150" width="208" height="150" rx="8"/>
+<text class="t-title" x="696" y="176">Monitoring</text>
+<text class="t-small" x="696" y="198">Prometheus: ServiceMonitor</text>
+<text class="t-small" x="696" y="218">Alertmanager: PrometheusRule</text>
+<text class="t-small" x="696" y="238">Alloy → Loki: JSON logs</text>
+<text class="t-small" x="696" y="258">Tempo: OTLP traces</text>
+<text class="t-small" x="696" y="278">Grafana: dashboard</text>
+<path class="edge-muted" d="M630,193 L676,193" marker-end="url(#arrow-muted)"/>
+<rect class="box-muted" x="680" y="340" width="208" height="150" rx="8"/>
+<text class="t-title" x="696" y="366">Outside the cluster</text>
+<text class="t-small" x="696" y="388">Keycloak id.example.org</text>
+<text class="t-small" x="696" y="408">llm.example.org (chat, embed)</text>
+<text class="t-small" x="696" y="428">FNT Command (REST)</text>
+<text class="t-small" x="696" y="448">ns1..3, dhcp1..2, hv-01..06</text>
+<text class="t-small t-muted" x="696" y="474">reach the Ingress or are called</text>
+<path class="edge-muted" d="M630,230 L650,230 L650,350 L676,350" marker-end="url(#arrow-muted)"/>
+</svg>
+<figcaption>The bembel deployment on Kubernetes. The three pods spread over three zones. The migration Job is a Helm hook.</figcaption>
+</figure>
+
+<h3 id="chart">Helm chart</h3>
+<pre><code class="language-yaml"># values.yaml (excerpt)
+replicaCount: 3
+image:
+  repository: ghcr.io/dennisklein/bembel
+  tag: ""                       # default: chart appVersion
+ingress:
+  enabled: true
+  className: nginx
+  host: bembel.example.org
+  tls:
+    secretName: bembel-tls     # issued by cert-manager
+podDisruptionBudget:
+  minAvailable: 2
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector: { matchLabels: { app.kubernetes.io/name: bembel } }
+resources:
+  requests: { cpu: 250m, memory: 256Mi }
+  limits:   { memory: 512Mi }
+config:                          # becomes /etc/bembel/bembel.yaml (see Configuration)
+  public_url: https://bembel.example.org
+postgresql:
+  mode: cnpg                     # cnpg | external
+  cnpg:
+    instances: 3
+    storage: { size: 50Gi, storageClass: fast-ssd }
+  external:
+    existingSecret: bembel-db   # key: url
+metrics:
+  serviceMonitor: { enabled: true, interval: 30s }
+  prometheusRule: { enabled: true }
+  grafanaDashboard: { enabled: true }   # ConfigMap with the label grafana_dashboard=1</code></pre>
+<table>
+<thead><tr><th>Object</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>Deployment bembel</code></td><td>3 or more replicas, rolling update with <code>maxUnavailable: 0</code>, <code>maxSurge: 1</code></td></tr>
+<tr><td><code>Service bembel</code></td><td>Ports 8443 (API, UI) and 9090 (metrics)</td></tr>
+<tr><td><code>Ingress</code></td><td>TLS at the edge. A <code>Gateway</code> API route is an option.</td></tr>
+<tr><td><code>PodDisruptionBudget</code></td><td><code>minAvailable: 2</code>. A node drain never takes more than one replica.</td></tr>
+<tr><td><code>Job bembel-migrate</code></td><td>Helm <code>pre-install,pre-upgrade</code> hook</td></tr>
+<tr><td><code>Cluster bembel-db</code>, <code>Pooler</code>, <code>ScheduledBackup</code></td><td>CloudNativePG objects (when <code>mode: cnpg</code>)</td></tr>
+<tr><td><code>NetworkPolicy</code></td><td>Ingress only from the ingress controller and Prometheus. Egress to PostgreSQL, Keycloak, the LLM host and FNT Command.</td></tr>
+<tr><td><code>ServiceMonitor</code>, <code>PrometheusRule</code>, <code>ConfigMap</code> (dashboard)</td><td>See <a href="#observability">Observability</a></td></tr>
+<tr><td><code>ServiceAccount</code>, <code>Role</code></td><td>Only for the optional <code>Lease</code> (singleton jobs). No other API rights.</td></tr>
+</tbody>
+</table>
+<h3 id="packages">Packages</h3>
+<pre><code class="language-bash"># Debian
+apt install ./bembel_1.0.0_amd64.deb
+sudoedit /etc/bembel/bembel.yaml
+systemctl enable --now bembel-migrate.service bembel.service
+
+# the unit (excerpt)
+[Service]
+User=bembel
+ExecStartPre=/usr/bin/bembel migrate up --config /etc/bembel/bembel.yaml
+ExecStart=/usr/bin/bembel serve --config /etc/bembel/bembel.yaml
+Restart=on-failure
+NoNewPrivileges=yes
+ProtectSystem=strict
+StateDirectory=bembel</code></pre>
+<p>The package for the hypervisors is a separate one: <code>bembel-agent</code> (<a href="vms.html#agent">Virtual machines</a>). The apt and RPM repositories are signed with the release key.</p>
+
+<h2 id="config">Configuration</h2>
+<p>bembel reads one YAML file. The order of precedence is: command line flags, environment variables, the file, the defaults. A secret never sits in the file. It sits in a file that the file names (<code>*_file</code>), or in an environment variable.</p>
+<pre><code class="language-yaml"># /etc/bembel/bembel.yaml
+public_url: https://bembel.example.org
+listen: ":8443"
+metrics_listen: ":9090"
+
+db:
+  url_file: /run/secrets/db-url        # postgres://bembel@bembel-db-rw/bembel?sslmode=verify-full
+  max_conns: 20
+  min_conns: 4
+  statement_timeout: 15s
+
+oidc:
+  session:
+    cookie_secret_file: /run/secrets/session-key
+  issuers:
+    - name: keycloak
+      url: https://id.example.org/realms/main
+      client_id: bembel
+      client_secret_file: /run/secrets/oidc-secret
+      groups_claim: groups
+      audience: bembel
+    - name: k8s-kestrel                 # service accounts of a cluster (machines only)
+      url: https://kubernetes.default.svc
+      audience: bembel
+      ca_file: /etc/bembel/k8s-ca.pem
+
+allocation:
+  default_claim_ttl: 10m
+  max_claim_ttl: 1h
+  deprecated_grace: 168h               # 7 days
+
+llm:
+  enabled: true
+  base_url: https://llm.example.org/v1  # OpenAI-compatible
+  chat_model: gpt-oss-20b
+  embedding_model: bge-m3
+  api_key_file: /run/secrets/llm-key
+  request_timeout: 60s
+  max_tool_calls: 8
+
+exports:
+  bind:
+    enabled: true
+    targets:
+      - { name: ns1, role: primary,   views: [internal, external] }
+      - { name: ns2, role: secondary, views: [internal, external] }
+  dhcpd:
+    enabled: true
+    targets:
+      - { name: dhcp-a, primary: dhcp1.example.org, secondary: dhcp2.example.org }
+  pull_tokens_file: /run/secrets/export-tokens   # one token per target
+
+agents:
+  auth: oidc-client-credentials         # or: mtls
+  mtls:
+    client_ca_file: /etc/bembel/agent-ca.pem
+
+sources:
+  fnt: { enabled: true, config_file: /etc/bembel/fnt.yaml }
+
+limits:
+  rate_per_subject: 50                  # requests per second
+  rate_allocate_per_subject: 10
+  rate_per_ip_anonymous: 20
+  max_body_bytes: 4194304
+
+logging: { level: info, format: json }
+tracing:
+  otlp_endpoint: tempo.monitoring:4317  # empty: off
+  sample_ratio: 0.05
+metrics:
+  prefix_utilisation: opt-in            # none | opt-in | all</code></pre>
+<h3 id="env">Environment variables</h3>
+<p>Each key maps to a variable with the prefix <code>BEMBEL_</code>. Dots become underscores, upper case. A suffix <code>_FILE</code> reads the value from a file.</p>
+<table>
+<thead><tr><th>Variable</th><th>Key</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td><code>BEMBEL_PUBLIC_URL</code></td><td><code>public_url</code></td><td><code>https://bembel.example.org</code></td></tr>
+<tr><td><code>BEMBEL_DB_URL</code>, <code>BEMBEL_DB_URL_FILE</code></td><td><code>db.url</code>, <code>db.url_file</code></td><td><code>postgres://…</code></td></tr>
+<tr><td><code>BEMBEL_OIDC_SESSION_COOKIE_SECRET_FILE</code></td><td><code>oidc.session.cookie_secret_file</code></td><td><code>/run/secrets/session-key</code></td></tr>
+<tr><td><code>BEMBEL_LLM_ENABLED</code></td><td><code>llm.enabled</code></td><td><code>false</code> (turns the assistant off)</td></tr>
+<tr><td><code>BEMBEL_LOGGING_LEVEL</code></td><td><code>logging.level</code></td><td><code>debug</code></td></tr>
+<tr><td><code>BEMBEL_TRACING_OTLP_ENDPOINT</code></td><td><code>tracing.otlp_endpoint</code></td><td><code>tempo.monitoring:4317</code></td></tr>
+<tr><td><code>BEMBEL_CONFIG</code></td><td>flag <code>--config</code></td><td><code>/etc/bembel/bembel.yaml</code></td></tr>
+</tbody>
+</table>
+<p>List keys (issuers, targets) can be set only in the file. <code>bembel config check</code> loads the file, tests the database, the issuers' discovery URLs and the LLM endpoint, and prints the problems. The chart runs it in an init container. A change in the ConfigMap needs a rolling restart: the chart adds a checksum annotation to the pods.</p>
+
+<h2 id="ha">High availability</h2>
+<h3 id="stateless">The API is stateless</h3>
+<p>A request touches only PostgreSQL. The pods keep no session data: the UI session is an encrypted cookie, and the OIDC key sets (JWKS) are caches that each pod fills itself. So any pod can answer any request, and a pod can die at any time.</p>
+<table>
+<thead><tr><th>Probe</th><th>Path</th><th>Passes when</th></tr></thead>
+<tbody>
+<tr><td>liveness</td><td><code>/livez</code></td><td>The process answers. It does not check the database, because a database outage must not restart all pods.</td></tr>
+<tr><td>readiness</td><td><code>/readyz</code></td><td>The pool can run <code>SELECT 1</code> in 500 ms and the schema version is inside the range that this binary supports.</td></tr>
+<tr><td>startup</td><td><code>/livez</code></td><td>Up to 60 seconds for the first start.</td></tr>
+</tbody>
+</table>
+<p>On <code>SIGTERM</code> a pod fails <code>/readyz</code> at once, waits 5 seconds for the endpoints to drain, finishes running requests (up to 30 seconds), and then stops its workers.</p>
+<h3 id="workers">Workers</h3>
+<p>Each pod runs the API and the background workers. No pod is the leader. A worker takes one unit of work with a lock that PostgreSQL holds, so two pods do not do the same work.</p>
+<table>
+<thead><tr><th>Worker</th><th>Work unit</th><th>Mechanism</th><th>Interval</th></tr></thead>
+<tbody>
+<tr><td>reaper (claims, grace, keys)</td><td>500 rows</td><td><code>FOR UPDATE SKIP LOCKED</code> (<a href="allocation.html#reaper">Allocation</a>)</td><td>60 s</td></tr>
+<tr><td>outbox delivery (webhooks, SSE, Loki stream)</td><td>a batch of events per sink</td><td><code>SKIP LOCKED</code> on <code>event_outbox</code>, wake-up by <code>LISTEN/NOTIFY</code></td><td>at once, poll 5 s</td></tr>
+<tr><td>export build (BIND, dhcpd, OpenSM)</td><td>one target</td><td>advisory lock <code>pg_try_advisory_xact_lock(hash('export', target))</code></td><td>on change, at most every 30 s</td></tr>
+<tr><td>sync (FNT, later OpenStack)</td><td>one source</td><td>advisory lock for the source (<a href="assets.html#sync-rules">Assets</a>)</td><td>15 min, nightly</td></tr>
+<tr><td>embedding indexer</td><td>50 objects</td><td><code>SKIP LOCKED</code> on the queue table</td><td>at once, poll 10 s</td></tr>
+<tr><td>usage recount, history compaction</td><td>one table</td><td>advisory lock</td><td>nightly</td></tr>
+<tr><td>singleton jobs (optional)</td><td>a job that must not overlap in time</td><td>Kubernetes <code>Lease</code> in addition to the advisory lock</td><td>by job</td></tr>
+</tbody>
+</table>
+<div class="callout why">
+<p class="callout-title">Why PostgreSQL locks and not a leader election</p>
+<p>The database is already the one shared part. A lock in it ends with the transaction or the connection, so a crashed pod frees it at once. A leader election service is one more thing that can fail. The <code>Lease</code> is only for jobs that need strict single-run behaviour across the whole cluster, and then it adds to the advisory lock, not replaces it.</p>
+</div>
+<p>An advisory lock is a <em>transaction</em> lock (<code>pg_try_advisory_xact_lock</code>). The workers use pgx and the pooler in transaction mode, where a session lock would stay on a connection that another client uses.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 330" role="img" aria-labelledby="fl-t">
+<title id="fl-t">Data flows and agent flows of bembel: users, services, agents and exports</title>
+<rect class="box-muted" x="20" y="30" width="200" height="60" rx="8"/>
+<text class="t-title" x="36" y="56">Browser and CLI</text>
+<text class="t-small t-muted" x="36" y="76">OIDC login, PAT</text>
+<rect class="box-muted" x="20" y="110" width="200" height="60" rx="8"/>
+<text class="t-title" x="36" y="136">Services</text>
+<text class="t-small t-muted" x="36" y="156">CAPI, Neutron, Terraform, CI</text>
+<rect class="box-muted" x="20" y="190" width="200" height="60" rx="8"/>
+<text class="t-title" x="36" y="216">bembel-agent</text>
+<text class="t-small t-muted" x="36" y="236">hv-01..06, observed VMs</text>
+<rect class="box-accent" x="330" y="90" width="210" height="130" rx="8"/>
+<text class="t-title t-on" x="435" y="120" text-anchor="middle">bembel API</text>
+<text class="t-small t-on" x="435" y="142" text-anchor="middle">3 pods + workers</text>
+<text class="t-small t-on" x="435" y="162" text-anchor="middle">authorise, audit, event</text>
+<text class="t-small t-on" x="435" y="182" text-anchor="middle">export build</text>
+<text class="t-small t-on" x="435" y="202" text-anchor="middle">sync</text>
+<rect class="box" x="650" y="30" width="230" height="52" rx="8"/>
+<text class="t-title" x="666" y="52">ns1, ns2, ns3</text>
+<text class="t-small t-muted" x="666" y="70">pull zones (HTTPS, ETag)</text>
+<rect class="box" x="650" y="96" width="230" height="52" rx="8"/>
+<text class="t-title" x="666" y="118">dhcp1, dhcp2</text>
+<text class="t-small t-muted" x="666" y="136">pull dhcpd.conf</text>
+<rect class="box" x="650" y="162" width="230" height="52" rx="8"/>
+<text class="t-title" x="666" y="184">FNT Command</text>
+<text class="t-small t-muted" x="666" y="202">read by the sync worker</text>
+<rect class="box" x="650" y="228" width="230" height="52" rx="8"/>
+<text class="t-title" x="666" y="250">llm.example.org</text>
+<text class="t-small t-muted" x="666" y="268">chat and embeddings</text>
+<path class="edge" d="M220,60 L260,60 L260,115 L326,115" marker-end="url(#arrow)"/>
+<path class="edge" d="M220,140 L326,140" marker-end="url(#arrow)"/>
+<path class="edge" d="M220,220 L260,220 L260,185 L326,185" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="226" y="206">push</text>
+<path class="edge" d="M650,56 L610,56 L610,110 L544,110" marker-end="url(#arrow)"/>
+<path class="edge" d="M650,122 L620,122 L620,135 L544,135" marker-end="url(#arrow)"/>
+<path class="edge-muted" d="M544,185 L598,185 L646,188" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M544,205 L598,205 L598,254 L646,254" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="20" y="300">Arrows show the side that opens the connection. DNS and DHCP servers pull. The agent and the services push. No bembel connection goes to the servers.</text>
+</svg>
+<figcaption>Who opens which connection. All traffic to bembel is HTTPS to the API. Only the sync worker and the assistant call out.</figcaption>
+</figure>
+<h3 id="rollout">Rollout and zones</h3>
+<ul>
+  <li><code>RollingUpdate</code> with <code>maxUnavailable: 0</code>: a new pod must be ready before an old pod stops.</li>
+  <li>The topology spread keeps one pod per zone. If a zone fails, the other two pods carry the load (each pod is sized for 50 % of the peak).</li>
+  <li>A pod needs about 100 MB for 10<sup>5</sup> objects in its caches. Memory use stays flat, because lists are paged in PostgreSQL and not held in memory.</li>
+  <li>The connection pool of a pod is 20, so 3 pods use 60 of the default 100 PostgreSQL connections. With the pooler this is not a problem. For a site with more pods, the pooler is mandatory.</li>
+</ul>
+
+<h2 id="backup">Backup and restore</h2>
+<p>PostgreSQL is the only state. Exports, the UI and the help are built from it. A backup of the database is a backup of bembel.</p>
+<pre><code class="language-yaml"># CloudNativePG (verify the API version against the installed operator)
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: bembel-db
+spec:
+  instances: 3
+  imageName: ghcr.io/dennisklein/bembel-postgres:18   # PostgreSQL 18 with pgvector
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+  storage: { size: 50Gi, storageClass: fast-ssd }
+  affinity:
+    topologyKey: topology.kubernetes.io/zone
+  bootstrap:
+    initdb: { database: bembel, owner: bembel }
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters: { barmanObjectName: bembel-s3 }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: bembel-daily
+spec:
+  schedule: "0 0 1 * * *"          # 01:00, six-field cron of CNPG
+  cluster: { name: bembel-db }
+  method: plugin
+  pluginConfiguration: { name: barman-cloud.cloudnative-pg.io }</code></pre>
+<table>
+<thead><tr><th>Item</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Base backup</td><td>Daily at 01:00, kept 30 days (object store lifecycle)</td></tr>
+<tr><td>WAL archive</td><td>Continuous. The recovery point after a total loss is the last archived WAL: usually under 1 minute.</td></tr>
+<tr><td>RPO after a node failure</td><td>0 (synchronous replica: <code>any 1</code>)</td></tr>
+<tr><td>RTO after a primary failure</td><td>Under 1 minute (operator promotes the replica). Pods reconnect through the <code>-rw</code> service.</td></tr>
+<tr><td>RTO after a total loss</td><td>Restore from S3 into a new cluster. It depends on the database size. For 10 GB it is minutes.</td></tr>
+</tbody>
+</table>
+<p>The pgvector index and the other indexes are in the backup. The embeddings can be rebuilt from the objects if a restore is old. <code>bembel embeddings rebuild</code> does that.</p>
+<h3 id="restore">Restore</h3>
+<pre><code class="language-yaml"># a new cluster at a point in time (for example before a bad bulk change)
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: bembel-db-restore
+spec:
+  instances: 1
+  bootstrap:
+    recovery:
+      source: bembel-db
+      recoveryTarget:
+        targetTime: "2026-11-04 08:55:00+00"
+  externalClusters:
+    - name: bembel-db
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters: { barmanObjectName: bembel-s3, serverName: bembel-db }</code></pre>
+<ol class="steps">
+  <li>Scale the Deployment to 0, or point the Ingress to a maintenance page.</li>
+  <li>Create the restore cluster. Wait until it is ready.</li>
+  <li>Check the data: <code>bembel --db-url … audit tail</code> and <code>bembel migrate status</code>.</li>
+  <li>Change the secret <code>bembel-db</code> to the new <code>-rw</code> service. Scale the Deployment up.</li>
+  <li>Run <code>bembel export build --all</code>. The DNS and DHCP servers pull the restored state at the next poll.</li>
+</ol>
+<p>For a plain PostgreSQL, use pgBackRest or barman with the same schedule. The runbook is the same. The runbook also asks for a <strong>restore test every month</strong>: restore into a scratch cluster, run <code>bembel migrate status</code> and the read-only smoke test (<code>bembel check</code>).</p>
+<div class="callout note">
+<p class="callout-title">What is not in the database</p>
+<p>The config file, the secrets, the signing key of the release and the Keycloak data. The chart keeps the first two in Git (config) and in the secret store. Keycloak has its own backup.</p>
+</div>
+
+<h2 id="observability">Observability</h2>
+<h3 id="metrics">Metrics</h3>
+<p>Prometheus metrics are on <code>:9090/metrics</code>, a separate port that the Ingress does not expose. The Go runtime and process collectors are on too. Label values are bounded: the label <code>route</code> is the route pattern (<code>/v1/prefixes/{id}</code>), never the real path.</p>
+<table>
+<thead><tr><th>Metric</th><th>Type</th><th>Labels</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>bembel_http_request_duration_seconds</code></td><td>histogram</td><td><code>route</code>, <code>method</code>, <code>status_class</code></td><td>Request time per route</td></tr>
+<tr><td><code>bembel_http_requests_in_flight</code></td><td>gauge</td><td></td><td>Requests now</td></tr>
+<tr><td><code>bembel_allocations_total</code></td><td>counter</td><td><code>kind</code> (address, prefix), <code>result</code> (ok, replay, full, conflict, error)</td><td>Allocate calls</td></tr>
+<tr><td><code>bembel_allocation_duration_seconds</code></td><td>histogram</td><td><code>kind</code></td><td>Time of the whole transaction</td></tr>
+<tr><td><code>bembel_allocation_lock_wait_seconds</code></td><td>histogram</td><td><code>kind</code></td><td>Time waiting for the row lock</td></tr>
+<tr><td><code>bembel_claims_open</code></td><td>gauge</td><td></td><td>Addresses in state claimed</td></tr>
+<tr><td><code>bembel_claims_expired_total</code></td><td>counter</td><td></td><td>Claims released by the reaper</td></tr>
+<tr><td><code>bembel_claims_expired_unreaped</code></td><td>gauge</td><td></td><td>Claims past <code>expires_at</code> that the reaper did not release</td></tr>
+<tr><td><code>bembel_prefix_utilisation_ratio</code></td><td>gauge</td><td><code>vrf</code>, <code>prefix</code>, <code>name</code></td><td>Used / usable. Only for prefixes with the tag <code>metrics=true</code> (opt-in), to bound cardinality.</td></tr>
+<tr><td><code>bembel_export_build_duration_seconds</code></td><td>histogram</td><td><code>kind</code> (bind, dhcpd, opensm), <code>target</code></td><td>Build time of an export</td></tr>
+<tr><td><code>bembel_export_last_success_timestamp_seconds</code></td><td>gauge</td><td><code>kind</code>, <code>target</code></td><td>Last good build</td></tr>
+<tr><td><code>bembel_export_last_pull_timestamp_seconds</code></td><td>gauge</td><td><code>kind</code>, <code>target</code></td><td>Last pull of the target (DNS or DHCP server)</td></tr>
+<tr><td><code>bembel_export_failures_total</code></td><td>counter</td><td><code>kind</code>, <code>target</code>, <code>reason</code></td><td>Failed builds (checks, <code>named-checkzone</code>, <code>dhcpd -t</code>)</td></tr>
+<tr><td><code>bembel_agent_last_seen_timestamp_seconds</code></td><td>gauge</td><td><code>agent</code></td><td>Last report of a bembel-agent</td></tr>
+<tr><td><code>bembel_sync_runs_total</code></td><td>counter</td><td><code>source</code>, <code>mode</code>, <code>result</code></td><td>Sync runs</td></tr>
+<tr><td><code>bembel_sync_run_duration_seconds</code></td><td>histogram</td><td><code>source</code>, <code>mode</code></td><td>Sync time</td></tr>
+<tr><td><code>bembel_sync_last_success_timestamp_seconds</code></td><td>gauge</td><td><code>source</code></td><td>Last good sync</td></tr>
+<tr><td><code>bembel_sync_objects_total</code></td><td>counter</td><td><code>source</code>, <code>kind</code>, <code>action</code></td><td>Objects created, updated, missing</td></tr>
+<tr><td><code>bembel_outbox_pending</code></td><td>gauge</td><td><code>sink</code></td><td>Events not yet delivered</td></tr>
+<tr><td><code>bembel_outbox_oldest_age_seconds</code></td><td>gauge</td><td><code>sink</code></td><td>Age of the oldest undelivered event (lag)</td></tr>
+<tr><td><code>bembel_outbox_delivered_total</code></td><td>counter</td><td><code>sink</code>, <code>result</code></td><td>Deliveries</td></tr>
+<tr><td><code>bembel_db_pool_connections</code></td><td>gauge</td><td><code>state</code> (acquired, idle, max)</td><td>pgx pool</td></tr>
+<tr><td><code>bembel_db_pool_acquire_duration_seconds</code></td><td>histogram</td><td></td><td>Wait for a connection</td></tr>
+<tr><td><code>bembel_llm_request_duration_seconds</code></td><td>histogram</td><td><code>endpoint</code> (chat, embeddings), <code>model</code>, <code>result</code></td><td>Calls to the LLM service</td></tr>
+<tr><td><code>bembel_llm_tokens_total</code></td><td>counter</td><td><code>model</code>, <code>direction</code> (prompt, completion)</td><td>Token count</td></tr>
+<tr><td><code>bembel_embedding_backlog</code></td><td>gauge</td><td><code>index</code> (knowledge, objects)</td><td>Objects waiting for an embedding</td></tr>
+<tr><td><code>bembel_worker_last_run_timestamp_seconds</code></td><td>gauge</td><td><code>worker</code></td><td>Last run of each worker</td></tr>
+<tr><td><code>bembel_authz_denied_total</code></td><td>counter</td><td><code>permission</code></td><td>Denied requests (no user names)</td></tr>
+<tr><td><code>bembel_build_info</code></td><td>gauge (1)</td><td><code>version</code>, <code>commit</code>, <code>schema</code></td><td>Version and schema version</td></tr>
+</tbody>
+</table>
+<h3 id="alerts">ServiceMonitor and alerts</h3>
+<pre><code class="language-yaml">apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata: { name: bembel, labels: { release: kube-prometheus-stack } }
+spec:
+  selector: { matchLabels: { app.kubernetes.io/name: bembel } }
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata: { name: bembel, labels: { release: kube-prometheus-stack } }
+spec:
+  groups:
+    - name: bembel
+      rules:
+        - alert: BembelPrefixAlmostFull
+          expr: bembel_prefix_utilisation_ratio &gt; 0.90
+          for: 15m
+          labels: { severity: warning }
+          annotations:
+            summary: "Prefix {{ $labels.prefix }} ({{ $labels.name }}) is {{ $value | humanizePercentage }} full"
+            runbook_url: https://dennisklein.github.io/bembel/design/operations.html#alerts
+        - alert: BembelExportStale
+          expr: time() - bembel_export_last_success_timestamp_seconds &gt; 900
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: "No good {{ $labels.kind }} export for {{ $labels.target }} for 15 minutes"
+        - alert: BembelExportNotPulled
+          expr: time() - bembel_export_last_pull_timestamp_seconds &gt; 1800
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: "{{ $labels.target }} did not pull its {{ $labels.kind }} export for 30 minutes"
+        - alert: BembelSyncFailing
+          expr: time() - bembel_sync_last_success_timestamp_seconds{source="fnt"} &gt; 10800
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: "Sync {{ $labels.source }} has no success for 3 hours"
+        - alert: BembelOutboxLag
+          expr: bembel_outbox_oldest_age_seconds &gt; 300
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: "Events for {{ $labels.sink }} are {{ $value | humanizeDuration }} late"
+        - alert: BembelClaimLeak
+          expr: bembel_claims_expired_unreaped &gt; 0
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: "Expired claims are not released: the reaper does not run"
+        - alert: BembelReplicasLow
+          expr: count(up{job="bembel"} == 1) &lt; 2
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: "Fewer than 2 bembel pods are up"</code></pre>
+<h3 id="logs">Logs</h3>
+<p>bembel writes <em>one JSON object per line</em> on stdout (Go <code>log/slog</code>). Promtail and Grafana Alloy pick the lines up from the container log. Loki stores them. The format is the same for all components. Audit events are not logs: they stay in the database. An optional sink streams them to Loki or a SIEM (<code>exports.audit_stream</code>).</p>
+<pre class="term">{"ts":"2026-11-04T09:12:41.208Z","level":"INFO","msg":"request","app":"bembel","component":"api","request_id":"req_01JC4P6K","trace_id":"4bf92f3577b34da6a3ce929d0e0e4736","subject":"user:a.berger","route":"POST /v1/prefixes/{id}/addresses:allocate","status":201,"duration_ms":14}
+{"ts":"2026-11-04T09:12:41.210Z","level":"INFO","msg":"address allocated","app":"bembel","component":"api","request_id":"req_01JC4P6K","address":"10.20.4.46","prefix":"10.20.4.0/22","lock_wait_ms":3}
+{"ts":"2026-11-04T09:13:02.771Z","level":"WARN","msg":"export check failed","app":"bembel","component":"export","kind":"dhcpd","target":"dhcp-a","reason":"dhcpd -t: duplicate fixed-address"}
+{"ts":"2026-11-04T09:15:00.004Z","level":"ERROR","msg":"sync run failed","app":"bembel","component":"sync","source":"fnt","mode":"delta","error":"401 after re-login"}</pre>
+<table>
+<thead><tr><th>Field</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td><code>ts</code>, <code>level</code>, <code>msg</code></td><td>Always. <code>ts</code> is RFC 3339 in UTC with milliseconds. <code>level</code> is <code>DEBUG</code>, <code>INFO</code>, <code>WARN</code>, <code>ERROR</code>.</td></tr>
+<tr><td><code>app</code>, <code>component</code></td><td>Always. <code>component</code> is <code>api</code>, <code>export</code>, <code>sync</code>, <code>reaper</code>, <code>outbox</code>, <code>assistant</code>, <code>migrate</code>.</td></tr>
+<tr><td><code>request_id</code>, <code>trace_id</code></td><td>On every line of a request. The <code>request_id</code> is also in the response header <code>X-Request-Id</code> and in the problem body.</td></tr>
+<tr><td><code>subject</code>, <code>route</code>, <code>status</code>, <code>duration_ms</code></td><td>On the request line. <code>route</code> is the pattern.</td></tr>
+</tbody>
+</table>
+<p>No log line holds a token, a password, a cookie, a prompt or an LLM answer. A line that logs a body logs only its size.</p>
+<div class="callout tip">
+<p class="callout-title">Loki labels</p>
+<p>Use labels only for values with few distinct values: <code>app</code>, <code>component</code>, <code>level</code> (and <code>namespace</code>, <code>pod</code> from Kubernetes). Keep <code>subject</code>, <code>route</code>, <code>request_id</code> and <code>trace_id</code> in the line, and filter at query time with <code>| json</code>. A label for <code>request_id</code> would create a stream for each request and would make Loki slow.</p>
+</div>
+<pre><code class="language-text"># Alloy: promote three fields to labels
+loki.process "bembel" {
+  forward_to = [loki.write.default.receiver]
+  stage.json   { expressions = { level = "level", component = "component", app = "app" } }
+  stage.labels { values = { level = "", component = "", app = "" } }
+}
+
+# LogQL: server errors in the last hour, by route
+sum by (route) (count_over_time({app="bembel", component="api"} | json | status &gt;= 500 [1h]))
+
+# LogQL: follow one request from a user report
+{app="bembel"} | json | request_id="req_01JC4P6K"</code></pre>
+<h3 id="traces">Traces</h3>
+<p>bembel can send OpenTelemetry traces over OTLP (gRPC or HTTP). It is off until <code>tracing.otlp_endpoint</code> is set. A trace starts at the HTTP handler and covers the SQL queries (the <code>otelpgx</code> tracer), the calls to FNT Command and to the LLM service, and the export builds. bembel reads and writes the W3C header <code>traceparent</code>. The log field <code>trace_id</code> links the logs to the trace in Grafana. The default sample ratio is 5 %. Errors are always kept (tail sampling in the collector).</p>
+<h3 id="dashboard">Grafana dashboard</h3>
+<p>The chart ships the dashboard JSON as a ConfigMap (<code>deploy/grafana/bembel.json</code>). The sidecar of Grafana loads it by the label.</p>
+<table>
+<thead><tr><th>Row</th><th>Panels</th></tr></thead>
+<tbody>
+<tr><td>API</td><td>Request rate, error rate and p50, p95, p99 per route (RED); pods up; in-flight requests</td></tr>
+<tr><td>Allocation</td><td>Allocations by result, lock wait p95, claims open and expired, top 10 prefixes by utilisation</td></tr>
+<tr><td>Exports</td><td>Age of the last good build and last pull per target; build duration; failures</td></tr>
+<tr><td>Sync and agents</td><td>Last success per source; duration; objects changed; age of each bembel-agent report</td></tr>
+<tr><td>Outbox</td><td>Pending events and oldest age per sink; delivery errors</td></tr>
+<tr><td>Database</td><td>Pool use and wait; CloudNativePG panels (replication lag, WAL archive age)</td></tr>
+<tr><td>Assistant</td><td>LLM latency, tokens per hour, embedding backlog</td></tr>
+<tr><td>Logs</td><td>Loki panel for <code>level=~"WARN|ERROR"</code> with a link to the trace</td></tr>
+</tbody>
+</table>
+
+<h2 id="upgrades">Upgrades</h2>
+<p>An upgrade must not stop the service. The old and the new version run together for a few minutes, so every schema change follows <dfn>expand and contract</dfn>.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 900 250" role="img" aria-labelledby="up-t">
+<title id="up-t">Upgrade sequence: pre-upgrade migration Job (expand), rolling update with old and new pods, contract in a later release</title>
+<rect class="box-warn" x="20" y="50" width="170" height="80" rx="8"/>
+<text class="t-title" x="36" y="76">1 migrate (Job)</text>
+<text class="t-small t-muted" x="36" y="98">expand: add column,</text>
+<text class="t-small t-muted" x="36" y="114">table, index</text>
+<rect class="box" x="230" y="50" width="200" height="80" rx="8"/>
+<text class="t-title" x="246" y="76">2 new pod starts</text>
+<text class="t-small t-muted" x="246" y="98">/readyz needs schema ≥ N</text>
+<text class="t-small t-muted" x="246" y="114">old pods keep serving</text>
+<rect class="box" x="470" y="50" width="200" height="80" rx="8"/>
+<text class="t-title" x="486" y="76">3 old pod stops</text>
+<text class="t-small t-muted" x="486" y="98">one by one, PDB holds 2</text>
+<text class="t-small t-muted" x="486" y="114">(maxUnavailable 0)</text>
+<rect class="box-ok" x="710" y="50" width="170" height="80" rx="8"/>
+<text class="t-title" x="726" y="76">4 done</text>
+<text class="t-small t-muted" x="726" y="98">all pods on N+1</text>
+<text class="t-small t-muted" x="726" y="114">helm test passes</text>
+<path class="edge" d="M190,90 L226,90" marker-end="url(#arrow)"/>
+<path class="edge" d="M430,90 L466,90" marker-end="url(#arrow)"/>
+<path class="edge" d="M670,90 L706,90" marker-end="url(#arrow)"/>
+<rect class="box-muted" x="470" y="170" width="410" height="60" rx="8"/>
+<text class="t-title" x="486" y="196">Next release: contract</text>
+<text class="t-small t-muted" x="486" y="216">drop the old column after no pod of release N−1 runs</text>
+<path class="edge-muted" d="M795,130 L795,166" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="20" y="190">Each step of the migration works with the code of N and N+1.</text>
+<text class="t-small t-muted" x="20" y="210">A failed Job stops the upgrade. The old pods keep running.</text>
+</svg>
+<figcaption>The upgrade flow. The migration runs once, before any new pod.</figcaption>
+</figure>
+<ol class="steps">
+  <li>Read the release notes. Check the supported version path (one minor release at a time, or the stated range).</li>
+  <li>Take a backup: <code>kubectl cnpg backup bembel-db</code>. Wait until it ends.</li>
+  <li>Run <code>helm upgrade bembel oci://ghcr.io/dennisklein/charts/bembel --version 1.1.0 -f values.yaml</code>.</li>
+  <li>The hook Job runs <code>bembel migrate up</code>. It takes an advisory lock, so a second Job waits.</li>
+  <li>The rolling update replaces the pods. Watch <code>kubectl rollout status deploy/bembel</code>.</li>
+  <li>Run <code>helm test bembel</code> (a smoke test: login with a test token, allocate and release in a test VRF).</li>
+</ol>
+<table>
+<thead><tr><th>Rule</th><th>Reason</th></tr></thead>
+<tbody>
+<tr><td>A migration adds only: nullable columns, columns with a constant default, new tables and new indexes (<code>CREATE INDEX CONCURRENTLY</code>, outside a transaction).</td><td>The old code still runs against the new schema.</td></tr>
+<tr><td>A column leaves in two steps: stop to read and write it in release N, drop it in N+1 or later.</td><td>Old pods can run while the Job drops the column.</td></tr>
+<tr><td>A change of a column type is a new column, a backfill by a worker, a switch, and a later drop.</td><td>No long lock on a large table.</td></tr>
+<tr><td>Each migration sets <code>lock_timeout = '3s'</code> and retries.</td><td>A queue behind a long query must not stop the API.</td></tr>
+<tr><td><code>/readyz</code> checks <code>min_schema &lt;= current &lt;= max_schema</code> for this binary.</td><td>A pod does not serve against a schema that is too old or too new.</td></tr>
+<tr><td>No down migrations in production. Roll back with the previous image; the schema stays.</td><td>A down migration loses data. Expand-only changes are safe for the old code.</td></tr>
+</tbody>
+</table>
+<p>The REST API is versioned under <code>/v1</code> and changes only by addition (<a href="api.html#versioning">REST API</a>). So an older <code>bembel</code> CLI, a bembel-agent or the Neutron driver works with a newer server. The agent also works one minor version behind. A PostgreSQL major upgrade uses the CloudNativePG procedure (<code>imageName</code> change with an in-place upgrade, or a new cluster by logical import). Test it on a restored copy first.</p>
+
+<h2 id="security">Security</h2>
+<table>
+<thead><tr><th>Area</th><th>Design</th></tr></thead>
+<tbody>
+<tr><td>TLS to clients</td><td>The Ingress terminates TLS with a cert-manager certificate (TLS 1.2 or 1.3). The pod can also serve TLS itself (<code>tls.cert_file</code>, <code>tls.key_file</code>) for the package form. HSTS is on.</td></tr>
+<tr><td>TLS to the database</td><td><code>sslmode=verify-full</code> with the CA of the CloudNativePG cluster. The user <code>bembel</code> owns the schema. No superuser at run time.</td></tr>
+<tr><td>Secrets</td><td>Kubernetes secrets mounted as files, filled by External Secrets or sealed secrets. The config file holds only file names. The session key, the OIDC secret, the database URL and the export tokens rotate without a release: bembel re-reads the files on <code>SIGHUP</code> and every 5 minutes.</td></tr>
+<tr><td>Agents</td><td>Default: OIDC client credentials (a service identity at Keycloak, short tokens). Option: mTLS, with a client certificate from cert-manager and a CA that the config names. The agent can write only observed VMs of its own hypervisor (a binding with scope <code>team</code> or <code>tag</code>). See <a href="access.html">Access control</a>.</td></tr>
+<tr><td>Export pull</td><td>A DNS or DHCP server pulls with a token for its target. The token gives read access to that one export. The export URL has an ETag, so an unchanged export costs almost nothing.</td></tr>
+<tr><td>Rate limits</td><td>A token bucket per subject: 50 requests per second, and 10 per second for <code>:allocate</code>. An anonymous client (the login and the health paths) is limited per IP to 20 per second. The answer is <code>429</code> with <code>Retry-After</code>. The limits are in the config.</td></tr>
+<tr><td>Body and time limits</td><td>4 MiB per request, 30 s per request (imports use an operation resource and a worker).</td></tr>
+<tr><td>UI headers</td><td>A strict Content Security Policy (below), <code>X-Content-Type-Options: nosniff</code>, <code>Referrer-Policy: same-origin</code>, <code>Cross-Origin-Opener-Policy: same-origin</code>. The session cookie is <code>HttpOnly; Secure; SameSite=Lax</code> and a CSRF token protects the BFF calls.</td></tr>
+<tr><td>Assistant</td><td>The LLM host is on the organisation's network. The assistant tools run with the rights of the user. No data goes to a third party (<a href="assistant.html#privacy">Assistant and help</a>).</td></tr>
+<tr><td>Pods</td><td>Non-root user, read-only root file system, no capabilities, seccomp <code>RuntimeDefault</code>, no service account token mounted, a NetworkPolicy as above.</td></tr>
+<tr><td>Audit</td><td>Each change and each deny is an audit event in the database. Deletes of audit events are not possible through the API. The optional stream copies them to a SIEM.</td></tr>
+</tbody>
+</table>
+<h3 id="csp">Content Security Policy of the UI</h3>
+<pre><code class="language-text">Content-Security-Policy:
+  default-src 'none';
+  script-src 'self';
+  style-src 'self';
+  img-src 'self' data:;
+  font-src 'self';
+  connect-src 'self';
+  manifest-src 'self';
+  frame-ancestors 'none';
+  base-uri 'none';
+  form-action 'self'</code></pre>
+<p>The UI has no inline script and no external resource. The SvelteKit static adapter writes one small bootstrap script. The build uses the SvelteKit CSP mode <code>hash</code>, which adds the hash of that script to <code>script-src</code>. <span class="tag warn">to verify</span> The hash mode must be confirmed with the adapter-static output of the chosen SvelteKit version. The mockups in this record follow the same rule: no inline style and no external resource.</p>
+<h3 id="supply-chain">Supply chain</h3>
+<ul>
+  <li><strong>SBOM.</strong> goreleaser makes an SPDX SBOM for the binary and for the image (with syft). The SBOM is a release asset and an OCI attestation.</li>
+  <li><strong>Signed images and charts.</strong> The release workflow signs the image, the chart and the SBOM with <code>cosign</code> (keyless, OIDC identity of the GitHub workflow). It adds SLSA provenance.</li>
+  <li><strong>Verify.</strong> <code>cosign verify ghcr.io/dennisklein/bembel:1.0.0 --certificate-identity-regexp '^https://github.com/dennisklein/bembel/' --certificate-oidc-issuer https://token.actions.githubusercontent.com</code>. A Kyverno or policy-controller rule can enforce this in the cluster.</li>
+  <li><strong>Packages.</strong> The Debian and RPM repositories are signed with the release key.</li>
+  <li><strong>Dependencies.</strong> <code>govulncheck</code> and <code>pnpm audit</code> run in CI. The base image is distroless and is rebuilt weekly.</li>
+</ul>
+</body>
+</html>

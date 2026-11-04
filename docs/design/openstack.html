@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OpenStack</title>
+<meta name="description" content="How bembel works with OpenStack: a read-only sync of Neutron and Ironic in phase 1, the networking-bembel IPAM driver in phase 2, Keystone federation, Designate and the risks.">
+</head>
+<body>
+<h1>OpenStack</h1>
+<p class="lede">This chapter specifies how bembel works with an OpenStack cloud. Phase 1 reads the cloud and shows what it uses. Phase 2 replaces the address allocation of Neutron with a driver that calls the bembel API. The example cloud is <code>os-prod</code>.</p>
+<ul class="keypoints">
+  <li>Phase 1 is read-only. A sync worker polls Neutron and Ironic with a Keystone application credential. Objects get <code>source=openstack:os-prod</code> and a managed-by mark, so a user cannot edit them.</li>
+  <li>The sync finds conflicts: an OpenStack subnet that overlaps a prefix that bembel manages becomes a finding.</li>
+  <li>Phase 2 is the Python package <code>networking-bembel</code>. It registers the entry point <code>neutron.ipam_drivers</code> and calls only the public REST API.</li>
+  <li>The driver makes a claim with a time to live (TTL). The sync confirms the claim when it sees the port. A reaper releases a claim that nobody confirms.</li>
+  <li>Keystone and bembel trust the same Keycloak. A Keystone project maps to a bembel team. The driver has its own service identity.</li>
+  <li>Each DNS zone has one writer. bembel owns the campus zones through the BIND export. Designate owns only the tenant zones.</li>
+  <li>The driver is on the API path of Neutron. It fails closed: when bembel is not reachable, a port create fails and no address is leaked.</li>
+</ul>
+
+<h2 id="summary">Summary</h2>
+<p>OpenStack has its own address management. Neutron stores networks, subnets, ports and floating IPs in its own database. A campus IPAM that does not know this data cannot find an overlap, a double use or a stale address. bembel joins the two worlds in two steps.</p>
+<ol class="steps">
+  <li>Phase 1 reads. bembel shows every OpenStack subnet, port and floating IP next to the campus data, and reports conflicts. Nothing in OpenStack changes.</li>
+  <li>Phase 2 writes. Neutron asks bembel for each address and each subnet. bembel becomes the one place that decides which address is free.</li>
+</ol>
+<p>Phase 2 is optional. A site can stay in phase 1 for ever. The two phases use the same data model: a VM is a host with <code>kind=vm</code>, <code>platform=openstack</code> and a <code>runs_on</code> link to its hypervisor. Debian hypervisors with libvirt use the same model (<a href="vms.html#model">Virtual machines</a>).</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 1000 420" role="img" aria-labelledby="os-arch-t">
+<title id="os-arch-t">Architecture: the os-prod cloud on the left, bembel on the right, Keycloak above</title>
+<rect class="zone" x="12" y="70" width="420" height="340" rx="10"/>
+<text class="t-title" x="28" y="92">OpenStack cloud os-prod</text>
+<rect class="zone" x="568" y="70" width="420" height="340" rx="10"/>
+<text class="t-title" x="584" y="92">bembel (Kubernetes or VM)</text>
+<rect class="box-info" x="400" y="8" width="200" height="42" rx="8"/>
+<text class="t-title" x="500" y="34" text-anchor="middle">Keycloak (realm main)</text>
+<rect class="box" x="32" y="104" width="170" height="40" rx="8"/>
+<text class="t-title" x="117" y="129" text-anchor="middle">Keystone</text>
+<rect class="box" x="242" y="104" width="170" height="40" rx="8"/>
+<text class="t-title" x="327" y="129" text-anchor="middle">Designate</text>
+<rect class="box" x="32" y="166" width="380" height="112" rx="8"/>
+<text class="t-title" x="48" y="188">Neutron</text>
+<rect class="box-accent" x="52" y="204" width="340" height="56" rx="8"/>
+<text class="t-title t-on" x="68" y="228">networking-bembel</text>
+<text class="t-small t-on" x="68" y="248">IPAM driver, phase 2</text>
+<rect class="box" x="32" y="316" width="170" height="44" rx="8"/>
+<text class="t-title" x="117" y="344" text-anchor="middle">Ironic</text>
+<rect class="box-muted" x="242" y="316" width="170" height="44" rx="8"/>
+<text class="t-title" x="327" y="344" text-anchor="middle">Nova (optional)</text>
+<rect class="box" x="588" y="104" width="380" height="52" rx="8"/>
+<text class="t-title" x="604" y="126">bembel serve</text>
+<text class="t-small t-muted" x="604" y="144">REST API /v1, OIDC, claims, allocate</text>
+<rect class="box-accent" x="588" y="184" width="180" height="52" rx="8"/>
+<text class="t-title t-on" x="604" y="206">sync worker</text>
+<text class="t-small t-on" x="604" y="224">source openstack:os-prod</text>
+<rect class="box" x="788" y="184" width="180" height="52" rx="8"/>
+<text class="t-title" x="804" y="206">PostgreSQL 18</text>
+<text class="t-small t-muted" x="804" y="224">objects, claims, history</text>
+<rect class="box" x="588" y="262" width="180" height="52" rx="8"/>
+<text class="t-title" x="604" y="284">reaper</text>
+<text class="t-small t-muted" x="604" y="302">releases open claims</text>
+<rect class="box" x="788" y="262" width="180" height="52" rx="8"/>
+<text class="t-title" x="804" y="284">export bind</text>
+<text class="t-small t-muted" x="804" y="302">campus zones</text>
+<rect class="box-ok" x="788" y="346" width="180" height="44" rx="8"/>
+<text class="t-title" x="878" y="373" text-anchor="middle">ns1.example.org</text>
+<path class="edge-muted" d="M400,29 L117,29 L117,102" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="150" y="23">OIDC federation</text>
+<path class="edge-muted" d="M600,29 L778,29 L778,102" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="640" y="23">OIDC tokens</text>
+<path class="edge-muted" d="M117,166 L117,146" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M327,166 L327,146" marker-end="url(#arrow-muted)"/>
+<path class="edge-accent" d="M392,222 L480,222 L480,130 L586,130" marker-end="url(#arrow-accent)"/>
+<text class="t-small" x="486" y="118">allocate, release</text>
+<path class="edge" d="M588,222 L520,222 L520,296 L434,296" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="448" y="314">poll, read-only</text>
+<path class="edge-muted" d="M434,338 L520,338 L520,296" />
+<line class="edge-muted" x1="768" y1="210" x2="786" y2="210" marker-end="url(#arrow-muted)"/>
+<line class="edge" x1="878" y1="314" x2="878" y2="344" marker-end="url(#arrow)"/>
+<text class="t-small" x="890" y="335">pull, HTTPS</text>
+<line class="edge-muted" x1="678" y1="156" x2="678" y2="182" marker-end="url(#arrow-muted)"/>
+</svg>
+<figcaption>The cloud os-prod and bembel. The driver (copper) is on the API path of Neutron. The sync worker only reads. The campus DNS zones go to ns1 through the BIND export. Designate serves only the tenant zones.</figcaption>
+</figure>
+
+<h2 id="sync">Phase 1: read-only sync</h2>
+<p>The sync worker is a job of the bembel binary. A source <code>os-prod</code> in the bembel config starts it. The worker needs no change in OpenStack, except one Keystone application credential. It polls the REST APIs and writes <em>observed</em> objects. An observed object has <code>source=openstack:os-prod</code>, an <code>external_ref</code> and <code>managed_by=openstack-sync</code>. A user cannot edit it in bembel; the cloud is the owner.</p>
+
+<h3 id="sync-config">Source configuration</h3>
+<pre><code class="language-yaml"># /etc/bembel/bembel.yaml (excerpt)
+sources:
+  - name: os-prod
+    kind: openstack
+    auth_url: https://keystone.os.example.org:5000/v3
+    region: RegionOne
+    credential:                      # Keystone application credential
+      id_file: /run/secrets/os-prod/app-cred-id
+      secret_file: /run/secrets/os-prod/app-cred-secret
+    interval: 2m                     # delta poll
+    full_every: 1h                   # full list, finds deletions
+    ironic: true
+    nova: false                      # optional: server names
+    vrf:                             # first match wins
+      - { address_scope: os-prod-v4, vrf: os-provider }
+      - { external: true,            vrf: global }
+      - { default: per-project,      prefix: "os-" }   # os-&lt;project name&gt;</code></pre>
+
+<h3 id="sync-map">What the worker reads</h3>
+<table>
+<thead><tr><th>OpenStack object</th><th>API call</th><th>bembel object</th></tr></thead>
+<tbody>
+<tr><td>Network (with segments)</td><td><code>GET /v2.0/networks</code></td><td>Tags on the subnets; VLAN or VXLAN id as attribute <code>os_segment</code>. A VLAN provider network links to the VLAN with the same id in the VLAN domain of the cloud.</td></tr>
+<tr><td>Subnet</td><td><code>GET /v2.0/subnets</code></td><td>Prefix with kind <code>subnet</code>, gateway, allocation pools as ranges (role <code>dhcp-pool</code>). <code>external_ref=os-prod:subnet:&lt;uuid&gt;</code>.</td></tr>
+<tr><td>Port</td><td><code>GET /v2.0/ports</code></td><td>Interface with the MAC and one address per fixed IP. A port with <code>device_owner=compute:*</code> belongs to a VM host.</td></tr>
+<tr><td>Floating IP</td><td><code>GET /v2.0/floatingips</code></td><td>Address in the external subnet. Tag <code>os_fip=true</code>. The link to the fixed address is an attribute.</td></tr>
+<tr><td>Router and gateway port</td><td><code>GET /v2.0/routers</code></td><td>Host with role <code>router</code>, interfaces from its ports.</td></tr>
+<tr><td>Ironic port</td><td><code>GET /v1/ports?detail=true</code></td><td>Interface of a physical host, keyed by MAC (<a href="#ironic">Ironic</a>).</td></tr>
+<tr><td>Keystone project</td><td><code>GET /v3/projects</code></td><td>Owner team through the mapping table (<a href="#keystone">Keystone</a>).</td></tr>
+</tbody>
+</table>
+
+<h3 id="sync-vms">VMs as hosts</h3>
+<p>Neutron does not store VMs. It stores ports with <code>device_id</code> (the Nova server UUID), <code>binding:host_id</code> (the hypervisor) and optional <code>dns_name</code>. The worker makes one VM host per <code>device_id</code>:</p>
+<dl class="facts">
+  <dt>name</dt><dd>The port <code>dns_name</code> with the domain of the network (<code>web-12.os.example.org</code>). Without it: <code>server-&lt;first 8 hex of the UUID&gt;</code>. With <code>nova: true</code> the worker reads the real server name from <code>GET /servers/detail</code>.</dd>
+  <dt>kind, platform</dt><dd><code>vm</code>, <code>openstack</code>.</dd>
+  <dt>runs_on</dt><dd>The host with the name <code>binding:host_id</code>, for example <code>hv-os-17.example.org</code> (kind <code>hypervisor</code>). When no such host exists, the worker makes it and marks it observed.</dd>
+  <dt>owner</dt><dd>The team of the project of the port.</dd>
+</dl>
+
+<h3 id="sync-loop">Poll, reconcile, conflicts</h3>
+<ol class="steps">
+  <li>Every <code>interval</code> the worker lists ports, subnets and floating IPs. It compares <code>revision_number</code> with the stored value. It upserts only the objects that changed.</li>
+  <li>Every <code>full_every</code> the worker compares the complete lists with the stored set. An object that is missing in two full lists becomes <code>deprecated</code>. After the grace time bembel releases it.</li>
+  <li>For each new or changed subnet the worker checks the prefix tree. An overlap with a prefix that a user manages becomes a finding, not a prefix.</li>
+  <li>The worker writes the run result: counts, duration and errors. The metrics <code>bembel_sync_run_seconds</code> and <code>bembel_sync_errors_total</code> carry the label <code>source="os-prod"</code>.</li>
+</ol>
+<aside class="callout why">
+<p class="callout-title">Why poll first</p>
+<p>Neutron sends notifications through RabbitMQ (<code>port.create.end</code>, <code>floatingip.update.end</code>). A consumer needs access to the broker, and a notification is lost when no queue exists. Polling needs only the REST API. It lags by minutes, which is enough for a view. Phase 3 adds a notification consumer to reduce the lag. The full list stays the source of truth.</p>
+</aside>
+<p>Tenant networks can overlap. Two projects can both use <code>192.168.1.0/24</code>. The database does not allow two equal prefixes in one VRF, so the worker puts each project without an address scope in its own VRF, for example <code>os-physics-lab</code>. A subnet with an address scope goes to the VRF of that scope. This is the VRF rule list in the config above. A subnet that still overlaps inside one VRF is stored as a finding with the raw data. The finding list shows both owners.</p>
+<table class="compact">
+<thead><tr><th>Finding</th><th>Meaning</th><th>Typical fix</th></tr></thead>
+<tbody>
+<tr><td><code>os.overlap-managed</code></td><td>An OpenStack subnet overlaps a managed prefix in the same VRF.</td><td>Change the subnet in Neutron, or the managed prefix.</td></tr>
+<tr><td><code>os.address-in-managed-subnet</code></td><td>A port uses an address in a managed subnet that has no claim.</td><td>Move the port, or create the allocation by hand.</td></tr>
+<tr><td><code>os.duplicate-mac</code></td><td>Two ports or an Ironic port and a host have the same MAC.</td><td>Correct the MAC at the source.</td></tr>
+<tr><td><code>os.orphan-fip</code></td><td>A floating IP has no port, or the port has no fixed IP.</td><td>Release the floating IP in Neutron.</td></tr>
+</tbody>
+</table>
+
+<h2 id="driver">Phase 2: the Neutron IPAM driver</h2>
+<p>Neutron has a pluggable IPAM interface (<code>neutron/ipam/driver.py</code>). The option <code>ipam_driver</code> names a Python entry point in the group <code>neutron.ipam_drivers</code>. The default is <code>internal</code>. bembel ships the package <code>networking-bembel</code> with the entry point <code>bembel</code>. The package has no logic about addresses. It translates each call to the bembel REST API.</p>
+<pre><code class="language-ini"># setup.cfg of networking-bembel
+[entry_points]
+neutron.ipam_drivers =
+    bembel = networking_bembel.driver:BembelPool
+
+# /etc/neutron/neutron.conf
+[DEFAULT]
+ipam_driver = bembel
+
+[bembel]
+url = https://ipam.example.org
+cloud = os-prod
+client_id = svc-neutron-os-prod
+client_secret_file = /etc/neutron/bembel.secret
+token_url = https://id.example.org/realms/main/protocol/openid-connect/token
+claim_ttl = 10m
+connect_timeout = 2
+read_timeout = 5
+retries = 2</code></pre>
+
+<h3 id="driver-map">Interface and API calls</h3>
+<p>The driver implements three abstract classes. The table shows each method and the call it makes. <code>{pool}</code> is the bembel prefix pool that belongs to the Neutron subnet pool.</p>
+<table>
+<thead><tr><th>Class and method</th><th>bembel call</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td><code>Pool.allocate_subnet(AnySubnetRequest)</code></td><td><code>POST /v1/prefixes/{pool}/prefixes:allocate</code> with <code>length</code>, status <code>claimed</code></td><td>The next free prefix of the pool. Neutron confirms it when the subnet row is written.</td></tr>
+<tr><td><code>Pool.allocate_subnet(SpecificSubnetRequest)</code></td><td><code>POST /v1/prefixes</code> with the CIDR, status <code>claimed</code></td><td>409 when the CIDR overlaps. The driver raises <code>SubnetAllocationError</code>.</td></tr>
+<tr><td><code>Pool.get_subnet(id)</code></td><td><code>GET /v1/prefixes?external_ref=os-prod:subnet:{id}</code></td><td>Returns a <code>BembelSubnet</code> object. No state in Python.</td></tr>
+<tr><td><code>Pool.update_subnet(request)</code></td><td><code>PATCH /v1/prefixes/{id}</code></td><td>Gateway and allocation pools (ranges).</td></tr>
+<tr><td><code>Pool.remove_subnet(id)</code></td><td><code>DELETE /v1/prefixes/{id}</code></td><td>bembel refuses when addresses exist (409).</td></tr>
+<tr><td><code>Pool.get_allocator(ids)</code></td><td>none</td><td>Returns a <code>SubnetGroup</code> over <code>get_subnet</code> objects.</td></tr>
+<tr><td><code>Pool.get_*_request_factory()</code></td><td>none</td><td>The default factories of Neutron.</td></tr>
+<tr><td><code>Pool.needs_rollback()</code></td><td>none</td><td>Returns <code>True</code>. See <a href="#driver-rollback">rollback</a>.</td></tr>
+<tr><td><code>Subnet.allocate(AnyAddressRequest)</code>, <code>PreferNextAddressRequest</code></td><td><code>POST /v1/prefixes/{id}/addresses:allocate</code> with status <code>claimed</code>, <code>ttl</code></td><td>The default path of a port create.</td></tr>
+<tr><td><code>Subnet.allocate(SpecificAddressRequest)</code></td><td><code>POST /v1/prefixes/{id}/addresses</code></td><td>409 when taken: <code>IpAddressAlreadyAllocated</code>.</td></tr>
+<tr><td><code>Subnet.allocate(BulkAddressRequest)</code></td><td><code>POST /v1/prefixes/{id}/addresses:allocate</code> with <code>count</code></td><td>One call for a list.</td></tr>
+<tr><td><code>Subnet.allocate(AutomaticAddressRequest)</code></td><td>none</td><td>EUI-64 (SLAAC). The driver computes the address from prefix and MAC. The sync observes it. bembel never allocates it.</td></tr>
+<tr><td><code>Subnet.deallocate(address)</code></td><td><code>POST /v1/addresses/{id}:release</code> (by external ref)</td><td>404 counts as success. The call is idempotent.</td></tr>
+<tr><td><code>Subnet.get_details()</code></td><td><code>GET /v1/prefixes/{id}</code></td><td>Cache of 30 s in the process.</td></tr>
+<tr><td><code>SubnetGroup.allocate(request)</code></td><td>the calls of <code>Subnet.allocate</code>, in order</td><td>Returns the first address that works, with its subnet id.</td></tr>
+</tbody>
+</table>
+
+<h3 id="driver-key">Idempotency key</h3>
+<p>Neutron can call <code>allocate</code> more than once for one port. A database deadlock retries the whole request. The driver must give the same address for the same logical request. It derives the key like this:</p>
+<pre><code class="language-text">key = sha256( cloud + "|" + subnet_id + "|" + request_id + "|" + n )
+
+cloud       "os-prod"
+subnet_id   the Neutron subnet UUID
+request_id  context.request_id of the API request; a retry keeps it
+n           index of the allocate call inside this request (0, 1, ...)</code></pre>
+<p>The driver sends the key as the header <code>Idempotency-Key</code>. bembel stores it for 24 h with the result. The same key gives the same response (<a href="api.html#conventions">API conventions</a>). The driver also sends <code>external_ref=os-prod:port-claim:&lt;key prefix&gt;</code>. The sync replaces it with the real port id.</p>
+<aside class="callout warn">
+<p class="callout-title">Not verified</p>
+<p>The request object does not carry the port id. This design assumes that the request id of the oslo context reaches the driver unchanged on a deadlock retry. A test against Neutron master must prove it. If it fails, the package carries a small patch that passes the port id in the request.</p>
+</aside>
+
+<h3 id="driver-seq">A port create</h3>
+<figure class="diagram wide">
+<svg viewBox="0 0 1000 520" role="img" aria-labelledby="os-seq-t">
+<title id="os-seq-t">Sequence of a port create: allocate claim, Neutron DB commit, sync confirms</title>
+<rect class="box" x="30" y="10" width="140" height="40" rx="8"/>
+<text class="t-title" x="100" y="35" text-anchor="middle">user / Nova</text>
+<rect class="box" x="230" y="10" width="140" height="40" rx="8"/>
+<text class="t-title" x="300" y="35" text-anchor="middle">Neutron</text>
+<rect class="box-accent" x="420" y="10" width="160" height="40" rx="8"/>
+<text class="t-title t-on" x="500" y="35" text-anchor="middle">networking-bembel</text>
+<rect class="box" x="630" y="10" width="140" height="40" rx="8"/>
+<text class="t-title" x="700" y="35" text-anchor="middle">bembel API</text>
+<rect class="box" x="830" y="10" width="140" height="40" rx="8"/>
+<text class="t-title" x="900" y="35" text-anchor="middle">sync worker</text>
+<line class="edge-muted" x1="100" y1="50" x2="100" y2="510"/>
+<line class="edge-muted" x1="300" y1="50" x2="300" y2="510"/>
+<line class="edge-muted" x1="500" y1="50" x2="500" y2="510"/>
+<line class="edge-muted" x1="700" y1="50" x2="700" y2="510"/>
+<line class="edge-muted" x1="900" y1="50" x2="900" y2="510"/>
+<text class="t-num t-accent" x="78" y="94">1</text>
+<line class="edge" x1="100" y1="90" x2="298" y2="90" marker-end="url(#arrow)"/>
+<text class="t-small" x="110" y="82">POST /v2.0/ports</text>
+<text class="t-num t-accent" x="278" y="134">2</text>
+<line class="edge" x1="300" y1="130" x2="498" y2="130" marker-end="url(#arrow)"/>
+<text class="t-small" x="310" y="122">allocate(AnyAddressRequest)</text>
+<text class="t-num t-accent" x="478" y="174">3</text>
+<line class="edge-accent" x1="500" y1="170" x2="698" y2="170" marker-end="url(#arrow-accent)"/>
+<text class="t-small" x="510" y="162">POST …/addresses:allocate</text>
+<text class="t-small t-muted" x="510" y="188">Idempotency-Key, ttl 10m</text>
+<line class="edge-ok" x1="698" y1="214" x2="502" y2="214" marker-end="url(#arrow)"/>
+<text class="t-small t-ok" x="512" y="206">201 claimed 10.30.4.17</text>
+<line class="edge-muted" x1="498" y1="250" x2="302" y2="250" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="312" y="242">10.30.4.17</text>
+<rect class="box-soft" x="226" y="274" width="148" height="44" rx="8"/>
+<text class="t-small" x="300" y="292" text-anchor="middle">DB commit:</text>
+<text class="t-small" x="300" y="308" text-anchor="middle">IPAllocation row</text>
+<text class="t-num t-accent" x="312" y="352">5</text>
+<line class="edge-muted" x1="298" y1="348" x2="102" y2="348" marker-end="url(#arrow-muted)"/>
+<text class="t-small" x="110" y="340">201 port, fixed_ips 10.30.4.17</text>
+<text class="t-num t-accent" x="912" y="404">6</text>
+<line class="edge" x1="900" y1="400" x2="302" y2="400" marker-end="url(#arrow)"/>
+<text class="t-small" x="620" y="392">GET /v2.0/ports (poll, 2 min)</text>
+<text class="t-num t-accent" x="912" y="454">7</text>
+<line class="edge-accent" x1="900" y1="450" x2="702" y2="450" marker-end="url(#arrow-accent)"/>
+<text class="t-small" x="730" y="442">confirm: claimed → allocated</text>
+<text class="t-small t-muted" x="730" y="478">key replaced by port id</text>
+<text class="t-num t-accent" x="206" y="302">4</text>
+</svg>
+<figcaption>The create call (steps 1 to 5) takes one round trip to bembel. Step 3 makes a claim, not an allocated address. Steps 6 and 7 happen later, on the next poll. If step 7 never happens, the reaper releases the claim after 10 minutes.</figcaption>
+</figure>
+
+<h3 id="driver-rollback">Rollback, leaks and the reaper</h3>
+<p>Neutron calls the IPAM driver first and writes its own rows after that. When the write fails, Neutron calls <code>deallocate</code> to undo the allocation. It does this only when <code>needs_rollback()</code> is <code>True</code>. The internal driver says <code>False</code> because it shares the database transaction. An external driver must say <code>True</code>.</p>
+<p>The rollback is best effort. It can fail, for example when bembel is not reachable at that moment. The address then stays in bembel without a port in Neutron. This is a <em>leak</em>. The claim with a TTL is the cure: the leaked address is a claim, not an allocated address, and it expires.</p>
+<figure class="diagram wide explainer">
+<svg viewBox="0 0 1000 380" role="img" aria-labelledby="os-leak-t"><title id="os-leak-t">A failed port create leaves a claim, and the reaper releases it</title>
+<text class="t-title" x="16" y="26" data-f="0">10:02:00 · allocate</text>
+<text class="t-title" x="16" y="26" data-f="1">10:02:00 · claim made</text>
+<text class="t-title" x="16" y="26" data-f="2">10:02:01 · commit fails</text>
+<text class="t-title" x="16" y="26" data-f="3">10:02:01 · rollback call</text>
+<text class="t-title" x="16" y="26" data-f="4">10:02:03 · rollback lost</text>
+<text class="t-title" x="16" y="26" data-f="5">10:04:00 · sync poll</text>
+<text class="t-title" x="16" y="26" data-f="6">10:12:00 · reaper</text>
+<rect class="zone" x="16" y="44" width="250" height="230" rx="10"/>
+<text class="t-title" x="32" y="68">Neutron</text>
+<rect class="zone" x="376" y="44" width="250" height="230" rx="10"/>
+<text class="t-title" x="392" y="68">networking-bembel</text>
+<rect class="zone" x="736" y="44" width="250" height="230" rx="10"/>
+<text class="t-title" x="752" y="68">bembel</text>
+<rect class="box" x="32" y="90" width="218" height="52" rx="8"/>
+<text class="t-small" x="46" y="112">port create p-81</text>
+<text class="t-small t-muted" x="46" y="130">subnet os-prod-net-7</text>
+<rect class="box-warn" x="32" y="170" width="218" height="52" rx="8" data-f="2-6"/>
+<text class="t-small" x="46" y="192" data-f="2-6">DB commit fails (deadlock)</text>
+<text class="t-small t-muted" x="46" y="210" data-f="2-6">no IPAllocation row</text>
+<rect class="box-soft" x="392" y="90" width="218" height="52" rx="8" data-f="0-6"/>
+<text class="t-small" x="406" y="112" data-f="0-6">allocate(AnyAddressRequest)</text>
+<text class="t-small t-muted" x="406" y="130" data-f="0-6">key = 7c1e…</text>
+<rect class="box-soft" x="392" y="170" width="218" height="52" rx="8" data-f="3-6"/>
+<text class="t-small" x="406" y="192" data-f="3-6">deallocate(10.30.4.17)</text>
+<text class="t-small t-muted" x="406" y="210" data-f="3-6">needs_rollback() = True</text>
+<rect class="box-accent" x="752" y="90" width="218" height="52" rx="8" data-f="1-4"/>
+<text class="t-small t-on" x="766" y="112" data-f="1-4">10.30.4.17 claimed</text>
+<text class="t-small t-on" x="766" y="130" data-f="1-4">expires 10:12:00</text>
+<rect class="box-warn" x="752" y="90" width="218" height="52" rx="8" data-f="5"/>
+<text class="t-small" x="766" y="112" data-f="5">10.30.4.17 claimed</text>
+<text class="t-small t-muted" x="766" y="130" data-f="5">not confirmed, 2 min old</text>
+<rect class="box-ok" x="752" y="90" width="218" height="52" rx="8" data-f="6"/>
+<text class="t-small" x="766" y="112" data-f="6">10.30.4.17 free again</text>
+<text class="t-small t-muted" x="766" y="130" data-f="6">claim expired, released</text>
+<rect class="box-err" x="752" y="170" width="218" height="52" rx="8" data-f="4"/>
+<text class="t-small" x="766" y="192" data-f="4">release call: no answer</text>
+<text class="t-small t-muted" x="766" y="210" data-f="4">leak candidate</text>
+<rect class="box" x="752" y="298" width="218" height="52" rx="8" data-f="5"/>
+<text class="t-small" x="766" y="320" data-f="5">sync worker</text>
+<text class="t-small t-muted" x="766" y="338" data-f="5">no port has 10.30.4.17</text>
+<rect class="box" x="392" y="298" width="218" height="52" rx="8" data-f="6"/>
+<text class="t-small" x="406" y="320" data-f="6">reaper (in bembel)</text>
+<text class="t-small t-muted" x="406" y="338" data-f="6">expires_at less than now</text>
+<line class="edge" x1="250" y1="116" x2="390" y2="116" marker-end="url(#arrow)" data-f="0"/>
+<line class="edge-accent" x1="610" y1="116" x2="750" y2="116" marker-end="url(#arrow-accent)" data-f="1"/>
+<line class="edge-err" x1="250" y1="196" x2="390" y2="196" marker-end="url(#arrow)" data-f="3"/>
+<line class="edge-err" x1="610" y1="196" x2="750" y2="196" marker-end="url(#arrow)" data-f="4"/>
+<path class="edge-muted" d="M861,298 L861,144" marker-end="url(#arrow-muted)" data-f="5"/>
+<path class="edge-ok" d="M610,324 L680,324 L680,150 L750,150" marker-end="url(#arrow)" data-f="6"/>
+<text class="t-small t-muted" x="500" y="370" data-f="4-6">Neutron has no port p-81. bembel keeps a claim, not an allocated address.</text>
+</svg>
+<script type="application/json" class="steps">["10:02:00 · A user creates port p-81 in subnet os-prod-net-7. Neutron calls the driver: allocate(AnyAddressRequest).", "10:02:00 · The driver sends POST addresses:allocate with the key 7c1e… and a TTL of 10 minutes. bembel answers 201 and gives 10.30.4.17 with the status claimed. It expires at 10:12:00.", "10:02:01 · Neutron gets the address and tries to write the IPAllocation row. The commit fails, for example with a deadlock. The retry gives up. Neutron has no port p-81.", "10:02:01 · Neutron calls the driver to undo the allocation: deallocate(10.30.4.17). It does this because needs_rollback() is True. The driver sends the release call.", "10:02:03 · The release call times out. bembel is slow or the network drops it. Neutron logs the error and returns the failure to the user. Now bembel holds a claim for a port that does not exist. If the allocation were final, this address would be lost.", "10:04:00 · The sync worker polls Neutron. No port has 10.30.4.17, so it cannot confirm the claim. The claim stays claimed and the metric bembel_claims_open shows it. A claim that a port uses would turn allocated here.", "10:12:00 · The claim expires. The reaper releases it. 10.30.4.17 is free again. The audit event names the reaper. The alert claim leak fires only when many claims expire in one hour, which means a systematic fault."]</script>
+<figcaption>The leak case. The address is a claim, so a lost rollback costs at most 10 minutes of one address. The reaper runs in every bembel replica and takes the expired claims with <code>FOR UPDATE SKIP LOCKED</code>.</figcaption>
+</figure>
+<p>These rules keep the state clean:</p>
+<ul>
+<li>A claim has the status <code>claimed</code> and <code>expires_at</code>. The default TTL is 10 minutes. It is longer than the longest poll interval plus two retries, so the sync can confirm a good claim first.</li>
+<li>The sync confirms a claim when it finds a port with that address in that subnet. The status becomes <code>allocated</code>. The key is replaced by the port id in <code>external_ref</code>.</li>
+<li>A <code>deallocate</code> call for an unknown address answers success. A repeated call does nothing.</li>
+<li>The sync also finds the opposite case: a port with an address that bembel does not know. It makes the address with <code>source=openstack:os-prod</code> and writes the finding <code>os.address-in-managed-subnet</code> if the subnet is managed.</li>
+</ul>
+
+<h3 id="driver-fail">Timeouts and fail-closed behaviour</h3>
+<p>The driver is on the API path of Neutron. Each call holds a Neutron worker and often a database lock. The driver must be fast and must stop early.</p>
+<table>
+<thead><tr><th>Case</th><th>Behaviour</th></tr></thead>
+<tbody>
+<tr><td>Connect time over 2 s, read time over 5 s</td><td>The driver retries 2 times with the same key. Then it raises <code>IpAddressGenerationFailure</code>. Neutron returns an error. No port is made.</td></tr>
+<tr><td>5 failures in 30 s</td><td>A circuit breaker opens for 20 s. The driver fails at once, without a call. This protects the Neutron workers.</td></tr>
+<tr><td>bembel answers 409 (address taken)</td><td>For a specific address: <code>IpAddressAlreadyAllocated</code>. For the next free address: the driver asks again (at most 3 times).</td></tr>
+<tr><td>bembel answers 429 or 503</td><td>The driver retries after the <code>Retry-After</code> time, within the read timeout.</td></tr>
+<tr><td>The pool is empty</td><td>bembel answers 409 <code>pool.exhausted</code>. The driver raises <code>IpAddressGenerationFailure</code>.</td></tr>
+<tr><td>bembel is down</td><td>Fail closed. The driver does <em>not</em> fall back to the internal driver. A fallback would give two sources of truth. Existing VMs keep running. New ports wait.</td></tr>
+</tbody>
+</table>
+<aside class="callout why">
+<p class="callout-title">Why fail closed</p>
+<p>An address that two systems give at the same time is worse than a failed port create. The user sees an error and tries again. An address conflict stays hidden until two VMs fight for one IP. The bembel API is in HA mode (<a href="operations.html#ha">Deployment and operations</a>), so a short outage is rare.</p>
+</aside>
+
+<h3 id="driver-pools">Subnet pools, address scopes and prefix pools</h3>
+<p>Neutron has <em>subnet pools</em>. Neutron carves tenant subnets from them. An <em>address scope</em> says that all subnet pools in the scope share one routing domain, so their prefixes never overlap. bembel has prefix pools (a container with the pool flag) in a VRF. The mapping is one to one.</p>
+<table>
+<thead><tr><th>Neutron</th><th>bembel</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Address scope <code>os-prod-v4</code></td><td>VRF <code>os-provider</code></td><td>One VRF holds all prefixes of the scope.</td></tr>
+<tr><td>Subnet pool <code>tenant-v4</code></td><td>Container prefix with the pool flag, in the VRF of its scope</td><td><code>10.200.0.0/16</code>, owner team <code>openstack</code>, <code>external_ref=os-prod:subnetpool:&lt;uuid&gt;</code></td></tr>
+<tr><td>Subnet from a pool</td><td>Child prefix, kind <code>subnet</code>, from <code>prefixes:allocate</code></td><td><code>10.200.14.0/24</code>, owner = team of the project</td></tr>
+<tr><td>External network, floating IPs</td><td>Subnet in VRF <code>global</code> below the container <code>10.30.0.0/16</code> "OpenStack"</td><td><code>10.30.128.0/20</code> for floating IPs</td></tr>
+<tr><td>Subnet without a pool</td><td>Prefix in the VRF per project (see <a href="#sync-loop">above</a>)</td><td><code>os-physics-lab: 192.168.1.0/24</code></td></tr>
+</tbody>
+</table>
+<p>Neutron keeps its own copy of the pool prefixes in its database. The driver cannot hide it. The rule is: bembel owns the prefix tree and Neutron mirrors it. An operator changes the pool in bembel; the sync then updates the Neutron subnet pool through a small admin command (<code>bembel sync openstack push-pools os-prod</code>, a phase 2 task). A change of the pool in Neutron by hand is a finding.</p>
+<p>Neutron allows only one IPAM driver for the whole cloud. It is not a setting per subnet pool. To start without risk, the site first runs the driver on a test cloud <code>os-test</code>. A cut-over on <code>os-prod</code> needs the existing allocations in bembel. Phase 1 already has them as observed objects. The cut-over changes their <code>managed_by</code> to the driver, in one step per subnet, after a check that the Neutron data and the bembel data agree.</p>
+
+<h2 id="keystone">Keystone and identity</h2>
+<p>Keystone and bembel are two clients of one IdP. Both trust the Keycloak realm <code>main</code> at <code>https://id.example.org/realms/main</code>. A user logs in once and has the same groups in both systems.</p>
+<h3 id="keystone-fed">Federation</h3>
+<ul>
+<li>Keystone is a service provider with Apache <code>mod_auth_openidc</code>. The attribute <code>remote_id_attribute = HTTP_OIDC_ISS</code> names the IdP.</li>
+<li>The mapping (schema 3.0, dynamic project assignment) reads the claim <code>groups</code> and the claim <code>openstack-projects</code> of Keycloak. Keystone makes the project and the role on first login.</li>
+<li>bembel reads the same <code>groups</code> claim. The group <code>openstack</code> maps to the team <code>openstack</code>. The user <code>s.yildiz</code> is in it.</li>
+</ul>
+<h3 id="keystone-map">Project to team</h3>
+<p>A bembel team is an owner of objects. A Keystone project has a stable UUID. The mapping table is part of the source config:</p>
+<pre><code class="language-yaml">    projects:                        # in the source os-prod
+      default_team: openstack
+      map:
+        - { project: "physics-lab",  team: hpc-ops }
+        - { project: "9d3f6b1e-6c3a-4f0b-8d2e-3f1c8f1a0b11", team: hpc-ops }
+        - { name_prefix: "tenant-",  team: openstack }</code></pre>
+<p>The team gets <code>external_ref=os-prod:project:&lt;uuid&gt;</code>. A project that is not in the table gets the <code>default_team</code> and a finding, so an operator sees the new project. The same project name in two clouds does not collide, because the external ref has the cloud name.</p>
+
+<h3 id="keystone-svc">Service identities</h3>
+<p>The driver has no end user. Neutron calls it for a request of a user, but the user token never reaches the driver. The driver has its own service identity and passes the project id from <code>SubnetRequest.project_id</code> as data. bembel trusts the driver for this statement and writes it to the audit event.</p>
+<table>
+<thead><tr><th>Service</th><th>How it logs in</th><th>Binding in bembel</th></tr></thead>
+<tbody>
+<tr><td><code>svc-neutron-os-prod</code> (driver)</td><td>OIDC client credentials at Keycloak. Short token, 5 min.</td><td>Role <code>allocator</code>, scope <code>vrf=os-provider</code>. A second binding: role <code>allocator</code>, scope <code>prefix=10.30.0.0/16</code> (VRF <code>global</code>).</td></tr>
+<tr><td><code>svc-sync-os-prod</code> (sync worker)</td><td>The same, or the built-in source identity of the bembel process.</td><td>A custom role <code>integration-sync</code> (<code>prefix:write</code>, <code>address:write</code>, <code>host:write</code>, <code>interface:write</code>) with the scope <code>vrf=os-provider</code> and the scope of each mapped VRF.</td></tr>
+<tr><td>sync worker to Keystone</td><td>An application credential with role <code>reader</code>. It is restricted and has an expiry date.</td><td>Not applicable.</td></tr>
+</tbody>
+</table>
+<pre><code class="language-bash">openstack application credential create bembel-sync \
+  --role reader --expiration 2027-11-04T00:00:00 \
+  --description "bembel read-only sync"</code></pre>
+<aside class="callout warn">
+<p class="callout-title">Open point</p>
+<p>An application credential is scoped to one project. The default Neutron policy lists the ports of all projects only for an admin. The design needs a policy override that gives the role <code>reader</code> a read-only view on ports, subnets and floating IPs of all projects. The exact rule names are not verified. The operator checks them against the release in use.</p>
+</aside>
+<p>The audit event of an allocation through the driver has: the subject <code>svc-neutron-os-prod</code>, the claim key, the asserted project and the Neutron request id. This is how a later question "who made 10.30.4.17" finds the Neutron request.</p>
+
+<h2 id="designate">Designate</h2>
+<p>Designate is the DNS service of OpenStack. It has an API for zones and record sets, and it pushes the zones to name servers (BIND, PowerDNS) with mini-DNS (AXFR and NOTIFY). Neutron can call it for each port (<code>dns_integration</code>, <code>dns_name</code>, <code>dns_domain</code>). Its sink makes records from Nova and Neutron events.</p>
+<p>bembel makes the campus DNS too. Two writers on one zone give lost records. There are three ways to combine them.</p>
+<table>
+<thead><tr><th>Option</th><th>Idea</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td>A. bembel reads</td><td>Designate owns its zones. bembel reads record sets (<code>/v2/zones/{id}/recordsets</code>) and shows them next to the addresses.</td><td>Phase 3. Good for visibility and for findings.</td></tr>
+<tr><td>B. bembel writes to Designate</td><td>bembel pushes records through the Designate API. Designate serves them.</td><td>No. Two systems keep the zone.</td></tr>
+<tr><td>C. Split by zone</td><td>bembel owns the campus zones. Designate owns only the tenant zones, in a sub-domain that bembel delegates.</td><td><strong>Recommended.</strong></td></tr>
+</tbody>
+</table>
+<h3 id="designate-split">Recommended split</h3>
+<table>
+<thead><tr><th>Zone</th><th>Writer</th><th>Served by</th></tr></thead>
+<tbody>
+<tr><td><code>example.org</code>, <code>kestrel.example.org</code></td><td>bembel</td><td>ns1, ns2, ns3 through the BIND export</td></tr>
+<tr><td><code>20.10.in-addr.arpa</code> and the other reverse zones of managed prefixes</td><td>bembel (computed)</td><td>ns1, ns2, ns3</td></tr>
+<tr><td><code>128.30.10.in-addr.arpa</code> (floating IPs)</td><td>bembel</td><td>ns1, ns2, ns3. The PTR of a floating IP comes from the address FQDN.</td></tr>
+<tr><td><code>os.example.org</code> (delegation point)</td><td>bembel writes only the NS and glue records</td><td>ns1, ns2, ns3</td></tr>
+<tr><td><code>tenant-a.os.example.org</code> and all zones below <code>os.example.org</code></td><td>Designate</td><td>The Designate name servers <code>ns-os1</code>, <code>ns-os2</code></td></tr>
+</tbody>
+</table>
+<ul>
+<li>Neutron sets <code>dns_domain = tenant-a.os.example.org.</code> on tenant networks. The external network has no <code>dns_domain</code>, so Neutron writes no record into a campus zone.</li>
+<li>A floating IP gets its campus name from bembel: the address in the external subnet has the FQDN <code>fip-0c41.os.example.org</code> or the name that a user sets in the UI. The sync never writes DNS.</li>
+<li>Each zone has the field <code>managed_by</code>. A zone below <code>os.example.org</code> that the sync finds in Designate is stored as a read-only zone with <code>managed_by=openstack-sync</code>. A user cannot add a record to it in bembel.</li>
+<li>bembel refuses to make a zone with the same name as a Designate zone that it knows. This is the rule "no two writers per zone".</li>
+</ul>
+<aside class="callout why">
+<p class="callout-title">Why not Designate for everything</p>
+<p>The campus has about 62 000 DNS records (<a href="map-ona.html#dns">ONA mapping</a>) and other sources than OpenStack. Hosts, switches and BMCs are not in Designate. Split-horizon views and RFC 2317 zones are core in bembel. Designate stays the right tool for tenants who create their own zones with the OpenStack API.</p>
+</aside>
+
+<h2 id="ironic">Ironic</h2>
+<p>Ironic manages bare metal. A physical machine in Ironic is a <em>node</em> with <em>ports</em>. A port is a NIC with a MAC (<code>address</code>), the flag <code>pxe_enabled</code> and the <code>local_link_connection</code> (the switch and the switch port). bembel uses Ironic in three ways.</p>
+<ol class="steps">
+  <li><strong>Learn MACs.</strong> The worker polls <code>GET /v1/ports?detail=true</code>. For each port it finds the host by MAC. If the host exists (for example <code>cn-004.kestrel.example.org</code> with <code>eno1</code> <code>3c:ec:ef:12:0a:44</code>), the Ironic node becomes an attribute of the host. If not, the worker makes an observed host and an asset link candidate.</li>
+  <li><strong>Provisioning networks.</strong> The provisioning, cleaning and rescue networks of Ironic are Neutron networks. Their addresses come through the Neutron driver. No extra hook is needed.</li>
+  <li><strong>Pre-reserved addresses.</strong> bembel can set <code>fixed_ips</code> on the Neutron port for a given MAC. The result: a node always gets the same address in the provisioning network. This is a phase 3 option.</li>
+</ol>
+<p>The node field <code>driver_info.redfish_address</code> (or <code>ipmi_address</code>) names the BMC. The worker looks it up in the VRF <code>oob</code>. If the address is <code>172.16.4.44</code> and the host <code>cn-004</code> has the interface <code>bmc</code> with that address, the worker links node and host. If the address is not in a managed subnet, it writes a finding.</p>
+<p>An Ironic port with <code>local_link_connection</code> data (switch id and port id from LLDP) feeds the asset link between the interface and the switch port from FNT Command. The match order stays: serial, asset tag, MAC, host name. A conflict goes to the review list.</p>
+<p>Standalone Ironic (no Neutron, external DHCP) is a special case. There bembel is the DHCP source: the dhcpd export has a reservation for each Ironic MAC that has an address (<a href="dhcp.html#export">ISC dhcpd export</a>).</p>
+
+<h2 id="phases">Phases</h2>
+<table>
+<thead><tr><th>Phase</th><th>Content</th><th>Needs in bembel</th><th>Risk</th></tr></thead>
+<tbody>
+<tr><td>0 Model</td><td>External refs, observed objects, <code>managed_by</code>, VM host kind, claims with TTL, idempotency keys, multi-issuer OIDC</td><td>Core API (<a href="api.html">REST API</a>)</td><td>Low</td></tr>
+<tr><td>1 Sync</td><td>Poll Neutron, Ironic and Keystone. Observed subnets, ports, floating IPs, VM hosts. Findings for overlaps</td><td>Phase 0, the source worker</td><td>Low. Read-only.</td></tr>
+<tr><td>2a Driver on a test cloud</td><td><code>networking-bembel</code> on <code>os-test</code>. Test with Tempest and a load test</td><td>Phase 1 stable, reaper</td><td>Medium. Fail closed.</td></tr>
+<tr><td>2b Driver on <code>os-prod</code></td><td>Cut-over subnet by subnet. Subnet pools mirror bembel pools</td><td>Phase 2a, HA bembel</td><td>High. On the API path.</td></tr>
+<tr><td>3 Extras</td><td>Notification consumer, Designate read, Ironic reservations, Keystone dynamic mapping</td><td>Phase 2</td><td>Low</td></tr>
+</tbody>
+</table>
+<p>The package <code>networking-bembel</code> needs CI against Neutron master and against the two last stable releases. The pool-level interface has few tests upstream and some TODO notes in its docstrings.</p>
+
+<h2 id="risks">Risks</h2>
+<table>
+<thead><tr><th>#</th><th>Risk</th><th>Effect</th><th>Answer</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>The driver is synchronous on the Neutron API path.</td><td>A bembel outage stops port creates.</td><td>HA, short timeouts, circuit breaker, fail closed. Alert on the latency of <code>allocate</code>.</td></tr>
+<tr><td>2</td><td>A deadlock retry calls <code>allocate</code> twice.</td><td>Duplicate or leaked addresses.</td><td>Idempotency key from the request id. Claims with a TTL.</td></tr>
+<tr><td>3</td><td>The rollback is best effort.</td><td>A claim without a port.</td><td>The reaper. The alert "claim leak".</td></tr>
+<tr><td>4</td><td>Only one IPAM driver per cloud. The interface is thin and changes between releases.</td><td>A release upgrade breaks the driver.</td><td>CI against Neutron master. A test cloud first.</td></tr>
+<tr><td>5</td><td>Two sources of truth: the Neutron database and bembel.</td><td>Drift.</td><td>The sync compares every hour. A finding for each difference.</td></tr>
+<tr><td>6</td><td>Notifications are lost.</td><td>Late view.</td><td>The full list is the truth. Notifications only reduce lag.</td></tr>
+<tr><td>7</td><td>No maintained upstream external driver is known. The Infoblox driver is in the <code>x/</code> namespace and its state is not verified.</td><td>The project owns the driver.</td><td>Keep it small. Put all logic in bembel.</td></tr>
+<tr><td>8</td><td>Python in a Go project. Packaging for each OpenStack release.</td><td>Work for the maintainers.</td><td>One thin package, no logic, wheel plus Debian package.</td></tr>
+<tr><td>9</td><td>Project ids collide in a multi-cloud setup.</td><td>Wrong owner.</td><td>The external ref has the cloud name.</td></tr>
+<tr><td>10</td><td>SLAAC addresses are not allocated by any IPAM.</td><td>IPv6 shows only what the sync sees.</td><td>Mark them observed. Do not count them as used in a pool.</td></tr>
+<tr><td>11</td><td>The sync credential sees all projects.</td><td>A leak of the credential shows all tenant data.</td><td>Role <code>reader</code>, expiry, rotation, secret in a Kubernetes secret.</td></tr>
+</tbody>
+</table>
+</body>
+</html>

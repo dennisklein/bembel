@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Virtual machines</title>
+<meta name="description" content="One VM model for libvirt on Debian, OpenStack and other platforms: bembel-agent, bembel vm prepare, the libvirt hook, cloud-init network config and the VM lifecycle.">
+</head>
+<body>
+<h1>Virtual machines</h1>
+<p class="lede">This chapter specifies how bembel handles virtual machines. OpenStack is one source of VMs. Many sites also run plain Debian hypervisors with libvirt. bembel has one VM model for both, and for any other platform. This chapter gives the libvirt path in detail: the agent, the prepare command, the hook and the lifecycle.</p>
+<ul class="keypoints">
+  <li>A VM is a host with <code>kind=vm</code>, a <code>platform</code> (<code>libvirt</code>, <code>openstack</code>, <code>other</code>) and a <code>runs_on</code> link to its hypervisor host.</li>
+  <li>On a Debian hypervisor, the Go daemon <code>bembel-agent</code> reads the libvirt domains over the read-only local socket. It reports them as observed VMs with <code>source=libvirt:&lt;hypervisor&gt;</code>.</li>
+  <li><code>bembel vm prepare</code> claims the addresses, makes the DNS records and the DHCP reservation, and prints the MAC and a cloud-init NoCloud network config.</li>
+  <li>The libvirt hook <code>/etc/libvirt/hooks/qemu</code> confirms the claim on <code>prepare</code>. The agent does the rest. A bembel outage never stops a VM start.</li>
+  <li>The address lifecycle is: claimed, allocated, deprecated, released after a grace time (default 7 days). A live migration changes only <code>runs_on</code>.</li>
+  <li>OpenStack VMs use the same model. Only the source and the way of allocation differ.</li>
+</ul>
+
+<h2 id="model">One VM model</h2>
+<p>A VM is a <em>host</em>, like a server or a switch. It has interfaces with MACs, and the interfaces have addresses. Three fields set the VM apart.</p>
+<dl class="facts">
+  <dt>kind</dt><dd><code>vm</code>. The other kinds are <code>physical</code>, <code>hypervisor</code>, <code>appliance</code> and <code>container-node</code>.</dd>
+  <dt>platform</dt><dd><code>libvirt</code>, <code>openstack</code> or <code>other</code> (for example VMware or Proxmox, made by hand or by Terraform).</dd>
+  <dt>runs_on</dt><dd>A link to the hypervisor host. The hypervisor is a host with <code>kind=hypervisor</code>. It can be a physical server with an asset link to its FNT device.</dd>
+</dl>
+<figure class="diagram wide">
+<svg viewBox="0 0 960 330" role="img" aria-labelledby="vm-model-t">
+<title id="vm-model-t">One VM model: three hypervisors, three VMs, their interfaces and addresses</title>
+<text class="t-small t-muted" x="20" y="22">hypervisor host</text>
+<text class="t-small t-muted" x="330" y="22">VM host</text>
+<text class="t-small t-muted" x="650" y="22">interface and address</text>
+<rect class="box" x="20" y="36" width="230" height="72" rx="8"/>
+<text class="t-title" x="36" y="60">hv-03.example.org</text>
+<text class="t-small t-muted" x="36" y="80">kind hypervisor · Debian · libvirt</text>
+<text class="t-small t-muted" x="36" y="96">bridges br204, br220</text>
+<rect class="box-accent" x="330" y="36" width="260" height="72" rx="8"/>
+<text class="t-title t-on" x="346" y="60">vm-build-07</text>
+<text class="t-small t-on" x="346" y="80">platform libvirt</text>
+<text class="t-small t-on" x="346" y="96">source libvirt:hv-03</text>
+<rect class="box-soft" x="650" y="36" width="290" height="72" rx="8"/>
+<text class="t-title" x="666" y="60">eth0 52:54:00:5e:3a:b1</text>
+<text class="t-small" x="666" y="80">10.20.20.37 (kestrel-services)</text>
+<text class="t-small" x="666" y="96">2001:db8:4200:220::37</text>
+<line class="edge" x1="330" y1="72" x2="252" y2="72" marker-end="url(#arrow)"/>
+<text class="t-small" x="291" y="64" text-anchor="middle">runs_on</text>
+<line class="edge" x1="590" y1="72" x2="648" y2="72" marker-end="url(#arrow)"/>
+<rect class="box" x="20" y="132" width="230" height="72" rx="8"/>
+<text class="t-title" x="36" y="156">hv-os-17.example.org</text>
+<text class="t-small t-muted" x="36" y="176">kind hypervisor · Nova compute</text>
+<text class="t-small t-muted" x="36" y="192">source openstack:os-prod</text>
+<rect class="box-info" x="330" y="132" width="260" height="72" rx="8"/>
+<text class="t-title" x="346" y="156">web-12.os.example.org</text>
+<text class="t-small t-muted" x="346" y="176">platform openstack</text>
+<text class="t-small t-muted" x="346" y="192">source openstack:os-prod</text>
+<rect class="box-soft" x="650" y="132" width="290" height="72" rx="8"/>
+<text class="t-title" x="666" y="156">port fa:16:3e:8b:2d:10</text>
+<text class="t-small" x="666" y="176">10.200.14.9 (tenant subnet)</text>
+<text class="t-small t-muted" x="666" y="192">external_ref os-prod:port:…</text>
+<line class="edge" x1="330" y1="168" x2="252" y2="168" marker-end="url(#arrow)"/>
+<line class="edge" x1="590" y1="168" x2="648" y2="168" marker-end="url(#arrow)"/>
+<rect class="box" x="20" y="228" width="230" height="72" rx="8"/>
+<text class="t-title" x="36" y="252">vh-09.example.org</text>
+<text class="t-small t-muted" x="36" y="272">kind hypervisor · other</text>
+<text class="t-small t-muted" x="36" y="288">source local</text>
+<rect class="box-muted" x="330" y="228" width="260" height="72" rx="8"/>
+<text class="t-title" x="346" y="252">db-02.kestrel.example.org</text>
+<text class="t-small t-muted" x="346" y="272">platform other</text>
+<text class="t-small t-muted" x="346" y="288">source local · made by hand</text>
+<rect class="box-soft" x="650" y="228" width="290" height="72" rx="8"/>
+<text class="t-title" x="666" y="252">eth0 00:50:56:a1:00:12</text>
+<text class="t-small" x="666" y="272">10.20.20.52 (kestrel-services)</text>
+<text class="t-small t-muted" x="666" y="288">status allocated</text>
+<line class="edge" x1="330" y1="264" x2="252" y2="264" marker-end="url(#arrow)"/>
+<line class="edge" x1="590" y1="264" x2="648" y2="264" marker-end="url(#arrow)"/>
+</svg>
+<figcaption>Three VMs with the same fields. The first comes from the libvirt agent, the second from the OpenStack sync, the third from a user. Queries, DNS, DHCP and the UI work in the same way for all three.</figcaption>
+</figure>
+<p>Two rules keep the model clean. They are the <em>observed or managed</em> rules (<a href="#rules">details below</a>).</p>
+<ul>
+<li>An <strong>observed</strong> VM is a fact that a source reported. The source owns it: the agent for <code>libvirt:hv-03</code>, the sync for <code>openstack:os-prod</code>. A user cannot edit its identity (name, UUID, MACs). A user can add tags and notes.</li>
+<li>A <strong>managed</strong> VM is a plan that a user made before the VM exists (<code>bembel vm prepare</code>). The user owns the name, the address and the DNS name. The source only confirms the facts and sets <code>runs_on</code> and the state.</li>
+</ul>
+
+<h2 id="libvirt">libvirt on Debian</h2>
+<p>The example hypervisors are <code>hv-01</code> to <code>hv-06.example.org</code>. They run Debian with <code>libvirt-daemon-system</code> and KVM. Each hypervisor has VLAN bridges, for example <code>br204</code> on VLAN 204 (subnet <code>kestrel-compute</code>) and <code>br220</code> on VLAN 220 (subnet <code>kestrel-services</code>, <code>10.20.20.0/24</code> and <code>2001:db8:4200:220::/64</code>). A domain connects to a bridge. This is the part of its XML that bembel reads:</p>
+<pre><code class="language-xml">&lt;domain type='kvm'&gt;
+  &lt;name&gt;vm-build-07&lt;/name&gt;
+  &lt;uuid&gt;6f1d6a2e-8a1c-4c76-b0a5-3b1d2f9c7e10&lt;/uuid&gt;
+  &lt;memory unit='GiB'&gt;8&lt;/memory&gt;
+  &lt;vcpu&gt;4&lt;/vcpu&gt;
+  &lt;devices&gt;
+    &lt;interface type='bridge'&gt;
+      &lt;mac address='52:54:00:5e:3a:b1'/&gt;
+      &lt;source bridge='br220'/&gt;
+      &lt;model type='virtio'/&gt;
+    &lt;/interface&gt;
+  &lt;/devices&gt;
+&lt;/domain&gt;</code></pre>
+<p>An interface can also be <code>type='network'</code> (a libvirt network, with <code>&lt;source network='...'/&gt;</code>) or <code>type='direct'</code> (macvtap on a NIC). The agent reads the type, the MAC and the source name. It maps the bridge to a subnet in this order:</p>
+<ol class="steps">
+  <li>The agent config has a table <code>bridges</code> (for example <code>br220</code> to <code>kestrel-services</code>).</li>
+  <li>If the table has no entry, bembel looks for a subnet with the VLAN id in the bridge name (<code>br220</code> gives VLAN 220).</li>
+  <li>If both fail, the interface has no subnet. The VM is shown with a warning.</li>
+</ol>
+<p>An interface of type <code>hostdev</code> (SR-IOV virtual function) has a PCI address and a MAC. The agent reports it as a normal interface with the tag <code>sriov=true</code>. A passed-through InfiniBand function is reported with its port GUID if the domain XML shows it (not verified for all drivers).</p>
+
+<h2 id="agent">bembel-agent</h2>
+<p>The agent is a small Go daemon in a Debian package. It runs on each hypervisor. It has three jobs: it reads the domains, it reports them and it answers the hook.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 960 360" role="img" aria-labelledby="vm-agent-t">
+<title id="vm-agent-t">On a hypervisor: libvirtd, the hook, bembel-agent and the connection to the bembel API</title>
+<rect class="zone" x="12" y="30" width="580" height="310" rx="10"/>
+<text class="t-title" x="28" y="54">hv-03.example.org (Debian)</text>
+<rect class="box" x="32" y="78" width="220" height="86" rx="8"/>
+<text class="t-title" x="48" y="102">libvirtd</text>
+<text class="t-small t-muted" x="48" y="122">domains: name, UUID, state, XML</text>
+<text class="t-small t-mono" x="48" y="142">libvirt-sock-ro</text>
+<rect class="box" x="32" y="214" width="220" height="86" rx="8"/>
+<text class="t-title" x="48" y="238">hook script</text>
+<text class="t-small t-muted" x="48" y="258">prepare and release events</text>
+<text class="t-small t-mono" x="48" y="278">hooks/qemu</text>
+<rect class="box-accent" x="340" y="110" width="232" height="150" rx="8"/>
+<text class="t-title t-on" x="356" y="136">bembel-agent</text>
+<text class="t-small t-on" x="356" y="158">reads domains and events</text>
+<text class="t-small t-on" x="356" y="176">answers the hook</text>
+<text class="t-small t-on" x="356" y="194">reports to bembel</text>
+<text class="t-small t-mono t-on" x="356" y="228">hook.sock (unix)</text>
+<line class="edge" x1="252" y1="121" x2="338" y2="150" marker-end="url(#arrow)"/>
+<text class="t-small" x="296" y="116" text-anchor="middle">events</text>
+<line class="edge" x1="252" y1="257" x2="338" y2="226" marker-end="url(#arrow)"/>
+<text class="t-small" x="296" y="276" text-anchor="middle">HTTP</text>
+<line class="edge-muted" x1="142" y1="214" x2="142" y2="166" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="152" y="194">libvirt calls</text>
+<rect class="box" x="680" y="78" width="268" height="140" rx="8"/>
+<text class="t-title" x="696" y="102">bembel API</text>
+<text class="t-small t-muted" x="696" y="124">POST /v1/sources/libvirt:hv-03/report</text>
+<text class="t-small t-muted" x="696" y="144">POST /v1/addresses/{id}:confirm</text>
+<text class="t-small t-muted" x="696" y="164">service identity svc-agent-hv-03</text>
+<text class="t-small t-muted" x="696" y="184">OIDC token, 5 min</text>
+<rect class="box-info" x="680" y="252" width="268" height="60" rx="8"/>
+<text class="t-title" x="696" y="276">bembel vm prepare</text>
+<text class="t-small t-muted" x="696" y="296">CLI or API, from any machine</text>
+<line class="edge-accent" x1="572" y1="170" x2="678" y2="150" marker-end="url(#arrow-accent)"/>
+<text class="t-small" x="624" y="140" text-anchor="middle">HTTPS</text>
+<line class="edge" x1="814" y1="252" x2="814" y2="220" marker-end="url(#arrow)"/>
+</svg>
+<figcaption>The agent uses only the read-only libvirt socket. It cannot start or stop a domain. The hook sends its events to the agent through a local Unix socket. Only the agent talks to bembel.</figcaption>
+</figure>
+
+<h3 id="agent-package">Package and service</h3>
+<p>The Debian package <code>bembel-agent</code> has the binary <code>/usr/bin/bembel-agent</code>, the unit file, the example config and the hook script. It depends on <code>libvirt-daemon-system | libvirt-daemon</code>. The post-install script makes the user <code>bembel-agent</code> and adds it to the group <code>libvirt</code>. This group may open the read-only socket.</p>
+<pre><code class="language-ini"># /lib/systemd/system/bembel-agent.service
+[Unit]
+Description=bembel agent (libvirt inventory)
+After=libvirtd.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=bembel-agent
+Group=libvirt
+RuntimeDirectory=bembel-agent
+ExecStart=/usr/bin/bembel-agent --config /etc/bembel/agent.yaml
+Restart=on-failure
+RestartSec=5
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true
+ReadWritePaths=/run/bembel-agent /var/lib/bembel-agent
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+<pre><code class="language-yaml"># /etc/bembel/agent.yaml
+server: https://ipam.example.org
+hypervisor: hv-03.example.org        # the host name in bembel
+source: libvirt:hv-03                # source name of every VM it reports
+auth:
+  method: oidc-client-credentials    # or: token (a personal token for small sites)
+  token_url: https://id.example.org/realms/main/protocol/openid-connect/token
+  client_id: svc-agent-hv-03
+  client_secret_file: /etc/bembel/agent.secret
+libvirt:
+  uri: qemu:///system
+  read_only: true
+  report_every: 5m                   # full inventory; events go at once
+  guest_agent: false                 # true: read guest IPs with qemu-guest-agent
+bridges:
+  br204: kestrel-compute
+  br220: kestrel-services
+hook:
+  socket: /run/bembel-agent/hook.sock
+  enforce: warn                      # off | warn | deny (see hook)
+  timeout: 3s</code></pre>
+<p>A Go library without cgo reads the socket (candidate: <code>digitalocean/go-libvirt</code>). The agent stays one static binary.</p>
+
+<h3 id="agent-report">What the agent reports</h3>
+<p>The agent subscribes to the libvirt lifecycle events (defined, undefined, started, stopped, migrated). It sends a full inventory on start and every <code>report_every</code>. It also sends each event at once. The report is idempotent: bembel replaces the set of VMs of this source.</p>
+<pre><code class="language-json">{
+  "source": "libvirt:hv-03",
+  "hypervisor": "hv-03.example.org",
+  "reported_at": "2026-11-04T09:31:07Z",
+  "vms": [
+    {
+      "name": "vm-build-07",
+      "uuid": "6f1d6a2e-8a1c-4c76-b0a5-3b1d2f9c7e10",
+      "state": "running",
+      "persistent": true,
+      "interfaces": [
+        { "mac": "52:54:00:5e:3a:b1", "type": "bridge", "source": "br220", "model": "virtio" }
+      ]
+    }
+  ]
+}</code></pre>
+<table>
+<thead><tr><th>Field</th><th>Use in bembel</th></tr></thead>
+<tbody>
+<tr><td><code>uuid</code></td><td>The identity of the VM host. It stays the same in a live migration (<code>external_ref=libvirt:uuid:…</code>).</td></tr>
+<tr><td><code>name</code></td><td>The domain name. It is the host name when the VM is new. A prepared VM keeps the name it has.</td></tr>
+<tr><td><code>state</code></td><td>Attribute <code>power_state</code> (<code>running</code>, <code>shut off</code>, <code>paused</code>, <code>crashed</code>). It does not change the address status.</td></tr>
+<tr><td><code>persistent</code></td><td>A transient domain has no definition. It cannot come back after a stop.</td></tr>
+<tr><td><code>interfaces[]</code></td><td>Interface rows by MAC. The bridge selects the subnet.</td></tr>
+</tbody>
+</table>
+<p>The agent does not see the IP inside the guest. Three sources fill this gap. First, a prepared VM has its address from bembel. Second, with <code>guest_agent: true</code> the agent asks the QEMU guest agent for the guest interfaces (works only if the guest runs it). Third, the DHCP lease file of the DHCP servers shows the address that a MAC uses (<a href="dhcp.html#leases">DHCP chapter</a>). An address that the agent or a lease shows in a managed subnet without a claim is a finding (<code>vm.address-without-claim</code>).</p>
+<p>The agent has a service identity. In Keycloak this is a client <code>svc-agent-hv-03</code> with client credentials. bembel gives it the custom role <code>hypervisor-agent</code> (permissions <code>host:write</code>, <code>interface:write</code>, <code>address:confirm</code>) in the scope of the site. A personal token is possible for a small site, but it must expire. The agent can only write VMs of its own source. bembel refuses a report for another source name.</p>
+
+<h2 id="prepare">Prepare a VM</h2>
+<p><code>bembel vm prepare</code> does the planning work before the VM exists. The command (or <code>POST /v1/vms:prepare</code>) does these steps in one transaction:</p>
+<ol class="steps">
+  <li>It makes the host <code>vm-build-07.kestrel.example.org</code> with <code>kind=vm</code>, <code>platform=libvirt</code> and the owner team.</li>
+  <li>It generates a MAC (<code>--mac auto</code>) in the QEMU range <code>52:54:00</code>, or it checks the MAC that the user gave. Duplicate MACs are refused.</li>
+  <li>It claims one address for each family of the subnet. The claim has a TTL (default 24 h).</li>
+  <li>It sets the FQDN on the addresses, so the A, AAAA and PTR records are derived.</li>
+  <li>If the subnet has a DHCP scope, it makes the reservation (MAC to address).</li>
+  <li>It renders the cloud-init network config and the meta-data.</li>
+</ol>
+<pre class="term">$ bembel vm prepare --name vm-build-07 --subnet kestrel-services \
+    --mac auto --hypervisor hv-03 --out ./vm-build-07
+prepared vm-build-07.kestrel.example.org
+  host     vm-build-07   kind vm · platform libvirt · owner hpc-ops
+  runs_on  hv-03.example.org (planned)
+  mac      52:54:00:5e:3a:b1   generated, unique
+  claim    10.20.20.37/24              claimed, expires 2026-11-05T09:20:00Z
+  claim    2001:db8:4200:220::37/64    claimed, expires 2026-11-05T09:20:00Z
+  dns      A, AAAA, PTR   derived, in the next export (about 30 s)
+  dhcp     reservation on dhcp-a, scope kestrel-services
+wrote ./vm-build-07/network-config
+wrote ./vm-build-07/meta-data
+next:
+  virt-install --name vm-build-07 --network bridge=br220,mac=52:54:00:5e:3a:b1 ...
+  The claim is confirmed when the domain is created on hv-03.</pre>
+<p>Options of the command:</p>
+<table class="compact">
+<thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>--name</code></td><td>required</td><td>Host name (short). The FQDN uses the <code>dnsZone</code> of the subnet.</td></tr>
+<tr><td><code>--subnet</code></td><td>required</td><td>A subnet name, or a subnet pair for dual stack. A repeat of the option adds an interface.</td></tr>
+<tr><td><code>--mac</code></td><td><code>auto</code></td><td><code>auto</code> or a MAC.</td></tr>
+<tr><td><code>--hypervisor</code></td><td>none</td><td>Sets the planned <code>runs_on</code>. The agent sets the real one.</td></tr>
+<tr><td><code>--config</code></td><td><code>static</code></td><td><code>static</code> puts the address in the network config. <code>dhcp</code> leaves the guest to ask DHCP. The reservation exists in both cases.</td></tr>
+<tr><td><code>--ttl</code></td><td><code>24h</code></td><td>Life of the claim.</td></tr>
+<tr><td><code>--out</code></td><td>stdout</td><td>Directory for <code>network-config</code> and <code>meta-data</code>.</td></tr>
+</tbody>
+</table>
+<p>The command is idempotent for one name: a second call with the same arguments returns the same result. It needs the permissions <code>prefix:allocate</code> and <code>host:write</code> in the subnet.</p>
+
+<h2 id="cloud-init">cloud-init network config</h2>
+<p>The files use the NoCloud data source of cloud-init. The network config is version 2 (Netplan style). It matches the interface by MAC, so the name inside the guest does not matter.</p>
+<pre><code class="language-yaml"># ./vm-build-07/network-config
+version: 2
+ethernets:
+  eth0:
+    match:
+      macaddress: "52:54:00:5e:3a:b1"
+    set-name: eth0
+    addresses:
+      - 10.20.20.37/24
+      - 2001:db8:4200:220::37/64
+    routes:
+      - to: 0.0.0.0/0
+        via: 10.20.20.1
+      - to: "::/0"
+        via: 2001:db8:4200:220::1
+    nameservers:
+      search: [kestrel.example.org, example.org]
+      addresses: [10.0.0.53, 10.0.0.54]</code></pre>
+<pre><code class="language-yaml"># ./vm-build-07/meta-data
+instance-id: 0193a8f2-7c11-7d2e-9b41-6c5d0f3a8e02    # the host id in bembel
+local-hostname: vm-build-07</code></pre>
+<p>The gateway comes from the subnet. The resolvers and the search list come from the DHCP options of the scope (<code>domain-name-servers</code>, <code>domain-search</code>), so DHCP and static guests get the same values. With <code>--config dhcp</code> the file has only <code>dhcp4: true</code> and <code>dhcp6: true</code> for the matched interface.</p>
+<p>The admin then builds the seed image and creates the domain:</p>
+<pre><code class="language-bash">cloud-localds -N vm-build-07/network-config \
+  /var/lib/libvirt/images/vm-build-07-seed.iso user-data vm-build-07/meta-data
+
+virt-install --connect qemu+ssh://root@hv-03.example.org/system \
+  --name vm-build-07 --memory 8192 --vcpus 4 --import --osinfo debian13 \
+  --disk path=/var/lib/libvirt/images/vm-build-07.qcow2 \
+  --disk path=/var/lib/libvirt/images/vm-build-07-seed.iso,device=cdrom \
+  --network bridge=br220,mac=52:54:00:5e:3a:b1,model=virtio \
+  --noautoconsole</code></pre>
+<p>Check the options of your <code>virt-install</code> version. Newer versions can also take the files directly with <code>--cloud-init</code>.</p>
+
+<h2 id="hook">The libvirt hook</h2>
+<p>libvirt calls the script <code>/etc/libvirt/hooks/qemu</code> for every QEMU domain. It passes four arguments: the guest name, the operation, a sub-operation and an extra argument. The domain XML is on standard input. The two events that bembel uses are:</p>
+<table class="compact">
+<thead><tr><th>Call</th><th>When</th><th>Action of the hook</th></tr></thead>
+<tbody>
+<tr><td><code>qemu NAME prepare begin -</code></td><td>Before the resources of the domain are set up</td><td>Send the XML to the agent. The agent confirms the claim by MAC.</td></tr>
+<tr><td><code>qemu NAME release end -</code></td><td>After the domain stopped and the resources are free</td><td>Tell the agent. If the domain is gone (transient, or undefined), the agent starts the grace time.</td></tr>
+</tbody>
+</table>
+<pre><code class="language-shell">#!/bin/sh
+# /etc/libvirt/hooks/qemu  (installed by: bembel-agent install-hook)
+# libvirt calls: qemu GUEST OPERATION SUB-OPERATION EXTRA   (domain XML on stdin)
+guest="$1"; op="$2"; sub="$3"
+sock=/run/bembel-agent/hook.sock
+
+call() {  # call PATH ; the XML on stdin goes to the agent
+    curl -sS --max-time 4 --unix-socket "$sock" -o /dev/null -w '%{http_code}' \
+         -X POST -H 'Content-Type: application/xml' --data-binary @- \
+         "http://agent/hook/$1?name=$guest"
+}
+
+case "$op/$sub" in
+  prepare/begin)
+    code=$(call prepare) || code=000
+    case "$code" in
+      200) ;;                                    # claim confirmed, or not needed
+      403) echo "bembel: no claim for $guest" >&2; exit 1 ;;   # enforce: deny
+      *)   logger -t bembel-hook "prepare $guest: agent answered $code (ignored)" ;;
+    esac ;;
+  release/end)
+    code=$(call release) || code=000
+    [ "$code" = 200 ] || logger -t bembel-hook "release $guest: agent answered $code" ;;
+esac
+exit 0</code></pre>
+<p>The agent decides on the policy, not the script. For <code>prepare</code> it looks up the MACs of the domain. If it finds a claim for a MAC, it calls <code>POST /v1/addresses/{id}:confirm</code> and answers 200. If it finds no claim, the answer depends on <code>hook.enforce</code>:</p>
+<table class="compact">
+<thead><tr><th>enforce</th><th>No claim for the MACs</th></tr></thead>
+<tbody>
+<tr><td><code>off</code></td><td>Answer 200. The agent only reports the VM later.</td></tr>
+<tr><td><code>warn</code> (default)</td><td>Answer 200. The agent writes a finding <code>vm.no-claim</code>.</td></tr>
+<tr><td><code>deny</code></td><td>Answer 403. The hook exits 1 and libvirt does not start the domain. The message says: run <code>bembel vm prepare</code>.</td></tr>
+</tbody>
+</table>
+<aside class="callout why">
+<p class="callout-title">Why the hook fails open</p>
+<p>The Neutron driver fails closed, because two systems must not give one address. A hypervisor is different. A VM that already has its address must start when bembel is down, for example after a power loss that also took the network. If the agent does not answer, the hook logs the problem and lets the domain start. The agent confirms the claim later, when it can reach bembel. The claim TTL of 24 h is long enough for this.</p>
+</aside>
+<aside class="callout warn">
+<p class="callout-title">What the hook cannot see</p>
+<p>libvirt has no hook for "define" or "undefine". The <code>release</code> event comes at every stop. A stopped but defined domain is not deleted. Therefore the hook only informs the agent, and the agent decides: it deprecates the address only when the domain is transient or when a libvirt <em>undefined</em> event comes. After the first install of the hook, restart <code>libvirtd</code> once. Running domains stay up. A site that already uses hooks puts the script in <code>/etc/libvirt/hooks/qemu.d/10-bembel</code> (libvirt 6.5 and later).</p>
+</aside>
+
+<h2 id="lifecycle">Lifecycle</h2>
+<p>The VM and its addresses have separate states. The address status follows the domain.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 960 330" role="img" aria-labelledby="vm-life-t">
+<title id="vm-life-t">Address states of a VM: claimed, allocated, deprecated, released</title>
+<rect class="box-info" x="30" y="70" width="170" height="70" rx="10"/>
+<text class="t-title" x="115" y="100" text-anchor="middle">claimed</text>
+<text class="t-small t-muted" x="115" y="120" text-anchor="middle">TTL 24 h</text>
+<rect class="box-ok" x="290" y="70" width="170" height="70" rx="10"/>
+<text class="t-title" x="375" y="100" text-anchor="middle">allocated</text>
+<text class="t-small t-muted" x="375" y="120" text-anchor="middle">domain defined</text>
+<rect class="box-warn" x="550" y="70" width="170" height="70" rx="10"/>
+<text class="t-title" x="635" y="100" text-anchor="middle">deprecated</text>
+<text class="t-small t-muted" x="635" y="120" text-anchor="middle">domain undefined</text>
+<rect class="box-muted" x="780" y="70" width="150" height="70" rx="10"/>
+<text class="t-title" x="855" y="100" text-anchor="middle">released</text>
+<text class="t-small t-muted" x="855" y="120" text-anchor="middle">free, records gone</text>
+<line class="edge" x1="200" y1="105" x2="288" y2="105" marker-end="url(#arrow)"/>
+<text class="t-small" x="244" y="64" text-anchor="middle">hook prepare</text>
+<text class="t-small t-muted" x="244" y="80" text-anchor="middle">confirms</text>
+<line class="edge" x1="460" y1="105" x2="548" y2="105" marker-end="url(#arrow)"/>
+<text class="t-small" x="504" y="64" text-anchor="middle">undefine,</text>
+<text class="t-small t-muted" x="504" y="80" text-anchor="middle">UUID nowhere</text>
+<line class="edge" x1="720" y1="105" x2="778" y2="105" marker-end="url(#arrow)"/>
+<text class="t-small" x="749" y="64" text-anchor="middle">7 days</text>
+<path class="edge-muted" d="M635,140 C635,210 375,210 375,142" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="505" y="212" text-anchor="middle">defined again with the same MAC within the grace time</text>
+<path class="edge-err" d="M115,140 C115,290 855,290 855,142" marker-end="url(#arrow)"/>
+<text class="t-small t-err" x="485" y="284" text-anchor="middle">TTL ends without a domain: the reaper releases the claim</text>
+<path class="edge-accent" d="M330,70 C330,30 420,30 420,68" marker-end="url(#arrow-accent)"/>
+<text class="t-small t-accent" x="375" y="22" text-anchor="middle">live migration: runs_on changes</text>
+</svg>
+<figcaption>The states of an address of a VM. A claim comes from <code>vm prepare</code>. The agent or the hook confirms it. The domain undefine starts the grace time. A migration does not change the status.</figcaption>
+</figure>
+<table>
+<thead><tr><th>Event</th><th>Seen by</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td><code>vm prepare</code></td><td>bembel</td><td>Addresses <code>claimed</code>, DNS and DHCP reservation made.</td></tr>
+<tr><td>Domain with a claimed MAC is created</td><td>Hook <code>prepare</code> or the agent report</td><td>Claim confirmed: <code>allocated</code>. <code>runs_on</code> is set to the reporting hypervisor.</td></tr>
+<tr><td>Domain without a claim appears</td><td>Agent</td><td>Observed VM (<code>source=libvirt:hv-03</code>). Finding <code>vm.no-claim</code>. If the MAC matches an existing reservation, bembel links them.</td></tr>
+<tr><td>Domain stops</td><td>Hook <code>release</code>, agent event</td><td>Only <code>power_state</code> changes. The address stays <code>allocated</code>.</td></tr>
+<tr><td>Domain is undefined, and no hypervisor reports the UUID within two report cycles (10 min)</td><td>Agent</td><td>Addresses <code>deprecated</code> with <code>deprecated_at</code>. DNS records and the reservation stay.</td></tr>
+<tr><td>Grace time ends (<code>vm.release_grace</code>, default 7 d)</td><td>Reaper</td><td>Addresses released. Records and reservation removed. The host becomes <code>deprecated</code>, then it is deleted by the retention rule of the host kind.</td></tr>
+<tr><td>A domain with the same MAC returns in the grace time</td><td>Agent</td><td>Addresses <code>allocated</code> again. Same IP.</td></tr>
+<tr><td>Live migration from hv-02 to hv-03</td><td>Both agents</td><td>The UUID is on hv-03. <code>runs_on</code> and <code>source</code> change. Nothing else.</td></tr>
+<tr><td><code>bembel vm release vm-build-07 --now</code></td><td>User</td><td>Skips the grace time. Needs a confirmation.</td></tr>
+</tbody>
+</table>
+<aside class="callout why">
+<p class="callout-title">Why a grace time</p>
+<p>A defined domain disappears by mistake more often than an address is reused at once. A VM that an admin undefined by accident, and defined again an hour later, must get its old IP and its old DNS name. The grace time also keeps the DNS name from being taken at once. After 7 days the address is free for the next VM.</p>
+</aside>
+<h3 id="lifecycle-migration">Live migration</h3>
+<p>The VM host is identified by the libvirt UUID, not by the hypervisor. During a live migration the UUID is on two hypervisors for a short time. After the migration the source agent sees the domain disappear (undefined or inactive). The target agent reports it. bembel does this:</p>
+<ol class="steps">
+  <li>The target report names a UUID that belongs to a VM with another source. bembel moves the VM: <code>runs_on</code> is the target and <code>source</code> is <code>libvirt:hv-03</code>.</li>
+  <li>The "undefined" event of the source comes later. bembel sees that the UUID lives on another hypervisor. It does not deprecate the addresses.</li>
+  <li>If the source event comes first, bembel waits two report cycles (10 min) before it deprecates. The report of the target is in this time.</li>
+</ol>
+
+<h2 id="rules">Observed and managed</h2>
+<table>
+<thead><tr><th>Case</th><th>Who writes</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td>VM prepared by a user, domain created</td><td>User (identity, address), agent (facts)</td><td>Managed. The agent may set <code>runs_on</code>, <code>power_state</code> and confirm. It never renames the host or changes its address.</td></tr>
+<tr><td>VM created without a prepare</td><td>Agent</td><td>Observed. The host has <code>managed_by=agent:hv-03</code>. A user adopts it with <code>bembel vm adopt NAME</code>: the VM becomes managed, and the user can name it and give it an address.</td></tr>
+<tr><td>VM from OpenStack</td><td>Sync</td><td>Observed, <code>managed_by=openstack-sync</code>. See the next section.</td></tr>
+<tr><td>VM on another platform</td><td>User or Terraform</td><td>Managed, <code>platform=other</code>. No source reports it. The user keeps it current.</td></tr>
+<tr><td>The agent reports a MAC that belongs to another host</td><td>Agent</td><td>A finding <code>vm.duplicate-mac</code>. bembel changes nothing.</td></tr>
+<tr><td>A MAC is on two hypervisors for more than 10 minutes</td><td>Agents</td><td>A finding <code>vm.duplicate-uuid</code> or <code>vm.duplicate-mac</code>, depending on the UUID. Typical cause: a cloned domain XML.</td></tr>
+</tbody>
+</table>
+<h3 id="rules-story">Create a VM on hv-03</h3>
+<p>The explainer shows the whole path for <code>vm-build-07</code>. It starts with the prepare command and ends with the first report of the agent.</p>
+<figure class="diagram wide explainer">
+<svg viewBox="0 0 1000 430" role="img" aria-labelledby="vm-story-t"><title id="vm-story-t">Create vm-build-07 on hv-03: prepare, claim, DNS and DHCP, virt-install, hook, agent report</title>
+<text class="t-title" x="16" y="22" data-f="0">1 · prepare</text>
+<text class="t-title" x="16" y="22" data-f="1">2 · claim</text>
+<text class="t-title" x="16" y="22" data-f="2">3 · DNS and DHCP</text>
+<text class="t-title" x="16" y="22" data-f="3">4 · virt-install</text>
+<text class="t-title" x="16" y="22" data-f="4">5 · hook</text>
+<text class="t-title" x="16" y="22" data-f="5">6 · agent</text>
+<text class="t-title" x="16" y="22" data-f="6">7 · first boot</text>
+<rect class="zone" x="16" y="38" width="330" height="360" rx="10"/>
+<text class="t-title" x="32" y="62">bembel</text>
+<rect class="zone" x="372" y="38" width="250" height="360" rx="10"/>
+<text class="t-title" x="388" y="62">admin</text>
+<rect class="zone" x="648" y="38" width="336" height="360" rx="10"/>
+<text class="t-title" x="664" y="62">hv-03.example.org</text>
+<rect class="box-soft" x="32" y="78" width="298" height="76" rx="8"/>
+<text class="t-title t-mono" x="46" y="100">vm-build-07</text>
+<text class="t-small t-muted" x="46" y="120" data-f="0">not known yet</text>
+<text class="t-small" x="46" y="120" data-f="1-3">10.20.20.37 claimed · TTL 24 h</text>
+<text class="t-small" x="46" y="138" data-f="1-4">MAC 52:54:00:5e:3a:b1</text>
+<text class="t-small t-ok" x="46" y="120" data-f="4-6">10.20.20.37 allocated</text>
+<text class="t-small t-ok" x="46" y="138" data-f="5-6">MAC …3a:b1 · runs_on hv-03</text>
+<rect class="box" x="32" y="176" width="298" height="76" rx="8" data-f="2-6"/>
+<text class="t-title" x="46" y="198" data-f="2-6">DNS and DHCP</text>
+<text class="t-small t-muted" x="46" y="218" data-f="2-6">A, AAAA, PTR vm-build-07.kestrel…</text>
+<text class="t-small t-muted" x="46" y="236" data-f="2-6">reservation in scope kestrel-services</text>
+<rect class="box-ok" x="32" y="274" width="298" height="76" rx="8" data-f="2-6"/>
+<text class="t-title" x="46" y="296" data-f="2-6">exports</text>
+<text class="t-small" x="46" y="316" data-f="2-6">ns1 and dhcp1 pull the new files</text>
+<text class="t-small t-muted" x="46" y="334" data-f="2-6">about 30 s later</text>
+<rect class="box-accent" x="388" y="78" width="218" height="76" rx="8" data-f="0-1"/>
+<text class="t-title t-mono t-on" x="402" y="100" data-f="0-1">bembel vm prepare</text>
+<text class="t-small t-on" x="402" y="120" data-f="0-1">--name vm-build-07</text>
+<text class="t-small t-on" x="402" y="138" data-f="0-1">--subnet kestrel-services</text>
+<rect class="box-soft" x="388" y="78" width="218" height="76" rx="8" data-f="2-6"/>
+<text class="t-title t-mono" x="402" y="100" data-f="2-6">bembel vm prepare</text>
+<text class="t-small t-muted" x="402" y="120" data-f="2-6">done</text>
+<rect class="box" x="388" y="176" width="218" height="76" rx="8" data-f="1-6"/>
+<text class="t-title" x="402" y="198" data-f="1-6">network-config</text>
+<text class="t-small t-muted" x="402" y="218" data-f="1-6">meta-data, MAC, address</text>
+<rect class="box-accent" x="388" y="274" width="218" height="76" rx="8" data-f="3"/>
+<text class="t-title t-mono t-on" x="402" y="296" data-f="3">virt-install</text>
+<text class="t-small t-on" x="402" y="316" data-f="3">bridge=br220,mac=52:54:00:…</text>
+<rect class="box-soft" x="388" y="274" width="218" height="76" rx="8" data-f="4-6"/>
+<text class="t-title t-mono" x="402" y="296" data-f="4-6">virt-install</text>
+<text class="t-small t-muted" x="402" y="316" data-f="4-6">domain created</text>
+<rect class="box-soft" x="664" y="78" width="304" height="62" rx="8" data-f="3-6"/>
+<text class="t-title" x="680" y="100" data-f="3-6">libvirt domain vm-build-07</text>
+<text class="t-small t-muted" x="680" y="120" data-f="3-6">eth0 on br220, seed ISO attached</text>
+<rect class="box-accent" x="664" y="158" width="304" height="62" rx="8" data-f="4"/>
+<text class="t-title t-on" x="680" y="180" data-f="4">hook: prepare begin</text>
+<text class="t-small t-on" x="680" y="200" data-f="4">agent confirms the claim by MAC</text>
+<rect class="box" x="664" y="158" width="304" height="62" rx="8" data-f="5-6"/>
+<text class="t-title" x="680" y="180" data-f="5-6">hook: prepare begin</text>
+<text class="t-small t-ok" x="680" y="200" data-f="5-6">claim confirmed, 200</text>
+<rect class="box-accent" x="664" y="238" width="304" height="62" rx="8" data-f="5"/>
+<text class="t-title t-on" x="680" y="260" data-f="5">bembel-agent report</text>
+<text class="t-small t-on" x="680" y="280" data-f="5">UUID 6f1d…, running, runs_on hv-03</text>
+<rect class="box" x="664" y="238" width="304" height="62" rx="8" data-f="6"/>
+<text class="t-title" x="680" y="260" data-f="6">bembel-agent report</text>
+<text class="t-small t-muted" x="680" y="280" data-f="6">sent, every 5 min</text>
+<rect class="box-ok" x="664" y="318" width="304" height="62" rx="8" data-f="6"/>
+<text class="t-title" x="680" y="340" data-f="6">guest boots</text>
+<text class="t-small" x="680" y="360" data-f="6">cloud-init sets 10.20.20.37/24</text>
+<line class="edge-accent" x1="388" y1="116" x2="332" y2="116" marker-end="url(#arrow-accent)" data-f="1"/>
+<line class="edge" x1="181" y1="154" x2="181" y2="174" marker-end="url(#arrow)" data-f="2"/>
+<line class="edge" x1="181" y1="252" x2="181" y2="272" marker-end="url(#arrow)" data-f="2"/>
+<path class="edge-accent" d="M606,312 L626,312 L626,109 L662,109" marker-end="url(#arrow-accent)" data-f="3"/>
+<path class="edge-accent" d="M816,220 L816,402 L181,402 L181,352" marker-end="url(#arrow-accent)" data-f="4"/>
+<path class="edge-accent" d="M816,300 L816,402 L181,402 L181,352" marker-end="url(#arrow-accent)" data-f="5"/>
+<text class="t-small t-muted" x="500" y="420" data-f="4-5">HTTPS from the agent to the bembel API</text>
+</svg>
+<script type="application/json" class="steps">["The admin d.klein runs bembel vm prepare --name vm-build-07 --subnet kestrel-services --mac auto --hypervisor hv-03. The VM does not exist anywhere yet.", "bembel makes the host, generates the MAC 52:54:00:5e:3a:b1, and claims 10.20.20.37 and 2001:db8:4200:220::37 with a TTL of 24 hours. The command writes network-config and meta-data.", "The addresses carry the FQDN, so bembel derives the A, AAAA and PTR records. The subnet has DHCP, so it also makes the reservation. The next export builds contain both. ns1 and dhcp1 pull the files after about 30 seconds.", "The admin builds the seed ISO with cloud-localds and runs virt-install against hv-03 with bridge=br220 and the MAC from the output. libvirt defines the domain and starts it.", "libvirt calls the hook with prepare begin. The hook sends the domain XML to the agent. The agent finds the claim for the MAC and calls confirm. The address becomes allocated. The hook exits 0 and the domain starts.", "The agent sends the report of hv-03: the VM vm-build-07 with the UUID 6f1d…, state running and the interface on br220. bembel sets runs_on to hv-03 and links the observed facts to the prepared host.", "The guest boots. cloud-init reads network-config from the seed ISO and sets 10.20.20.37/24 and the IPv6 address. DNS answers for vm-build-07.kestrel.example.org. The VM is complete in bembel, and the next report only keeps it current."]</script>
+<figcaption>A VM on hv-03 from the first command to the first report. If step 4 never happens, the claim from step 2 expires after 24 hours and the reaper frees both addresses. The DNS records and the reservation go with it.</figcaption>
+</figure>
+
+<h2 id="openstack">OpenStack VMs</h2>
+<p>OpenStack VMs use the same model. The sync of the cloud makes them (<a href="openstack.html#sync-vms">OpenStack sync</a>). The table shows what differs.</p>
+<table>
+<thead><tr><th>Aspect</th><th>libvirt on Debian</th><th>OpenStack</th><th>Other platform</th></tr></thead>
+<tbody>
+<tr><td><code>platform</code></td><td><code>libvirt</code></td><td><code>openstack</code></td><td><code>other</code></td></tr>
+<tr><td>Source of the facts</td><td>Agent on each hypervisor, <code>libvirt:hv-03</code></td><td>Sync worker, <code>openstack:os-prod</code></td><td>User, Terraform</td></tr>
+<tr><td>Identity of the VM</td><td>libvirt UUID</td><td>Nova server UUID (port <code>device_id</code>)</td><td>Name</td></tr>
+<tr><td>Who gives the address</td><td>bembel (<code>vm prepare</code>)</td><td>Neutron, with the bembel driver in phase 2</td><td>User or Terraform</td></tr>
+<tr><td>How the guest gets it</td><td>cloud-init network config or DHCP reservation</td><td>Neutron DHCP and metadata</td><td>Any</td></tr>
+<tr><td>Link to the claim</td><td>MAC</td><td>Idempotency key, then the port id</td><td>Not applicable</td></tr>
+<tr><td>Claim confirmed by</td><td>Hook or agent report</td><td>Next sync poll</td><td>Not applicable</td></tr>
+<tr><td>DNS</td><td>Campus zones of bembel</td><td>Campus zones for the floating IP, Designate for tenant zones</td><td>Campus zones</td></tr>
+<tr><td>End of life</td><td>Undefine, then the grace time</td><td>Port deleted, then the missing-twice rule</td><td>User</td></tr>
+<tr><td>Failure of bembel</td><td>Fail open: VMs start</td><td>Fail closed: no new ports</td><td>Not applicable</td></tr>
+</tbody>
+</table>
+<p>A user sees all three kinds in one list: the hosts with <code>kind=vm</code>. The filter <code>platform=libvirt</code> or <code>runs_on=hv-03</code> selects a part. The page of a hypervisor lists its VMs, whatever the platform is. The hypervisor <code>hv-03</code> is a physical host too, with an asset link to its FNT device, so a user finds the rack and the U position of the machine that runs a VM.</p>
+</body>
+</html>
