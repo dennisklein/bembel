@@ -9,15 +9,15 @@
 <h1>UI: DNS and DHCP</h1>
 <p class="lede">This chapter specifies the web UI pages for names, leases and delivery: Zones, one Zone, the record dialog, a DHCP scope, Exports, the parallel-run diff, and Routing and groups. The shell and the common parts are in <a href="ui.html">ui.html</a>. Each page below has a screenshot of the mockup, its purpose, its parts with the reason for each part, its states, and its URL, API calls and CLI commands.</p>
 <ul class="keypoints">
-  <li>The screenshots show one moment of the story: 4 November 2026, 18:02. Bundle <code>b-7c41e0</code> is on all servers, and night 12 of 14 of the parallel run with ONA is over.</li>
+  <li>The screenshots show one moment of the story: 4 November 2026, 18:02. Bundle <code>b-7c41e0</code> is the newest bundle of the DNS and DHCP servers. Their agents run in shadow mode and the servers are in compat mode, because ONA is the writer until the freeze on 2026-11-09. Night 12 of 14 of the parallel run with ONA is over.</li>
   <li>A record shows where it comes from. A <b>derived</b> record has a lock and a link to its address. A <b>manual</b> record has a checkbox and an edit action. The user never edits an A, AAAA or PTR record in a zone.</li>
   <li>Every dialog and every page shows the CLI command of its action, and an assistant button where a known tool plan exists. The assistant only reads. It proposes drafts.</li>
   <li>The Exports page is the place that says "the servers have what bembel knows". A target that does not pull is a warning, not an error.</li>
-  <li>The diff page makes the parallel run decidable: three lines, one known, two unexplained, each with a reason and a next step.</li>
+  <li>The diff page makes the parallel run decidable: on ns1 five lines differ from ONA, and each one matches a known difference with a reason and an owner.</li>
 </ul>
 
 <h2 id="common">Common parts</h2>
-<p>All pages use the shell of <a href="ui.html#layout">ui.html</a>: top bar, sidebar, main area. Zones is in the group "DNS and DHCP", with DHCP scopes and Exports. Routing and groups is in the group "Addressing". The page head of each page has the title, one line of facts, a CLI toggle, at most one assistant button and at most one filled button for the real next step.</p>
+<p>All pages use the shell of <a href="ui.html#layout">ui.html</a>: top bar, sidebar, main area. Zones is in the group "DNS and DHCP", with DHCP scopes and Exports. Routing and groups is in the group "Addressing". The page head of each page has the title, one line of facts, a CLI toggle, at most one assistant button and at most one filled button. A page has at most one filled button, for the real next step. It sits in the page head. On a page without a head action (search) it is the button of the next-step result card. A dialog or the assistant drawer may have its own one filled confirm button. Row, card and form-submit buttons are never filled.</p>
 <figure class="diagram">
 <svg viewBox="0 0 960 250" role="img" aria-labelledby="fig-write-t">
 <title id="fig-write-t">Two ways to a record: a derived record comes from an address, a manual record is written in the zone; both end in the zone file of a view and in a bundle</title>
@@ -61,11 +61,11 @@
 </ul>
 
 <h2 id="zones">Zones</h2>
-<figure class="shot"><a href="mockups/ui/zones.html"><img src="img/ui-zones.webp" alt="Zones page: forward and reverse zones as a tree with views, record counts, derived and manual split, serial, DNS servers, team, last export and status" loading="lazy"></a><figcaption>Zones at 18:02. 41 zones in 3 views; kestrel.example.org is a child of example.org; lab.example.org has 5 orphans from the ONA import.</figcaption></figure>
+<figure class="shot"><a href="mockups/ui/zones.html"><img src="img/ui-zones.webp" alt="Zones page: forward and reverse zones as a tree with views, record counts, derived and manual split, serial, DNS servers, team, last export and status" loading="lazy"></a><figcaption>Zones at 18:02. 44 zones in 3 views; kestrel.example.org is a child of example.org; lab.example.org has 5 orphans from the ONA import.</figcaption></figure>
 <p>Purpose: the page lists all zones that the user may see, and says which one needs a look. It is the start of every DNS task.</p>
 <h3 id="zones-layout">Layout</h3>
 <ul>
-  <li><b>Head.</b> "41 zones in 3 views", the split forward and reverse, the record count, the access of the user as a scope chip. Buttons: CLI toggle, "Check all zones" (assistant, quiet), "New zone…" (filled).</li>
+  <li><b>Head.</b> "44 zones in 3 views", the split forward and reverse, the record count, the access of the user as a scope chip. Buttons: CLI toggle, "Check all zones" (assistant, quiet), "New zone…" (filled).</li>
   <li><b>Banner.</b> One warning when a zone has findings from the ONA import. It says what is wrong and who decides. It links to the import page.</li>
   <li><b>Toolbar.</b> A filter box, chips for kind, view, team and "Needs a look", and a Tree or Flat switch. Each chip has a count.</li>
   <li><b>Table.</b> Two groups: "Forward zones" and "Reverse zones". Child zones are indented under their parent. Columns: zone, views, records, derived and manual, serial, DNS servers, team, last export, status.</li>
@@ -77,8 +77,8 @@
 <tbody>
 <tr><td>Tree by parent</td><td><code>kestrel.example.org</code> under <code>example.org</code>. Reverse zones show the prefix they come from, for example <code>10.20.0.0/16</code>.</td><td>A DNS editor thinks in the name tree. A reverse zone is computed from a subnet, so the link to the prefix explains it.</td></tr>
 <tr><td>Views chips</td><td><code>internal</code>, <code>external</code>, <code>fabric</code>.</td><td>The same name can be a different zone in each view. The chip says which copies exist.</td></tr>
-<tr><td>Derived and manual bar</td><td>A thin bar and "1 802 derived · 44 manual".</td><td>A zone with many manual records needs more care. A zone with 0 derived records is suspect (lab.example.org).</td></tr>
-<tr><td>Serial</td><td><code>2026110417</code>.</td><td>The user can compare it with the serial on a server, for example with <code>dig SOA</code>. bembel raises it only when the zone body changes (<a href="dns.html#serial">dns.html#serial</a>).</td></tr>
+<tr><td>Derived and manual bar</td><td>A thin bar and "1 803 derived · 43 manual". A classless parent also counts its RFC 2317 delegation records: "12 derived · 2 manual · 129 delegation".</td><td>A zone with many manual records needs more care. A zone with 0 derived records is suspect (lab.example.org).</td></tr>
+<tr><td>Serial</td><td><code>2026110417</code>.</td><td>The user can compare it with the serial on a server, for example with <code>dig SOA</code>. bembel raises it only when the zone body changes (<a href="dns.html#serial">dns.html#serial</a>). In compat mode the servers get the Unix time of the build instead (<a href="dns.html#compat">dns.html#compat</a>), so the servers card shows that value.</td></tr>
 <tr><td>Last export</td><td>Time and bundle id.</td><td>It answers "is my change on the servers?" without a visit to Exports.</td></tr>
 <tr><td>Status</td><td>A dot and "ok", or a pill: "5 orphans", "RFC 2317".</td><td>Only a state that needs a look gets a pill.</td></tr>
 </tbody>
@@ -98,7 +98,7 @@
 </dl>
 
 <h2 id="zone">Zone</h2>
-<figure class="shot"><a href="mockups/ui/zone.html"><img src="img/ui-zone.webp" alt="Zone kestrel.example.org in view internal: SOA facts, tabs, a records table with derived rows with a lock, an inline edit row with a CNAME conflict, bulk bar and a checks card" loading="lazy"></a><figcaption>Zone kestrel.example.org, view internal. The edit row at the bottom shows the error cname.conflict. Two manual rows are selected for a bulk action.</figcaption></figure>
+<figure class="shot"><a href="mockups/ui/zone.html"><img src="img/ui-zone.webp" alt="Zone kestrel.example.org in view internal: SOA facts, tabs, a records table with derived rows with a lock, an inline edit row with a CNAME conflict, bulk bar and a checks card" loading="lazy"></a><figcaption>Zone kestrel.example.org, view internal. The edit row at the bottom shows the error cname.conflict. Two manual rows are selected for a bulk action. The page shows the zone with editing on, as it is after the cutover on 2026-11-09. Until then ONA writes the zone, its source is <code>ona-import</code>, and bembel disables these controls with the reason in the title.</figcaption></figure>
 <p>Purpose: the page shows and changes the facts and the records of one zone in one view. It tells a user where each record comes from and what a change does.</p>
 <h3 id="zone-layout">Layout</h3>
 <ul>
@@ -113,7 +113,7 @@
 <thead><tr><th>Column</th><th>Content</th></tr></thead>
 <tbody>
 <tr><td>First</td><td>A checkbox for a manual row. A lock for a derived row, and for the NS set.</td></tr>
-<tr><td>Name</td><td>Relative to the zone. <code>@</code> is the apex. A <span class="tag">new</span> tag marks a record younger than the last export (cn-011).</td></tr>
+<tr><td>Name</td><td>Relative to the zone. <code>@</code> is the apex. A <span class="tag">new</span> tag marks a record younger than the last nightly diff. In the story this is cn-011: a.berger added it in ONA at 16:12, and the import <code>imp-20261104-1612</code> brought it into bembel.</td></tr>
 <tr><td>Type</td><td>A small chip: A and AAAA in the DNS colour, CNAME in blue, SRV, MX and TXT in violet.</td></tr>
 <tr><td>TTL</td><td>Seconds. An empty TTL in the data shows the zone default.</td></tr>
 <tr><td>Data</td><td>By type. SRV shows priority, weight and port in bold and the target as an FQDN. TXT shows the quoted text.</td></tr>
@@ -159,7 +159,7 @@
 <h3 id="zone-checks">Checks and the assistant</h3>
 <ul>
   <li><b>Checks card.</b> Five lines with a dot: named-checkzone ok, no CNAME beside other data, PTR coverage, targets outside the zone, and the unsaved row. A warning has a second line with the detail.</li>
-  <li><b>Check zone.</b> The advisory <code>check-zone</code> reads the records and the last export diff. The answer is one sentence of verdict and a numbered list. It cites the known difference <code>kd-1</code> and the new record cn-011. A fold "Tools used" lists the calls. A button opens the diff.</li>
+  <li><b>Check zone.</b> The advisory <code>check-zone</code> reads the records and the last export diff. The answer is one sentence of verdict and a numbered list. It cites the known difference <code>KD-002</code> (a TXT text over 255 bytes) and says that cn-011 came from ONA by the import at 16:12. A fold "Tools used" lists the calls. A button opens the diff.</li>
 </ul>
 <h3 id="zone-states2">States</h3>
 <ul>
@@ -197,7 +197,7 @@
 <tr><td>MX</td><td>preference, mail host</td><td>The host has an address record and is not a CNAME.</td></tr>
 <tr><td>NS</td><td>name server</td><td>Only for a delegation. The zone NS set has its own place.</td></tr>
 <tr><td>SRV</td><td>priority, weight, port, target</td><td>The target has an A or AAAA record in the view. The mockup shows <code>10.20.4.7</code>.</td></tr>
-<tr><td>TXT</td><td>text</td><td>bembel splits the text at 255 bytes and escapes a semicolon and a quote.</td></tr>
+<tr><td>TXT</td><td>text</td><td>bembel splits the text at 255 bytes and escapes a quote and a backslash.</td></tr>
 <tr><td>CAA</td><td>flag, tag, value</td><td>The tag is <code>issue</code>, <code>issuewild</code> or <code>iodef</code>.</td></tr>
 </tbody>
 </table>
@@ -206,7 +206,7 @@
 <ul>
   <li><b>Error.</b> An invalid field has a red border and a sentence under it. "Create record" stays enabled. The server answer shows on the first field it names.</li>
   <li><b>Edit.</b> The title is "Edit record in …". The name and type are fixed. The footer shows "Revision 7".</li>
-  <li><b>Held.</b> A change that needs approval has the button "Ask for approval…" and a field for the reason.</li>
+  <li><b>Held.</b> An action that needs a change request keeps its label with the note "Needs a change request". The dialog adds a reason field and the confirm button "Request approval".</li>
   <li><b>No permission.</b> The page behind the dialog does not offer the dialog. The button is disabled, with the reason in its title.</li>
 </ul>
 <dl class="facts">
@@ -228,13 +228,13 @@
 <table>
 <thead><tr><th>Part</th><th>What it shows</th><th>Why</th></tr></thead>
 <tbody>
-<tr><td>Address map</td><td>One bar for the /22 in four parts: infrastructure (<code>10.20.4.0</code>–<code>.31</code>), reservations and static addresses, the DHCP pool <code>10.20.7.0</code>–<code>10.20.7.254</code>, the broadcast address.</td><td>The map explains the ranges at one look. The pool is a range with role <code>dhcp-pool</code>, so the allocation tool never hands out an address inside it.</td></tr>
-<tr><td>Pool row</td><td>255 addresses, 143 used by leases (56 %), 61 expired, 51 free. Split: dhcp1 128, dhcp2 127.</td><td>The use comes from the lease files, not from allocations. It shows whether the pool is big enough.</td></tr>
-<tr><td>Reservations</td><td>MAC, address, host, own options, last lease seen, state. 16 of 641 rows. Stale rows have a yellow background and a pill "stale 106 d".</td><td>A reservation holds an address for a host. A reservation without a lease for 90 days is a candidate for removal.</td></tr>
-<tr><td>IPoIB reservations</td><td>The client identifier <code>ff:00:00:00:00:00:02:00:00:02:c9:00</code> and the 8-byte port GUID in bold.</td><td>An InfiniBand port has no useful MAC for DHCP. The server matches <code>dhcp-client-identifier</code>. The rows belong to scope <code>kestrel-ipoib</code> (10.100.4.0/22), which uses the same pair.</td></tr>
+<tr><td>Address map</td><td>One bar for the /22 in four parts: infrastructure (<code>10.20.4.0</code>–<code>.31</code>), reservations and static addresses, the DHCP pool <code>10.20.7.0</code>–<code>10.20.7.254</code>, the broadcast address.</td><td>The map explains the ranges at one look. The pool is a range with the purpose <code>dhcp-pool</code>, so the allocation tool never hands out an address inside it.</td></tr>
+<tr><td>Pool row</td><td>255 addresses, 143 used by leases (56 %), 61 expired, 51 free. Split 128 (about 50 % of clients each, by hash).</td><td>The use comes from the lease files, not from allocations. It shows whether the pool is big enough.</td></tr>
+<tr><td>Reservations</td><td>MAC, address, host, own options, last DHCP ACK (log), state. 16 of 641 rows. Stale rows have a yellow background and a pill "stale 106 d".</td><td>A reservation holds an address for a host. A reservation without a DHCP ACK or other sign for 90 days is a candidate for removal. dhcpd.leases holds only pool addresses, so the last ACK of a reservation comes from the dhcpd log.</td></tr>
+<tr><td>IPoIB reservations</td><td>The client identifier: the prefix <code>ff:00:00:00:00:00:02:00:00:02:c9:00</code> and, in bold, the last 8 bytes, which are the port GUID. For cn-004 the client identifier is <code>ff:00:00:00:00:00:02:00:00:02:c9:00:0c:42:a1:03:00:71:a2:b4</code> and the port GUID is <code>0c42a1030071a2b4</code>.</td><td>An InfiniBand port has no useful MAC for DHCP. The server matches <code>dhcp-client-identifier</code>. The rows belong to scope <code>kestrel-ipoib</code> (10.100.0.0/16, partition <code>0x0001</code>), which uses the same pair.</td></tr>
 <tr><td>Options</td><td>Option name and code, the effective value, the chain global › server › scope › host, a note.</td><td>See the next figure.</td></tr>
-<tr><td>Leases</td><td>Address, MAC, client name, state, end, last seen, and a pill when the MAC is unknown or the lease matches a stale reservation.</td><td>The ingestion reads <code>dhcpd.leases</code> from both servers every 5 minutes. bembel never writes a lease.</td></tr>
-<tr><td>Failover pair</td><td>dhcp1 primary and dhcp2 secondary, state normal, split 50, MCLT 3600 s, max response delay 60 s.</td><td>The user sees if the pair is healthy before a change. The restart order is stated: secondary first.</td></tr>
+<tr><td>Leases</td><td>The pool addresses only: address, MAC, client name, state, end, last seen, and a pill when the MAC is unknown.</td><td>The ingestion reads <code>dhcpd.leases</code> and the dhcpd log from both servers every 5 minutes (<a href="dhcp.html#leases">dhcp.html#leases</a>). bembel never writes a lease.</td></tr>
+<tr><td>Failover pair</td><td>dhcp1 primary and dhcp2 secondary, state normal, split 128 (50 %), MCLT 3600 s, max response delay 60 s.</td><td>The user sees if the pair is healthy before a change. The restart order is stated: secondary first.</td></tr>
 </tbody>
 </table>
 <figure class="diagram">
@@ -242,16 +242,16 @@
 <title id="fig-opt-t">Option inheritance: the most specific level wins; the options table shows the level where each option is set and the levels that it overrides</title>
 <rect class="box" x="16" y="30" width="190" height="86" rx="10"/>
 <text class="t-title" x="32" y="58">Global</text>
-<text class="t-small" x="32" y="80">interface-mtu 1500</text>
-<text class="t-small t-muted" x="32" y="98">default-lease-time 86400</text>
+<text class="t-small" x="32" y="80">ntp-servers 10.20.2.60</text>
+<text class="t-small t-muted" x="32" y="98">default-lease-time 28800</text>
 <rect class="box" x="268" y="30" width="190" height="86" rx="10"/>
-<text class="t-title" x="284" y="58">Server or pair</text>
-<text class="t-small" x="284" y="80">ntp-servers 10.20.0.123</text>
-<text class="t-small t-muted" x="284" y="98">set on dhcp-a</text>
+<text class="t-title" x="284" y="58">Server</text>
+<text class="t-small" x="284" y="80">ntp-servers 10.20.2.61</text>
+<text class="t-small t-muted" x="284" y="98">set on dhcp2</text>
 <rect class="box-accent" x="520" y="30" width="190" height="86" rx="10"/>
 <text class="t-title t-on" x="536" y="58">Scope</text>
 <text class="t-small t-on" x="536" y="80">interface-mtu 9000</text>
-<text class="t-small t-on" x="536" y="98">default-lease-time 43200</text>
+<text class="t-small t-on" x="536" y="98">routers 10.20.4.1</text>
 <rect class="box" x="772" y="30" width="172" height="86" rx="10"/>
 <text class="t-title" x="788" y="58">Host</text>
 <text class="t-small" x="788" y="80">filename ipxe-gpu.efi</text>
@@ -267,7 +267,7 @@
 </figure>
 <aside class="callout why"><p class="callout-title">Why the chain, not only the value</p><p>ONA showed the option at one level. A user could not see why a host got MTU 1500 when the scope says 9000. The chain shows the answer, and the note names the overrides ("overridden for 2 hosts").</p></aside>
 <h3 id="dhcp-assistant">Find stale reservations</h3>
-<p>The advisory <code>stale-reservations</code> reads the reservations, the leases and the asset mirror. In the story it finds 4 of 641 reservations with no lease for 90 days. For cn-009 the asset mirror says "removed since 2026-08-02". The card lists the findings and offers "Open draft". The draft deletes nothing until the user applies it (<a href="assistant.html">assistant.html</a>).</p>
+<p>The advisory <code>stale-reservations</code> reads the reservations, the leases and the asset mirror. In the story it finds 2 of 641 reservations without a DHCP ACK or other sign for 90 days. For cn-009 the asset mirror says "removed since 2026-08-02". The card lists the findings and offers "Open draft". The draft deletes nothing until the user applies it (<a href="assistant.html">assistant.html</a>).</p>
 <h3 id="dhcp-states">States</h3>
 <ul>
   <li><b>Scope off.</b> The pill says "disabled". The pool and reservations stay visible. The export omits the scope.</li>
@@ -332,13 +332,13 @@
 <thead><tr><th>Field</th><th>Example</th><th>Why</th></tr></thead>
 <tbody>
 <tr><td>Name and role</td><td><code>ns1</code> BIND primary; <code>dhcp1</code> ISC dhcpd primary; <code>sm-kestrel</code> OpenSM partitions.conf; <code>fw-edge</code> feed login-nodes; <code>frr-core</code> FRR prefix list.</td><td>One card per place that gets files. The kind of target decides the format.</td></tr>
-<tr><td>Mode</td><td><span class="tag">compat</span> or <span class="tag">native</span></td><td><b>compat</b> writes the ONA format, byte for byte, for the parallel run. <b>native</b> is the clean bembel format. A target moves to native at the cutover (<a href="dns.html#compat">dns.html#compat</a>).</td></tr>
-<tr><td>Content</td><td>"3 views, 41 zones, 1 named.conf fragment".</td><td>The user sees the size of what the server loads.</td></tr>
+<tr><td>Mode</td><td><span class="tag">shadow · compat</span> or <span class="tag">native</span></td><td><b>compat</b> writes the ONA format, byte for byte, for the parallel run. <b>shadow</b> means that the agent pulls and checks the bundle, but does not activate it: ONA still writes the live files. <b>native</b> is the clean bembel format. ns1 to ns3, dhcp1 and dhcp2 move to native at the cutover (<a href="dns.html#compat">dns.html#compat</a>). sm-kestrel, fw-edge and frr-core are native now.</td></tr>
+<tr><td>Content</td><td>"1 flat set (view internal), 118 zone files, named.conf.ona". A warning dot says that the views external and fabric are not exported in compat.</td><td>The user sees the size of what the server loads.</td></tr>
 <tr><td>Bundle and built</td><td><code>b-7c41e0</code>, today 17:57:41.</td><td>The id is the start of the digest. It is the same on all targets of one build.</td></tr>
 <tr><td>Pulled</td><td>today 17:58:12 by <code>bembel-agent@ns1</code> · 200.</td><td>It shows who pulled, when, and the HTTP code. 304 means "nothing changed".</td></tr>
 <tr><td>ETag</td><td><code>"7c41e0a9…"</code> with a copy button.</td><td>An admin compares it with the header of a pull on the server.</td></tr>
-<tr><td>Checks</td><td>named-checkconf -z ok; named-checkzone 41 of 41 ok; dhcpd -t ok; "applied 17:59:10, restarted after dhcp2".</td><td>The checks run on the bembel side and on the agent. A check line has a green or yellow mark.</td></tr>
-<tr><td>Status pill</td><td><span class="tag">current</span> or <span class="tag">stale</span></td><td>"stale" means the target has not pulled for longer than the alert time (1 h).</td></tr>
+<tr><td>Checks</td><td>named-checkconf -z ok; named-checkzone 118 of 118 ok; "serial of kestrel.example.org 1793815061 on all" (the Unix time of the build); "dhcpd -t -cf ok · checked 17:59, not activated (shadow)".</td><td>The checks run on the bembel side and on the agent. A check line has a green or yellow mark.</td></tr>
+<tr><td>Status pill</td><td><span class="tag">current</span> or <span class="tag">stale</span></td><td>"stale" means the target has not pulled for longer than the alert time (30 minutes, the time of <code>BembelExportNotPulled</code>).</td></tr>
 </tbody>
 </table>
 <p>The stale card has a yellow edge. Its note says: "The agent reports no error. The host may be down, or the timer may be stopped." The bundle is not wrong: <code>b-3a90d1</code> is still the newest for sm-kestrel. The risk is a partition table on the subnet manager that is older than bembel knows.</p>
@@ -357,34 +357,34 @@
 </ul>
 <dl class="facts">
   <dt>URL</dt><dd><code>/exports[?kind=dns|dhcp|other&amp;stale=1]</code>, bundles at <code>/exports#bundles</code></dd>
-  <dt>API</dt><dd><code>GET /v1/exports</code>, <code>POST /v1/exports/{id}:build</code>, <code>GET /v1/exports/{id}/artifact</code> with <code>If-None-Match</code>. Bundle history and pull log are a proposal: <code>GET /v1/export-bundles</code>, <code>GET /v1/exports/{id}/pulls</code>.</dd>
+  <dt>API</dt><dd><code>GET /v1/exports</code>, <code>POST /v1/exports/{id}:build</code>, <code>GET /v1/exports/{id}/artifact</code> for the download and the preview. The agents do not use it: they pull <code>GET /v1/dns-servers/{name}/bundle</code> and <code>GET /v1/dhcp-servers/{name}/bundle</code> with <code>If-None-Match</code>. Bundle history and pull log are a proposal: <code>GET /v1/export-bundles</code>, <code>GET /v1/exports/{id}/pulls</code>.</dd>
   <dt>CLI</dt><dd><code>bembel export ls</code>, <code>bembel export build --all</code>, <code>bembel export preview ns1</code>, <code>bembel export bind --server ns1 --out ./ns1</code>, <code>bembel export dhcpd --server dhcp1 --out ./dhcp1</code></dd>
   <dt>Assistant</dt><dd>"Why does the export differ?": advisory <code>explain-diff</code>.</dd>
 </dl>
 
 <h3 id="export-diff">Export diff</h3>
-<figure class="shot"><a href="mockups/ui/export-diff.html"><img src="img/ui-export-diff.webp" alt="Parallel run diff of ns1 BIND, night 12 of 14: summary with 3 differing lines, a file tree, a unified diff in a dark block with a known-difference badge, and an Explain diff result" loading="lazy"></a><figcaption>Parallel run, night 12 of 14. One line is a known difference, two lines are new data from cn-011.</figcaption></figure>
-<p>Purpose: during the parallel run the page compares the ONA export with the bembel bundle of one target. A user decides each differing line: explained, or to fix. The run ends when the diff is empty or fully explained on the last 3 nights (<a href="migration.html">migration.html</a>).</p>
+<figure class="shot"><a href="mockups/ui/export-diff.html"><img src="img/ui-export-diff.webp" alt="Parallel run diff of ns1 BIND, night 12 of 14: summary with 5 differing lines, all explained, a file tree, unified diffs in dark blocks with known-difference badges, and an Explain diff result" loading="lazy"></a><figcaption>Parallel run, night 12 of 14. ns1 BIND: 5 lines differ from ONA, all explained (KD-001, KD-002, KD-004).</figcaption></figure>
+<p>Purpose: during the parallel run the page compares the ONA export with the bembel bundle of one target. A user decides each differing line: explained, or to fix. The cutover needs 14 nights in a row with no unexplained line, on all five servers. The counter is 12. Two nights remain (<a href="migration.html#exit">migration.html#exit</a>).</p>
 <p><b>Parts and why</b></p>
 <ul>
-  <li><b>Summary.</b> Three numbers: 3 differing lines in 2 of 41 files, 1 known difference, 2 unexplained. A bar splits the lines by class. A bar chart shows the unexplained lines for each night; the current night is marked. The cutover rule stands under it. The user sees the trend, not only a count.</li>
-  <li><b>File tree.</b> Files of the bundle with "identical" or "N lines". The filter "Differ" is on. Identical files fold into one line "31 more, all identical". The note says that ONA writes no views, so ONA is compared with view internal.</li>
-  <li><b>Normalised before the diff.</b> A card lists what the diff ignores: the SOA serial and the header date, and the order of record lines (<a href="dns.html#compat">dns.html#compat</a>). A user knows what the "identical" claim covers.</li>
-  <li><b>Diff.</b> One card per file. A dark block with two line-number columns, the sign, and the text. A removed line has a red tint, an added line a green tint, a hunk header a blue band. A badge ends the line: "known kd-1" links to the list below; "unexplained" is yellow.</li>
-  <li><b>Explain diff.</b> The result card of the advisory <code>explain-diff</code>. It explains each class in one sentence, and it checks the claim with a canonical zone dump ("L2 check"). It cannot accept a line. The button "Accept 2 lines as known difference…" opens a dialog that the user confirms.</li>
-  <li><b>Known differences.</b> A table of rules: id, what differs, why it is fine, who accepted it and when, and the lines that match tonight. A rule expires at the cutover.</li>
+  <li><b>Summary.</b> Four numbers: 5 differing lines in 5 of 119 files, 5 explained by known differences, 0 unexplained, 114 files identical. A bar splits the lines by class. A bar chart shows the explained lines for each night on all five servers. Its title says that no night had an unexplained line. The current night is marked. The cutover rule stands under it. The user sees the trend, not only a count.</li>
+  <li><b>File tree.</b> The compat files of both sides, <code>ns1/named.conf.ona</code> and <code>ns1/zone_data/named-&lt;FQDN&gt;</code>, with "identical" or "N lines". The filter "Differ" is on. Identical files fold into one line "114 more, all identical". The note says that compat mode writes one flat set (view internal), and that the views external and fabric are not exported in compat.</li>
+  <li><b>Normalised before the diff.</b> A card lists what the diff ignores: the SOA serial and the date in line 1 (both sides use the Unix time of the build; both are replaced by <code>&lt;SERIAL&gt;</code> and <code>&lt;DATE&gt;</code>), and the order of record lines (<a href="dns.html#compat">dns.html#compat</a>). A user knows what the "identical" claim covers.</li>
+  <li><b>Diff.</b> One card per file. A dark block with two line-number columns, the sign, and the text. A removed line has a red tint, an added line a green tint, a hunk header a blue band. A badge ends the line: "known KD-002" links to the list below; "unexplained" is yellow.</li>
+  <li><b>Explain diff.</b> The result card of the advisory <code>explain-diff</code>. It explains each class in one sentence, and it checks the claim with a canonical zone dump ("L2 check"). It cannot accept a line. In the story all 5 lines are known differences, so the card has no accept action.</li>
+  <li><b>Known differences.</b> A table of the rules KD-001 to KD-004 of <code>known-differences.yaml</code> (<a href="migration.html#known">migration.html#known</a>): id, what differs, why it is fine, the owner, the date it was added, and the lines that match tonight on all five servers. A rule can have an expiry date.</li>
 </ul>
 <aside class="callout why"><p class="callout-title">Why accept by rule and not by line</p><p>A line number changes every night. A rule matches by zone, type and a pattern, so the same difference is not a new question the next night. A new kind of difference never matches an old rule by accident.</p></aside>
 <p><b>States</b></p>
 <ul>
   <li><b>Empty diff.</b> The summary says "0 differing lines" with a green mark. The page counts the nights with an empty or explained diff.</li>
-  <li><b>Accept dialog.</b> It asks for a note of 8 characters or more, shows the pattern of the rule, and the CLI command. The audit event names the user.</li>
+  <li><b>Accept dialog.</b> "Accept as known difference…" in the head opens it for an unexplained line. It asks for a note of 8 characters or more, shows the pattern of the new rule, and the CLI command. The audit event names the user.</li>
   <li><b>No ONA data.</b> If the ONA export of the night is missing, the page says so and shows no diff.</li>
 </ul>
 <dl class="facts">
   <dt>URL</dt><dd><code>/exports/ns1/diff[?night=12&amp;file=]</code></dd>
   <dt>API</dt><dd><code>GET /v1/exports/{id}/diff?against=ona&amp;night=12</code>, <code>POST /v1/exports/{id}/known-differences</code>. Both are a proposal for the OpenAPI document.</dd>
-  <dt>CLI</dt><dd><code>bembel export diff ns1 --against ona:/srv/ona/zone_data --normalize</code>, <code>bembel export diff accept ns1 --line db.kestrel.example.org:34 --note "…" --until cutover</code></dd>
+  <dt>CLI</dt><dd><code>bembel export diff ns1 --against ona:/srv/ona-parallel/ns1.example.org --normalize</code>, <code>bembel export diff accept ns1 --line zone_data/named-kestrel.example.org:34 --note "…" --until cutover</code></dd>
   <dt>Assistant</dt><dd>"Explain diff": advisory <code>explain-diff</code>, tools <code>export.diff</code>, <code>address.get</code>, <code>audit.query</code>.</dd>
 </dl>
 
@@ -394,10 +394,10 @@
 <p><b>Parts and why</b></p>
 <ul>
   <li><b>Tabs.</b> ASNs 3, Route targets 12, Static routes 27, Address groups 7. The mockup shows the last one.</li>
-  <li><b>Groups table.</b> Name and description, filter as chips (<code>host.role</code> login, <code>vrf</code> global, <code>team</code> hpc-ops), member count, feeds (nftables, EDL, firewalld, JSON), consumers with the last pull. The selected row has a tint. A group with no consumer says so.</li>
-  <li><b>Filter card.</b> The definition of <code>login-nodes</code> as YAML in a dark block, the revision, the editor, and a table of the 4 matching hosts with the reason. "6 members" counts hosts and prefixes.</li>
+  <li><b>Groups table.</b> Name and description, filter as chips (<code>tag role=login</code>, <code>vrf global</code>), member count, feeds (nftables, EDL, firewalld, JSON), consumers with the last pull. The selected row has a tint. A group with no consumer says so.</li>
+  <li><b>Filter card.</b> The definition of <code>login-nodes</code> as YAML in a dark block, revision 43, the editor, and a table of the 3 matching hosts with the reason. "6 entries" counts 3 hosts in 2 families.</li>
   <li><b>Feed card.</b> The plain text list that a firewall fetches over HTTPS: a comment line and one entry per line. The URL has a copy button. Two consumers show the last pull, the code and the ETag.</li>
-  <li><b>Prefix list card.</b> A preview of <code>bembel export prefix-list</code> for FRR with a switch for bird, junos and eos. It shows the prefixes with <code>announce=true</code> in VRF <code>global</code> and the target <code>frr-core</code>.</li>
+  <li><b>Prefix list card.</b> A preview of <code>bembel export prefix-list campus-bgp</code> for FRR with a switch for bird, junos and eos. It shows the prefixes with <code>announce=true</code> and tag <code>announce=campus-bgp</code> in VRF <code>global</code>, revision 58, and the target <code>frr-core</code>.</li>
 </ul>
 <aside class="callout why"><p class="callout-title">Why a filter and not a list</p><p>A list of addresses is old after the next allocation. A filter follows the data: a new login node with role login joins the group and all feeds change at the next build. The firewall policy stays in the firewall tool and refers to the group by name.</p></aside>
 <table>
@@ -417,8 +417,8 @@
 </ul>
 <dl class="facts">
   <dt>URL</dt><dd><code>/routing?tab=groups[&amp;group=login-nodes]</code>, other tabs <code>tab=asn|rt|routes</code></dd>
-  <dt>API</dt><dd><code>GET /v1/address-groups</code>, <code>GET /v1/address-groups/{id}/members</code>, <code>GET /v1/feeds/{name}.txt</code> (plain text, ETag), <code>GET /v1/prefix-lists?vrf=global&amp;format=frr</code>. The group and feed paths are a proposal for the OpenAPI document.</dd>
-  <dt>CLI</dt><dd><code>bembel group ls</code>, <code>bembel group show login-nodes --members</code>, <code>bembel export group login-nodes --format edl</code>, <code>bembel export prefix-list --vrf global --format frr</code></dd>
+  <dt>API</dt><dd><code>GET /v1/address-groups</code>, <code>GET /v1/address-groups/{id}/members</code>, <code>GET /v1/feeds/login-nodes?format=text</code> (plain text, ETag), <code>GET /v1/exports/campus-bgp/artifact?format=frr&amp;family=4</code>. The group paths are a proposal for the OpenAPI document.</dd>
+  <dt>CLI</dt><dd><code>bembel address-group ls</code>, <code>bembel address-group show login-nodes --members</code>, <code>bembel export address-group login-nodes --format text</code>, <code>bembel export prefix-list campus-bgp --format frr</code></dd>
   <dt>Assistant</dt><dd>"Who is in this group?": advisory <code>group-impact</code>, tools <code>group.members</code>, <code>host.list</code>. Read only.</dd>
 </dl>
 </body>
