@@ -14,7 +14,7 @@
   <li>A failover pair, for example <code>dhcp-a</code>, writes an ISC <code>failover peer</code> block on both servers and puts the pools in it.</li>
   <li>DHCPv6 uses a separate file, <code>dhcpd6.conf</code>, for <code>dhcpd -6</code>. ISC dhcpd has no failover for DHCPv6.</li>
   <li>ISC dhcpd has no reload. bembel-agent restarts one peer at a time, and bembel grants the restart ticket.</li>
-  <li>The agent reads <code>dhcpd.leases</code> and sends last-seen data to bembel. bembel uses it to find stale addresses and wrong client identifiers.</li>
+  <li>The agent reads <code>dhcpd.leases</code> for the pool addresses and the dhcpd log for the reservations, and sends last-seen data to bembel. bembel uses it to find stale addresses and wrong client identifiers.</li>
   <li>ISC DHCP has reached end of life. The model is neutral, so a Kea 3.0 LTS JSON export is a second renderer later.</li>
 </ul>
 
@@ -24,16 +24,18 @@
 </aside>
 
 <h2 id="scopes">Scopes</h2>
-<p>A DHCP scope belongs to one subnet. The scope switches DHCP on or off for the subnet, names the DHCP servers, holds the options and refers to the failover pair. An IPv4 subnet and an IPv6 subnet are two prefixes and have two scopes (see <a href="fabrics.html#dual-stack">fabrics.html#dual-stack</a>).</p>
+<p>A DHCP scope belongs to one subnet. The scope switches DHCP on or off for the subnet, names the DHCP servers, holds the options and refers to the failover pair. The scope names its subnet by <code>prefix_id</code>. It shows the <code>cidr</code> and the <code>vrf</code> of that prefix, read only. An IPv4 subnet and an IPv6 subnet are two prefixes and have two scopes (see <a href="fabrics.html#dual-stack">fabrics.html#dual-stack</a>).</p>
 
 <table class="compact">
 <thead><tr><th>Field</th><th>Meaning</th><th>Example</th></tr></thead>
 <tbody>
+<tr><td><code>prefix_id</code></td><td>The subnet of the scope. The fields <code>cidr</code> and <code>vrf</code> come from it and are read only.</td><td>the id of <code>10.20.4.0/22</code> (VRF <code>global</code>)</td></tr>
 <tr><td><code>enabled</code></td><td>The export includes the scope only if it is true.</td><td><code>true</code></td></tr>
 <tr><td><code>servers</code></td><td>The DHCP servers that serve the scope. With a failover pair, the servers of the pair.</td><td><code>dhcp1</code>, <code>dhcp2</code></td></tr>
 <tr><td><code>failover_pair</code></td><td>The pair that shares the pools. Empty means: one server, no failover.</td><td><code>dhcp-a</code></td></tr>
 <tr><td><code>default_lease_time</code>, <code>max_lease_time</code></td><td>Lease times in seconds.</td><td>28800, 86400</td></tr>
 <tr><td><code>routers</code></td><td>Taken from the subnet gateway. The value <code>none</code> states that the scope has no router.</td><td>10.20.4.1</td></tr>
+<tr><td><code>reachability</code></td><td>How a client request gets to a server. <code>relay</code>: the gateway runs <code>ip helper</code> and the scope needs a router. <code>attached</code>: a DHCP server has an interface in the subnet (<a href="#reach">reachability</a>). Default <code>relay</code>.</td><td><code>relay</code></td></tr>
 <tr><td><code>options</code></td><td>The scope options (<a href="#options">options</a>).</td><td><code>domain-name-servers</code></td></tr>
 <tr><td><code>shared_network</code></td><td>The name of the ISC <code>shared-network</code> that holds the subnet. Default: derived from the VLAN.</td><td><code>vlan204-kestrel-compute</code></td></tr>
 </tbody>
@@ -41,8 +43,11 @@
 
 <pre><code class="language-json">{
   "kind": "dhcp-scope",
-  "subnet": "10.20.4.0/22",
+  "prefix_id": "0197c0de-0001-7a00-8000-0000000420e4",
+  "cidr": "10.20.4.0/22",
+  "vrf": "global",
   "enabled": true,
+  "reachability": "relay",
   "servers": ["dhcp1.example.org", "dhcp2.example.org"],
   "failover_pair": "dhcp-a",
   "default_lease_time": 28800,
@@ -54,18 +59,71 @@
   ]
 }</code></pre>
 
-<p>The API path is <code>/v1/subnets/{id}/dhcp-scope</code>. A user needs <code>dhcp-scope:write</code> in the scope of the subnet. The role <code>dhcp-editor</code> has this permission.</p>
+<p>The API path is <code>/v1/dhcp-scopes/{id}</code>. A user needs <code>dhcp-scope:create</code>, <code>dhcp-scope:update</code> or <code>dhcp-scope:delete</code> in the scope of the subnet. The role <code>dhcp-editor</code> has them.</p>
 
 <p>Rules for a scope:</p>
 <ul>
-  <li>The scope has a router (the subnet gateway) or <code>routers: none</code>. ONA drops a subnet without a router option and writes a warning comment. bembel reports a finding and refuses the export of a scope that has neither. A subnet for IPoIB often has no router, so the explicit <code>none</code> is the normal case there.</li>
+  <li>The scope has a router (the subnet gateway) or <code>routers: none</code>. ONA drops a subnet without a router option and writes a warning comment. bembel reports a finding and refuses the export of a scope that has neither. A subnet for IPoIB often has no router, so the explicit <code>none</code> with <code>reachability: attached</code> is the normal case there (<a href="#reach">reachability</a>).</li>
   <li>The subnet is in a shared network. All subnets on the same VLAN, or in the same IB partition, go in the same <code>shared-network</code> block. Without a VLAN, the subnet stands alone.</li>
   <li>All servers of a failover pair have the same scopes. The export writes the same scope to both.</li>
+  <li>One server, and both peers of a pair, serve no overlapping subnets from different VRFs. ISC dhcpd 4.4 has one flat address space and no VSS (RFC 6607). It selects a subnet only by the relay address (giaddr) or the link selection, so it cannot tell two VRFs apart. bembel checks this at write time: a scope create or change, or a change of its <code>servers</code> or <code>failover_pair</code>, that gives one server an overlapping subnet from another VRF gets <code>409 dhcp-scope.vrf-overlap</code>. The error names both scopes and both VRFs. Overlapping VRFs need separate dhcpd instances or pairs.</li>
 </ul>
 
+<h3 id="reach">Reachability</h3>
+<p>A client sends DHCPDISCOVER as a broadcast. The broadcast must get to a server. A scope has two ways:</p>
+<ul>
+  <li><code>relay</code>: the gateway of the subnet forwards the request (<code>ip helper</code>) to the servers of the scope. This is the normal case for Ethernet subnets, for example kestrel-compute on VLAN 204.</li>
+  <li><code>attached</code>: a DHCP server has an interface in the subnet and gets the broadcast directly. This is the normal case for an IPoIB subnet with <code>routers: none</code>, because no router forwards the request.</li>
+</ul>
+<p>The DHCP server object has the field <code>attached_interfaces</code>: a list of <code>{interface, prefix, partition, address}</code>. In the story both servers have the pkey child interface <code>ib0.8001</code> in kestrel-ipoib:</p>
+<table class="compact">
+<thead><tr><th>Server</th><th>interface</th><th>prefix</th><th>partition</th><th>address</th></tr></thead>
+<tbody>
+<tr><td>dhcp1</td><td><code>ib0.8001</code></td><td>10.100.0.0/16</td><td><code>0x0001</code></td><td>10.100.0.67</td></tr>
+<tr><td>dhcp2</td><td><code>ib0.8001</code></td><td>10.100.0.0/16</td><td><code>0x0001</code></td><td>10.100.0.68</td></tr>
+</tbody>
+</table>
+<ul>
+  <li>The scope kestrel-ipoib has <code>reachability: attached</code> and <code>routers: none</code>.</li>
+  <li>The agent's service config lists the interface: <code>INTERFACESv4="eno1 ib0.8001"</code> in <code>/etc/default/isc-dhcp-server</code>.</li>
+  <li>The OpenSM partition kestrel-ipoib (<code>0x0001</code>) lists the port GUIDs of dhcp1 and dhcp2 (<code>0c42a10300710067</code>, <code>0c42a10300710068</code>) as full members (<a href="fabrics.html#opensm">fabrics.html#opensm</a>). Without full membership, a limited member cannot reach the server.</li>
+  <li>A scope with <code>routers: none</code> needs at least one attached server in its subnet or partition. Otherwise the export check gives the error finding <code>dhcp-scope-unreachable</code>, and the scope is not exported.</li>
+</ul>
+
+<figure class="diagram wide">
+<svg viewBox="0 0 960 300" role="img" aria-labelledby="fig-ib-t">
+<title id="fig-ib-t">IPoIB topology: the clients in partition 0x0001 reach dhcp1 and dhcp2 directly on their ib0.8001 interfaces; there is no relay</title>
+<rect class="zone" x="16" y="30" width="500" height="250" rx="12"/>
+<text class="t-small t-muted" x="30" y="52">kestrel-ib · partition kestrel-ipoib 0x0001 · 10.100.0.0/16</text>
+<rect class="box" x="40" y="80" width="190" height="64" rx="8"/>
+<text class="t-title" x="54" y="104">cn-004 ib0</text>
+<text class="t-small" x="54" y="124">DHCPDISCOVER (broadcast)</text>
+<rect class="box" x="40" y="180" width="190" height="64" rx="8"/>
+<text class="t-title" x="54" y="204">cn-001 … cn-0nn ib0</text>
+<text class="t-small" x="54" y="224">limited or full members</text>
+<rect class="box-accent" x="270" y="80" width="220" height="64" rx="8"/>
+<text class="t-title t-on" x="284" y="104">dhcp1 ib0.8001</text>
+<text class="t-small t-on" x="284" y="124">10.100.0.67 · full member</text>
+<rect class="box" x="270" y="180" width="220" height="64" rx="8"/>
+<text class="t-title" x="284" y="204">dhcp2 ib0.8001</text>
+<text class="t-small" x="284" y="224">10.100.0.68 · full member</text>
+<path class="edge" d="M230,112 L268,112" marker-end="url(#arrow)"/>
+<path class="edge" d="M230,124 L268,200" marker-end="url(#arrow)"/>
+<rect class="box-soft" x="580" y="80" width="364" height="164" rx="10"/>
+<text class="t-title" x="594" y="104">scope kestrel-ipoib</text>
+<text class="t-small t-mono" x="594" y="128">reachability: attached</text>
+<text class="t-small t-mono" x="594" y="148">routers: none</text>
+<text class="t-small t-mono" x="594" y="168">INTERFACESv4="eno1 ib0.8001"</text>
+<text class="t-small t-muted" x="594" y="196">no router, no ip helper: the servers</text>
+<text class="t-small t-muted" x="594" y="214">must be in the partition</text>
+<path class="edge-muted" d="M516,162 L578,162" marker-end="url(#arrow-muted)"/>
+</svg>
+<figcaption>The IPoIB case. The clients and the servers share the partition 0x0001. The servers are full members, so every client reaches them. The scope has no router and no relay.</figcaption>
+</figure>
+
 <h2 id="pools">Pools</h2>
-<p>A DHCP pool is a range of a subnet with the role <code>dhcp-pool</code>. The range is part of the addressing model (<a href="model.html#addressing">model.html#addressing</a>). The DHCP scope adds the pool settings: lease times, failover and the bootp rule.</p>
-<p>In the story, the subnet kestrel-compute (10.20.4.0/22) has the range 10.20.7.0 to 10.20.7.254 with the role <code>dhcp-pool</code>. The rest of the /22 is static.</p>
+<p>A DHCP pool is a range of a subnet with the purpose <code>dhcp-pool</code>. The range is part of the addressing model (<a href="model.html#addressing">model.html#addressing</a>). The DHCP scope adds the pool settings: lease times, failover and the bootp rule.</p>
+<p>In the story, the subnet kestrel-compute (10.20.4.0/22) has the range 10.20.7.0 to 10.20.7.254 (255 addresses) with the purpose <code>dhcp-pool</code>. The rest of the /22 is static.</p>
 <table class="compact">
 <thead><tr><th>Rule</th><th>Reason</th></tr></thead>
 <tbody>
@@ -82,6 +140,7 @@
 <h2 id="reservations">Reservations</h2>
 <p>A reservation gives one address to one client always. bembel makes it from an address that is bound to an interface with a MAC. The address field <code>dhcp</code> has the values <code>reserve</code> (default for an interface with a MAC), <code>none</code> and <code>dynamic</code>. The interface and the address are the data of the host, so a reservation needs no separate object.</p>
 <ul>
+  <li>The export writes a reservation for an address in status <code>allocated</code>, for a <code>reserved</code> address with an FQDN, and for a <code>claimed</code> address only when the claim has <code>publish: true</code> (<code>bembel vm prepare</code> sets it). A <code>deprecated</code> address makes no reservation. Its reservation leaves the export when it becomes deprecated (<a href="allocation.html#release">allocation.html#release</a>).</li>
   <li>The key of the match is the MAC for Ethernet fabrics, and the client identifier for IPoIB (<a href="#ipoib">ipoib</a>).</li>
   <li>The host stanza name is <code>HOST-INTERFACE</code>, for example <code>cn-004-eno1</code>. ONA names it by the IP address. A host name stays valid after an address change, so native mode uses the host name.</li>
   <li>The stanza has <code>fixed-address</code> (the address, or the FQDN if the setting <code>dhcp.fixed_address_fqdn</code> is true), the match and the option <code>host-name</code> with the primary FQDN label.</li>
@@ -150,7 +209,7 @@
 </ul>
 
 <h3 id="option-defs">Option definitions</h3>
-<p>The standard options of dhcpd (<code>routers</code>, <code>domain-name-servers</code>, <code>domain-name</code>, <code>domain-search</code>, <code>ntp-servers</code>, <code>interface-mtu</code>, <code>tftp-server-name</code>, <code>bootfile-name</code>) are known. A site can define an own option by code. The definition has a name, a code, a type and the family. The export writes the definition before it uses the option, as ISC dhcpd requires.</p>
+<p>The standard options of dhcpd (<code>routers</code>, <code>domain-name-servers</code>, <code>domain-name</code>, <code>domain-search</code>, <code>ntp-servers</code>, <code>interface-mtu</code>, <code>tftp-server-name</code>, <code>bootfile-name</code>) are known. A site can define an own option by code. The definition has a name, a code, a type and the family. The export writes the definition before it uses the option, as ISC dhcpd requires. Native mode writes a definition only for a real site-defined option, normally a code from 224 to 254 (RFC 3942). Codes from 101 to 223 include standard options such as 119 <code>domain-search</code> and 121 <code>classless-static-routes</code>, which dhcpd knows. The ONA import maps an ONA option with a known code to the standard option (<a href="map-ona.html#dhcp-options">map-ona.html#dhcp-options</a>).</p>
 <table class="compact">
 <thead><tr><th>Field</th><th>Values</th></tr></thead>
 <tbody>
@@ -197,7 +256,7 @@ option cluster-id code 225 = unsigned integer 16;</code></pre>
 <text class="t-title" x="714" y="94">bembel-agent (dhcp1)</text>
 <text class="t-small" x="714" y="114">pulls dhcpd.conf, checks</text>
 <text class="t-small" x="714" y="134">asks for a restart ticket</text>
-<text class="t-small" x="714" y="154">ships dhcpd.leases data</text>
+<text class="t-small" x="714" y="154">ships lease and log data</text>
 <rect class="box-soft" x="700" y="230" width="244" height="110" rx="10"/>
 <text class="t-title" x="714" y="254">bembel-agent (dhcp2)</text>
 <text class="t-small" x="714" y="274">same steps</text>
@@ -249,9 +308,9 @@ option cluster-id code 225 = unsigned integer 16;</code></pre>
 <p>bembel stores the port GUID on the IB interface (<a href="fabrics.html#guids">fabrics.html#guids</a>). It derives the client identifier from the GUID:</p>
 <pre><code class="language-plaintext">client identifier = FABRIC_PREFIX (12 bytes) + port GUID (8 bytes)
 default prefix    = ff:00:00:00:00:00:02:00:00:02:c9:00
-port GUID cn-004  = 0c:42:a1:03:00:71:a2:b4
+port GUID cn-004  = 0c42a1030071a2b4
 identifier        = ff:00:00:00:00:00:02:00:00:02:c9:00:0c:42:a1:03:00:71:a2:b4</code></pre>
-<p>The prefix is a setting of the fabric (<code>ib.client_id_prefix</code>). The default is the value that many NVIDIA OFED setups send. The value depends on the client software and on the subnet prefix. This chapter does not claim that the default is right for each site. A user can replace the full identifier on an interface (<code>dhcp_client_id</code>). The lease ingestion helps to find a wrong prefix: bembel compares the last 8 bytes of each IPoIB lease with the known GUIDs. A match with a different prefix gives the finding <code>ipoib-client-id-mismatch</code> with the identifier that the client sent.</p>
+<p>The prefix is a setting of the fabric (<code>ib.client_id_prefix</code>). The default is the value that many NVIDIA OFED setups send. The value depends on the client software and on the subnet prefix. This chapter does not claim that the default is right for each site. A user can replace the full identifier on an interface (<code>dhcp_client_id</code>). The IPoIB subnet has no pool, so dhcpd writes no lease for a wrong identifier. The log ingestion helps to find a wrong prefix: bembel reads the unmatched DHCPDISCOVER lines from <code>ib0.8001</code> and compares their last 8 bytes with the known GUIDs. A match with a different prefix gives the finding <code>ipoib-client-id-mismatch</code> with the identifier that the client sent. That dhcpd 4.3 and later log the client identifier when the hardware length is 0 is not verified in this record. A site can also add a small quarantine pool to the IPoIB scope (short lease, no routers), whose leases show the identifier that the client sent.</p>
 <aside class="callout why">
 <p class="callout-title">Why not match the GUID alone</p>
 <p>A host stanza in ISC dhcpd matches an exact value. A <code>substring</code> test works in a class, but a class cannot assign a fixed address. An exact identifier in the host stanza is the only way to a fixed IPoIB address in ISC dhcpd. The setting for the prefix keeps the exactness without hand work.</p>
@@ -263,11 +322,19 @@ identifier        = ff:00:00:00:00:00:02:00:00:02:c9:00:0c:42:a1:03:00:71:a2:b4<
 authoritative;
 ddns-update-style none;
 log-facility local7;
+include "/etc/dhcp/bembel-omapi.key";   # key "bembel-omapi" { algorithm hmac-md5; secret "…"; };
+omapi-port 7911;
+omapi-key bembel-omapi;
 include "/var/lib/bembel-agent/dhcpd/current/dhcpd.conf.bembel";</code></pre>
+<ul>
+  <li>The agent reads the live failover state over OMAPI (<a href="#delivery">delivery</a>). It uses the key only for reads. dhcpd cannot bind OMAPI to localhost only, so the agent installs an nftables rule that accepts tcp/7911 only from 127.0.0.1 and ::1.</li>
+  <li>The agent writes the bundle to <code>/var/lib/bembel-agent/dhcpd/releases/&lt;bundle&gt;/</code> and swaps the symlink <code>current</code>. dhcpd only reads <code>/var/lib/bembel-agent/dhcpd/current/dhcpd.conf.bembel</code>. The leases stay in <code>/var/lib/dhcp/dhcpd.leases</code>, and dhcpd never needs write access to <code>/var/lib/bembel-agent</code>.</li>
+  <li>The bembel path is outside the distribution defaults. With AppArmor, the agent package adds <code>/var/lib/bembel-agent/dhcpd/** r,</code> to <code>/etc/apparmor.d/local/usr.sbin.dhcpd</code>. With SELinux, the tree gets the context <code>dhcp_etc_t</code>. The agent pre-flight check fails as a deployment error when dhcpd cannot read the tree.</li>
+</ul>
 
 <p>The export for dhcp1 looks like this. The text is shortened at the marked places.</p>
 <pre><code class="language-plaintext"># dhcpd.conf.bembel for dhcp1.example.org
-# bundle d-20261104-1431-4a7, generator bembel 0.1.0, mode native
+# bundle b-7c41e0, generator bembel 0.1.0, mode native
 # DO NOT EDIT. The next export replaces this file.
 
 # ---- option definitions (2) ----
@@ -296,7 +363,7 @@ failover peer "dhcp-a" {
 
 # ---- shared networks (2) ----
 shared-network vlan204-kestrel-compute {
-    # kestrel-compute  10.20.4.0/22  VLAN 204
+    # kestrel-compute  10.20.4.0/22  VLAN 204  vrf global
     subnet 10.20.4.0 netmask 255.255.252.0 {
         option routers 10.20.4.1;
         option domain-name "kestrel.example.org";
@@ -310,9 +377,9 @@ shared-network vlan204-kestrel-compute {
 }
 
 shared-network ib-kestrel-ipoib {
-    # kestrel-ipoib  10.100.0.0/16  partition 0x8001
+    # kestrel-ipoib  10.100.0.0/16  partition 0x0001  vrf hpc-fabric
     subnet 10.100.0.0 netmask 255.255.0.0 {
-        # routers: none (explicit)
+        # routers: none (explicit), reachability: attached (ib0.8001 on dhcp1 and dhcp2)
         option interface-mtu 4092;
     }
 }
@@ -337,6 +404,7 @@ host cn-004-ib0 {
   <li>The IPoIB subnet has no pool in the story. The nodes have reservations. A site can add a pool in the same way.</li>
   <li>The file for dhcp2 differs in the <code>failover</code> block (<code>secondary;</code>, no <code>mclt</code>, no <code>split</code>, the two addresses swapped) and in the server options. All other blocks are identical.</li>
   <li>The sort order of subnets is by address. The host stanzas are by host name. The same data gives the same bytes.</li>
+  <li>The comment of each subnet names its VLAN or partition and its VRF. One server serves subnets from two VRFs here (global and hpc-fabric). This is allowed because the subnets do not overlap (<a href="#scopes">scopes</a>).</li>
 </ul>
 
 <figure class="diagram wide">
@@ -373,7 +441,7 @@ host cn-004-ib0 {
 <path class="edge" d="M772,83 L794,83" marker-end="url(#arrow)"/>
 <rect class="box-ok" x="632" y="190" width="312" height="72" rx="8"/>
 <text class="t-title" x="646" y="214">wait for state normal, report</text>
-<text class="t-small" x="646" y="234">read dhcpd.leases for the failover state,</text>
+<text class="t-small" x="646" y="234">read the failover state over OMAPI,</text>
 <text class="t-small" x="646" y="250">POST the status, return the ticket</text>
 <path class="edge" d="M870,126 L870,188" marker-end="url(#arrow)"/>
 <rect class="box-err" x="170" y="190" width="284" height="72" rx="8"/>
@@ -398,6 +466,8 @@ host cn-004-ib0 {
 <tr><td>bembel</td><td>Failover symmetric: both servers have the same scopes, pools and hosts. The peer names match. Ports are not equal on the primary and on the secondary.</td><td>Error</td></tr>
 <tr><td>bembel</td><td>Option values match their definition type. A custom code does not collide with a standard code.</td><td>Error</td></tr>
 <tr><td>bembel</td><td>IPoIB identifier has 20 bytes (or the length set by the fabric). The GUID is unique.</td><td>Error</td></tr>
+<tr><td>bembel</td><td>No overlapping subnets from different VRFs on one server (or on the two peers of a pair). The finding names both scopes and both VRFs.</td><td>Error. No bundle.</td></tr>
+<tr><td>bembel</td><td>A scope with <code>routers: none</code> has at least one attached server in its subnet or partition (<a href="#reach">reachability</a>).</td><td>Error finding <code>dhcp-scope-unreachable</code>. The scope is not exported.</td></tr>
 <tr><td>bembel</td><td>Mass change guard: more than N % of the host stanzas removed</td><td>Held for approval</td></tr>
 <tr><td>sandbox and agent</td><td><code>dhcpd -t -cf FILE</code> and <code>dhcpd -6 -t -cf FILE</code></td><td>Error. The sandbox uses a copy of the real server file with the include pointed at the bundle.</td></tr>
 </tbody>
@@ -405,20 +475,24 @@ host cn-004-ib0 {
 <p>The command <code>dhcpd -t</code> only checks syntax. A variant <code>dhcpd -T</code> also loads the lease file. The agent uses it on the server only, because the sandbox has no lease file. The option <code>-T</code> is not verified in this record.</p>
 
 <h2 id="delivery">Delivery</h2>
-<p>The delivery of the dhcpd export follows the same pull model as the BIND export (<a href="dns.html#delivery">dns.html#delivery</a>): <code>GET /v1/dhcp-servers/dhcp1.example.org/bundle</code> with <code>If-None-Match</code>, a manifest, an Ed25519 signature, a release directory and an atomic symlink swap. Two things differ.</p>
+<p>The delivery of the dhcpd export follows the same pull model as the BIND export (<a href="dns.html#delivery">dns.html#delivery</a>): <code>GET /v1/dhcp-servers/dhcp1.example.org/bundle</code> with <code>If-None-Match</code>, a signed manifest, a release directory and an atomic symlink swap. The agent never pulls <code>/v1/exports/{id}/artifact</code>; that path is for human download and preview.</p>
+<p>The bundle has <code>bundle.tar</code>, <code>manifest.json</code> with <code>"kind": "dhcpd"</code> and <code>"server": "dhcp1.example.org"</code>, and <code>manifest.json.sig</code> (Ed25519 over <code>manifest.json</code>). The agent trusts only the signed manifest. It runs the same checks as the DNS agent (<a href="dns.html#manifest">dns.html#manifest</a>), in this order: the signature with the key named by <code>key_id</code>; <code>kind</code> and <code>server</code> equal to its own identity; a <code>snapshot</code> not lower than that of the current release; the sha256 of the tar and of each file. A rejected bundle leaves the current release in place and is reported as <code>deploy.bundle-rejected</code>. The signature protects the transport and the ingress path. It does not protect against a compromised bembel pod that holds the key.</p>
+<p>Two things differ from DNS.</p>
 <ol>
-  <li><strong>ISC dhcpd has no reload.</strong> A new config needs a restart (<code>systemctl restart isc-dhcp-server</code> on Debian). OMAPI can add a host at run time, but the file and the run time then differ. v1 does not use OMAPI for config.</li>
+  <li><strong>ISC dhcpd has no reload.</strong> A new config needs a restart (<code>systemctl restart isc-dhcp-server</code> on Debian). OMAPI can add a host at run time, but the file and the run time then differ. v1 does not use OMAPI for config. The agent uses OMAPI only to read the failover state.</li>
   <li><strong>A restart of both peers at once stops DHCP.</strong> The failover pair protects the service only if one server runs.</li>
 </ol>
-<p>The restart ticket solves this. The agent that has a new valid config asks bembel for a ticket: <code>POST /v1/dhcp-failover-pairs/dhcp-a/restart-tickets</code> with its server name.</p>
+<p>The restart ticket solves this. The agent that has a new valid config asks bembel for a ticket: <code>POST /v1/dhcp-failover-pairs/dhcp-a/restart-tickets</code> with the body <code>{"server": "dhcp2.example.org"}</code>. The answer is <code>201</code> with <code>{id, server, expires_at}</code>. <code>DELETE /v1/dhcp-failover-pairs/dhcp-a/restart-tickets/{id}</code> returns the ticket.</p>
+<p>The agent reads the live failover state over OMAPI (<a href="#export">export</a>). It reads the <code>failover-state</code> object <code>dhcp-a</code> and needs <code>local-state</code> and <code>partner-state</code> both <code>normal</code>. It also needs <code>systemctl is-active isc-dhcp-server</code>, so a dead process cannot report <code>normal</code>. The agent sends this state in its periodic report and after each restart.</p>
 <ul>
-  <li>bembel grants one ticket at a time for each pair.</li>
-  <li>bembel grants a ticket only if the other peer reported the failover state <code>normal</code> less than 2 minutes ago.</li>
+  <li>bembel grants one ticket at a time for each pair. A second request gets <code>409 dhcp-failover.ticket-held</code>.</li>
+  <li>bembel grants a ticket only if the agent of the other peer reported, less than 2 minutes ago, both states <code>normal</code> and the process active. Otherwise the request gets <code>409 dhcp-failover.peer-not-normal</code>.</li>
   <li>The secondary gets its ticket first when both are waiting. Then the primary goes second.</li>
   <li>A ticket expires after 10 minutes. A crashed agent does not block the pair.</li>
   <li>A server without a pair needs no ticket. The agent restarts it at once, in a time window that the admin sets (<code>restart_window: "02:00-04:00"</code>), if the window is set.</li>
 </ul>
-<p>After the swap and the restart, the agent reads the failover state from <code>dhcpd.leases</code>. It waits up to 5 minutes for <code>my state normal</code>. Then it reports the result and returns the ticket. If the state does not become normal, the agent keeps the ticket, reports the error, and does not start the peer. The user reads the state on the server page. The agent can swap back to the previous release (<code>bembel-agent rollback</code>).</p>
+<p>After the swap and the restart, the agent reads the failover state over OMAPI again. It waits up to 5 minutes for both states <code>normal</code>. Then it reports the result and returns the ticket. If the state does not become normal, the agent keeps the ticket, reports the error and does not start the peer. It cannot hold the ticket past its expiry of 10 minutes. The user reads the state on the server page. The agent can swap back to the previous release (<code>bembel-agent rollback</code>).</p>
+<p>When one peer is down or stays in <code>communications-interrupted</code>, the other peer can never get a normal ticket. A user with <code>dhcp-server:update</code> can then send the request with <code>"override": true</code>. bembel holds the call (<code>202</code>) under the default rule <code>dhcp.restart-override</code> (<a href="access.html#changes">access.html#changes</a>). The approval screen shows the state of the partner, the MCLT and the impact: a short DHCP outage on the only serving peer, and whether to put the partner in <code>partner-down</code> first. On approval bembel issues the ticket, with <code>expires_at</code> 10 minutes after the approval. The audit log records the override.</p>
 <p>The agent keeps the last 5 releases. A change that touches only the other server (for example a server option of dhcp2) does not change the bundle of dhcp1, so dhcp1 does not restart.</p>
 
 <aside class="callout why">
@@ -427,7 +501,11 @@ host cn-004-ib0 {
 </aside>
 
 <h2 id="leases">Lease ingestion</h2>
-<p>A lease is a dynamic address that dhcpd gave. dhcpd writes every change as a new block at the end of the file <code>/var/lib/dhcp/dhcpd.leases</code>. The agent reads the file, keeps the last block per address, and sends the data to bembel.</p>
+<p>A lease is a dynamic address that dhcpd gave. dhcpd writes every change as a new block at the end of the file <code>/var/lib/dhcp/dhcpd.leases</code>. The file holds only pool addresses. A host with <code>fixed-address</code> never appears in it, so the agent has two inputs:</p>
+<ul>
+  <li>The lease file. The agent reads it, keeps the last block per address, and sends the data with <code>source: lease</code> and <code>kind: lease</code>.</li>
+  <li>The dhcpd log (<code>journalctl -u isc-dhcp-server</code> or syslog). A line <code>DHCPACK on 10.20.4.44 to 3c:ec:ef:12:0a:44 via …</code> gives last-seen data for a reservation (<code>source: log</code>, <code>kind: ack</code>). A DHCPDISCOVER or DHCPREQUEST line that ends in <code>no free leases</code> or <code>unknown client</code> gives an unmatched client (<code>kind: unmatched</code>).</li>
+</ul>
 <pre><code class="language-plaintext">lease 10.20.7.31 {
   starts 3 2026/11/04 13:02:11;
   ends 3 2026/11/04 21:02:11;
@@ -441,10 +519,15 @@ host cn-004-ib0 {
   { "address": "10.20.7.31", "mac": "3c:ec:ef:12:0b:9a",
     "client_id": "01:3c:ec:ef:12:0b:9a", "hostname": "cn-031",
     "state": "active", "starts": "2026-11-04T13:02:11Z",
-    "ends": "2026-11-04T21:02:11Z", "observed_at": "2026-11-04T13:03:00Z" }
+    "ends": "2026-11-04T21:02:11Z", "observed_at": "2026-11-04T13:03:00Z",
+    "source": "lease", "kind": "lease" },
+  { "address": "10.20.4.44", "mac": "3c:ec:ef:12:0a:44",
+    "observed_at": "2026-11-04T17:34:02Z",
+    "source": "log", "kind": "ack" }
 ]</code></pre>
 <ul>
-  <li>The agent sends changes only, in batches. It keeps its position in the file. A restart of the agent re-reads the file and sends a full state.</li>
+  <li>The agent sends changes only, in batches. It keeps its position in the file and in the log. A restart of the agent re-reads the file and sends a full state.</li>
+  <li>bembel finds the address through the scopes of the reporting server: (server, ip) → scope → prefix → VRF → address, never by the IP alone. The same IP can exist in two VRFs. One server serves no overlapping subnets from different VRFs, so this result is unique.</li>
   <li>bembel stores <code>last_seen_at</code>, <code>last_seen_mac</code>, <code>last_seen_client_id</code> and <code>last_seen_source</code> on the address. The data is an observation, not a claim. A lease does not create an address in the allocated state.</li>
   <li>bembel limits the writes: one update per address in 15 minutes. A renewal does not make a change event.</li>
   <li>With a failover pair, bembel merges the reports of both servers. The later <code>ends</code> wins.</li>
@@ -453,11 +536,11 @@ host cn-004-ib0 {
 <table class="compact">
 <thead><tr><th>Use</th><th>Rule</th></tr></thead>
 <tbody>
-<tr><td>Stale address</td><td>An allocated address with a reservation and no lease, ARP or other sign for 90 days (setting) gets the finding <code>stale-address</code>. The assistant button "Check this subnet for stale addresses" starts from the list.</td></tr>
+<tr><td>Stale address</td><td>An allocated address with a reservation and no lease, no DHCPACK in the log and no other observation for 90 days (setting) gets the finding <code>stale-address</code>. The rule applies only when the ingested log of the server covers the whole 90 days. At its first start the agent also reads the log history that the server keeps. Without 90 days of log, bembel reports no stale address for that server, so a new server does not mark all addresses stale at once. The assistant button "Check this subnet for stale addresses" starts from the list.</td></tr>
 <tr><td>Rogue client</td><td>A lease in a pool for a MAC that no interface has appears in the list "unknown clients" of the scope.</td></tr>
-<tr><td>Wrong client identifier</td><td>An IPoIB lease with an unknown identifier but a known GUID gives <code>ipoib-client-id-mismatch</code> (<a href="#ipoib">ipoib</a>).</td></tr>
-<tr><td>Pool utilisation</td><td>Active leases divided by the size of the pool. The metric <code>bembel_dhcp_pool_utilisation_ratio</code> has an alert at 90 %.</td></tr>
-<tr><td>Failover health</td><td>The state of the peers (<code>normal</code>, <code>communications-interrupted</code>, <code>partner-down</code>) shows on the server page.</td></tr>
+<tr><td>Wrong client identifier</td><td>An unmatched DHCPDISCOVER log line on <code>ib0.8001</code> whose last 8 bytes match a known GUID gives <code>ipoib-client-id-mismatch</code> (<a href="#ipoib">ipoib</a>).</td></tr>
+<tr><td>Pool utilisation</td><td>Active leases divided by the size of the pool. The metric <code>bembel_dhcp_pool_utilisation_ratio</code> has the alert <code>BembelDhcpPoolAlmostFull</code> at 90 % (<a href="operations.html#alerts">operations.html#alerts</a>).</td></tr>
+<tr><td>Failover health</td><td>The state of the peers (<code>normal</code>, <code>communications-interrupted</code>, <code>partner-down</code>), read over OMAPI, shows on the server page.</td></tr>
 </tbody>
 </table>
 
