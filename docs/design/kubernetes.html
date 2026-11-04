@@ -10,8 +10,8 @@
 <p class="lede">This chapter specifies how Kubernetes clusters use bembel. A small manager, <code>bembel-k8s</code>, runs in the cluster. It has a few controllers. Each controller talks to the public bembel API with a service account token. bembel itself does not depend on any cluster.</p>
 <ul class="keypoints">
   <li>One Helm chart installs <code>bembel-k8s</code>. Each controller is optional: the Cluster API IPAM provider, the load-balancer pool sync and the external-dns webhook.</li>
-  <li>The Cluster API provider is built on <code>ipamutil</code>. A claim in Kubernetes becomes a claim in bembel. The idempotency key is <code>cluster/namespace/name</code>, not the UID, so <code>clusterctl move</code> keeps the address.</li>
-  <li>A load-balancer pool is a whole range that bembel reserves. The controller renders it as a MetalLB or Cilium pool object. The load balancer then gives the single addresses.</li>
+  <li>The Cluster API provider is built on <code>ipamutil</code>. An <code>IPAddressClaim</code> in Kubernetes becomes an allocated address in bembel, with no bembel claim. The <code>external_ref</code> is <code>cluster/namespace/name</code>, not the UID, so <code>clusterctl move</code> adopts the old address.</li>
+  <li>A load-balancer pool is a whole range with the purpose <code>lb-pool</code> that bembel reserves inside a subnet. The controller renders it as a MetalLB or Cilium pool object. The load balancer then gives the single addresses.</li>
   <li>bembel has no CNI IPAM plugin. A pod start must not need a remote call. bembel gives only node CIDRs and pool ranges.</li>
   <li>The external-dns webhook writes records only into zones that bembel owns and that the service may write.</li>
   <li>A pod proves its identity with a projected service account token with the audience <code>bembel</code>. bembel trusts the issuer of each cluster.</li>
@@ -23,8 +23,8 @@
 <table>
 <thead><tr><th>Need</th><th>Who asks</th><th>Speed</th><th>Where bembel helps</th></tr></thead>
 <tbody>
-<tr><td>Node addresses of a cluster that Cluster API builds</td><td>The infrastructure provider (CAPV, CAPM3)</td><td>Minutes</td><td>IPAM provider: one claim per machine and pool (<a href="#capi">Cluster API</a>)</td></tr>
-<tr><td>Service addresses of type <code>LoadBalancer</code></td><td>MetalLB or Cilium</td><td>Seconds</td><td>One reserved range for each pool (<a href="#pools">pools</a>)</td></tr>
+<tr><td>Node addresses of a cluster that Cluster API builds</td><td>The infrastructure provider (CAPV, CAPM3)</td><td>Minutes</td><td>IPAM provider: one allocated address per <code>IPAddressClaim</code> (<a href="#capi">Cluster API</a>)</td></tr>
+<tr><td>Service addresses of type <code>LoadBalancer</code></td><td>MetalLB or Cilium</td><td>Seconds</td><td>One <code>lb-pool</code> range for each pool and family (<a href="#pools">pools</a>)</td></tr>
 <tr><td>DNS names of services and ingresses</td><td>external-dns</td><td>Seconds</td><td>A webhook provider for zones that bembel owns (<a href="#external-dns">external-dns</a>)</td></tr>
 <tr><td>Pod addresses</td><td>The CNI</td><td>Milliseconds</td><td>Only the node CIDRs and the pool ranges (<a href="#cni">CNI</a>)</td></tr>
 </tbody>
@@ -66,7 +66,7 @@
 <text class="t-small t-muted" x="734" y="140">REST API /v1</text>
 <text class="t-small t-muted" x="734" y="160">trusted issuer per cluster</text>
 <text class="t-small t-muted" x="734" y="180">bindings: subject, role, scope</text>
-<text class="t-small t-muted" x="734" y="200">idempotent allocate by key</text>
+<text class="t-small t-muted" x="734" y="200">allocate by key, adopt by ref</text>
 <text class="t-small t-muted" x="734" y="220">records, zones, prefixes</text>
 <text class="t-small t-muted" x="734" y="256">HA: see Deployment and</text>
 <text class="t-small t-muted" x="734" y="274">operations</text>
@@ -88,7 +88,7 @@
 <p>The manager lives in its own repository and chart. bembel itself needs no Kubernetes. The manager uses controller-runtime, the same language and tools as the server (Go). The chart sets the leader election lease, so two replicas are safe. The values file chooses the controllers:</p>
 <pre><code class="language-yaml"># values.yaml of the chart bembel-k8s (excerpt)
 bembel:
-  url: https://ipam.example.org
+  url: https://bembel.example.org
   clusterId: kestrel-mgmt          # name of this cluster in bembel
   audience: bembel
 controllers:
@@ -124,11 +124,11 @@ spec:
   prefix:
     vrf: global
     cidr: 10.20.64.0/22                            # subnet kestrel-k8s, VLAN 264
-  range: 10.20.64.20-10.20.64.250                  # optional: stay inside it
+  range: kestrel-k8s-nodes                         # a static range in the subnet, 10.20.64.20-10.20.64.250
   gateway: 10.20.64.1                              # default: the subnet gateway
   dnsZone: kestrel.example.org                     # name the address from the Machine
   tags: { cluster: kestrel-k8s, role: k8s-node }
-  releaseGrace: 1h                                 # keep the address after the claim ends
+  releaseGrace: 1h                                 # Go duration; the provider sends "grace": "PT1H"
 status:
   conditions:
     - type: Ready
@@ -137,40 +137,40 @@ status:
   free: 998</code></pre>
 <p>A claim for an IPv6 address uses a second pool of the same kind, with <code>cidr: 2001:db8:4200:264::/64</code>. The contract is single stack, so a machine with two stacks has two claims.</p>
 
-<h3 id="capi-claim">Claim to claim</h3>
+<h3 id="capi-claim">Claim to address</h3>
 <p>The provider watches each <code>IPAddressClaim</code> whose <code>poolRef</code> has kind <code>BembelPrefixPool</code>. For each claim it does these steps:</p>
 <ol class="steps">
   <li><code>ipamutil</code> checks that the cluster of the claim exists and is not paused. Then it adds the finalizer <code>ipam.cluster.x-k8s.io/ReleaseAddress</code>.</li>
   <li><code>FetchPool</code> reads the pool. When the subnet is missing, it sets the condition <code>PoolNotReady</code> and tries again later.</li>
-  <li><code>EnsureAddress</code> calls <code>POST /v1/prefixes/{id}/addresses:allocate</code> with the header <code>Idempotency-Key: k8s:kestrel-mgmt/capi-kestrel/kestrel-k8s-cp-0-eth0</code> and the body below.</li>
-  <li>bembel answers with the address. <code>ipamutil</code> creates the <code>IPAddress</code> with the same name as the claim, sets the owner references and the protection finalizer <code>ipam.cluster.x-k8s.io/protect-address</code>, and writes <code>claim.status.addressRef</code>.</li>
+  <li><code>EnsureAddress</code> calls <code>POST /v1/prefixes/{id}/addresses:allocate</code> with the header <code>Idempotency-Key: k8s:kestrel-mgmt:5f4e0c0a-2c1d-4b3c-9d44-0a55f3c1e0b7</code> (cluster id and claim UID) and the body below. The body has no <code>claim_ttl</code>, so bembel allocates the address at once. Cluster API makes no bembel claim.</li>
+  <li>bembel answers with the address: 201 for a new one, 200 for an address that it adopts by <code>external_ref</code>. <code>ipamutil</code> creates the <code>IPAddress</code> with the same name as the claim, sets the owner references and the protection finalizer <code>ipam.cluster.x-k8s.io/ProtectAddress</code>, and writes <code>claim.status.addressRef</code>.</li>
 </ol>
 <pre><code class="language-json">{
-  "range": "10.20.64.20-10.20.64.250",
-  "status": "allocated",
+  "range": "kestrel-k8s-nodes",
   "fqdn": "kestrel-k8s-cp-0.kestrel.example.org",
   "external_ref": "k8s:kestrel-mgmt:ipaddressclaim/capi-kestrel/kestrel-k8s-cp-0-eth0",
   "tags": { "cluster": "kestrel-k8s", "role": "k8s-node" },
   "attributes": { "claim_uid": "5f4e0c0a-2c1d-4b3c-9d44-0a55f3c1e0b7" }
 }</code></pre>
-<p>The key is the cluster id, the namespace and the name of the claim. It is not the UID. A claim keeps its name when <code>clusterctl move</code> recreates it in another cluster. The UID changes. A key with the UID would give a second address.</p>
+<p>The <code>external_ref</code> is the cluster id, the namespace and the name of the claim. It is not the UID. A claim keeps its name when <code>clusterctl move</code> recreates it in another cluster. The UID changes. An <code>external_ref</code> with the UID would give a second address. The <code>Idempotency-Key</code> has the UID, so it covers only the retries of one claim object. bembel finds the address of a recreated claim by its <code>external_ref</code> (<a href="allocation.html#adoption">adoption</a>).</p>
 <p>The hostname comes from the Machine. The provider walks the owner references of the claim up to the Machine (at most 5 steps) and builds the FQDN from the machine name and the <code>dnsZone</code> of the pool. This is the same method as the Infoblox provider. The address gets its A and PTR records (<a href="dns.html#derived">DNS chapter</a>).</p>
 
 <h3 id="capi-rules">Rules</h3>
 <table>
 <thead><tr><th>Case</th><th>Behaviour</th></tr></thead>
 <tbody>
-<tr><td>The claim is new</td><td>Allocate and make the <code>IPAddress</code>.</td></tr>
-<tr><td>The same key exists in bembel</td><td>The call returns the same address (idempotent). The provider makes the <code>IPAddress</code> if it is missing.</td></tr>
-<tr><td>The claim is deleted</td><td>The provider calls <code>POST /v1/addresses/{id}:release</code>. After <code>releaseGrace</code> the address is free. Then it deletes the <code>IPAddress</code> and removes both finalizers.</td></tr>
-<tr><td>The pool is exhausted</td><td>bembel answers 409 <code>pool.exhausted</code>. The claim gets the condition <code>Ready=False</code>, reason <code>PoolExhausted</code>.</td></tr>
+<tr><td>The claim is new</td><td>Allocate (201) and make the <code>IPAddress</code>.</td></tr>
+<tr><td>A retry with the same key</td><td>bembel replays the stored answer while the address is live. After a release the key row is gone, and the call runs as new (<a href="allocation.html#idempotency">idempotency</a>).</td></tr>
+<tr><td>The <code>external_ref</code> exists in bembel</td><td>200, the same address. The provider PATCHes <code>attributes.claim_uid</code> (with <code>If-Match</code>) if it differs, and makes the <code>IPAddress</code> if it is missing. A deprecated address becomes allocated again. An address with this <code>external_ref</code> in another prefix gives 409 <code>address.conflict</code>.</td></tr>
+<tr><td>The claim is deleted</td><td>The provider calls <code>POST /v1/addresses/{id}:release</code> with <code>{"grace": "PT1H"}</code>, once. 200 or 404 means done, and <code>ReleaseAddress</code> returns a nil <code>ctrl.Result</code>. <code>ipamutil</code> deletes the <code>IPAddress</code> and removes both finalizers. bembel keeps the address deprecated for 1 h. Then the reaper frees it and removes its records.</td></tr>
+<tr><td>The pool is exhausted</td><td>bembel answers 409 <code>prefix.exhausted</code>. The claim gets the condition <code>Ready=False</code>, reason <code>PoolExhausted</code>.</td></tr>
 <tr><td>bembel is not reachable</td><td>The claim stays pending with the reason <code>AllocationFailed</code>. The machine waits. This is fine for provisioning. The retry uses a back-off.</td></tr>
 <tr><td>The cluster is paused</td><td><code>ipamutil</code> does nothing.</td></tr>
-<tr><td><code>clusterctl move</code></td><td>See below.</td></tr>
+<tr><td><code>clusterctl move</code></td><td>The same <code>external_ref</code>, so adoption. See below.</td></tr>
 </tbody>
 </table>
-<p><code>clusterctl move</code> copies the objects with the label <code>cluster.x-k8s.io/cluster-name</code> to a new management cluster. The pool has this label (see the example). In the new cluster the claim has a new UID and no <code>IPAddress</code>. The provider calls allocate with the same key. bembel returns the old address. The provider writes the new UID to the attribute <code>claim_uid</code>. The address does not change.</p>
-<p>The <code>clusterId</code> is a value in the Helm values, not a host name. After a move, the new management cluster gets the same <code>clusterId</code>, so the keys stay the same.</p>
+<p><code>clusterctl move</code> copies the objects with the label <code>cluster.x-k8s.io/cluster-name</code> to a new management cluster. The pool has this label (see the example). In the new cluster the claim has a new UID and no <code>IPAddress</code>. The provider calls allocate. The <code>external_ref</code> is the same, so bembel returns the old address with 200. The provider PATCHes the new UID into <code>claim_uid</code>. The address does not change.</p>
+<p>The <code>clusterId</code> is a value in the Helm values, not a host name. After a move, the new management cluster gets the same <code>clusterId</code>, so the external refs stay the same. The trusted-issuer entry of the new management cluster keeps the subject prefix <code>k8s:kestrel-mgmt:</code> (<a href="#identity-issuer">below</a>); the operator replaces its issuer URL or key set during the move. The subject and the source stay the same.</p>
 
 <h3 id="capi-lifecycle">Lifecycle of a claim</h3>
 <figure class="diagram wide explainer">
@@ -193,13 +193,13 @@ status:
 <text class="t-small t-muted" x="46" y="146" data-f="1-2">finalizer ReleaseAddress</text>
 <text class="t-small t-ok" x="46" y="146" data-f="3">Ready, addressRef set</text>
 <text class="t-small t-muted" x="46" y="146" data-f="4">new UID, same name</text>
-<text class="t-small t-warn" x="46" y="146" data-f="5">deletionTimestamp set</text>
+<text class="t-small t-warn" x="46" y="146" data-f="5">finalizers removed, deleted</text>
 <text class="t-small t-muted" x="46" y="146" data-f="6">gone</text>
 <text class="t-small t-muted" x="46" y="164" data-f="3-5">address 10.20.64.21</text>
 <rect class="box-soft" x="32" y="200" width="268" height="86" rx="8" data-f="3-5"/>
 <text class="t-title t-mono" x="46" y="222" data-f="3-5">IPAddress</text>
 <text class="t-small" x="46" y="242" data-f="3-5">10.20.64.21/22</text>
-<text class="t-small t-muted" x="46" y="260" data-f="3-4">gateway 10.20.64.1 · protect-address</text>
+<text class="t-small t-muted" x="46" y="260" data-f="3-4">gateway 10.20.64.1 · ProtectAddress</text>
 <text class="t-small t-warn" x="46" y="260" data-f="5">deleted after the release</text>
 <rect class="box" x="360" y="86" width="270" height="86" rx="8"/>
 <text class="t-title" x="376" y="108">bembel-k8s</text>
@@ -207,9 +207,9 @@ status:
 <text class="t-small t-muted" x="376" y="128" data-f="1">adds the finalizer</text>
 <text class="t-small t-muted" x="376" y="128" data-f="2">EnsureAddress</text>
 <text class="t-small t-muted" x="376" y="128" data-f="3">idle</text>
-<text class="t-small t-muted" x="376" y="128" data-f="4">EnsureAddress, same key</text>
+<text class="t-small t-muted" x="376" y="128" data-f="4">EnsureAddress, new UID</text>
 <text class="t-small t-muted" x="376" y="128" data-f="5-6">ReleaseAddress</text>
-<text class="t-small t-mono" x="376" y="152" data-f="2,4">k8s:kestrel-mgmt/capi-kestrel/…eth0</text>
+<text class="t-small t-mono" x="376" y="152" data-f="2,4">external_ref …/capi-kestrel/…eth0</text>
 <rect class="box-accent" x="700" y="86" width="268" height="86" rx="8" data-f="2-3"/>
 <text class="t-title t-on" x="714" y="108" data-f="2-3">10.20.64.21</text>
 <text class="t-small t-on" x="714" y="128" data-f="2">allocate, status allocated</text>
@@ -217,14 +217,14 @@ status:
 <text class="t-small t-on" x="714" y="146" data-f="2-3">A and PTR derived</text>
 <rect class="box-accent" x="700" y="86" width="268" height="86" rx="8" data-f="4"/>
 <text class="t-title t-on" x="714" y="108" data-f="4">10.20.64.21</text>
-<text class="t-small t-on" x="714" y="128" data-f="4">same key found, adopted</text>
-<text class="t-small t-on" x="714" y="146" data-f="4">claim_uid updated</text>
+<text class="t-small t-on" x="714" y="128" data-f="4">same external_ref, adopted</text>
+<text class="t-small t-on" x="714" y="146" data-f="4">claim_uid patched</text>
 <rect class="box-warn" x="700" y="86" width="268" height="86" rx="8" data-f="5"/>
 <text class="t-title" x="714" y="108" data-f="5">10.20.64.21</text>
 <text class="t-small" x="714" y="128" data-f="5">deprecated, grace 1 h</text>
 <rect class="box-ok" x="700" y="86" width="268" height="86" rx="8" data-f="6"/>
 <text class="t-title" x="714" y="108" data-f="6">10.20.64.21</text>
-<text class="t-small" x="714" y="128" data-f="6">free again, records removed</text>
+<text class="t-small" x="714" y="128" data-f="6">reaper: free, records removed</text>
 <line class="edge-muted" x1="300" y1="120" x2="358" y2="120" marker-end="url(#arrow-muted)" data-f="0-1"/>
 <line class="edge-accent" x1="630" y1="120" x2="698" y2="120" marker-end="url(#arrow-accent)" data-f="2,4"/>
 <line class="edge" x1="630" y1="120" x2="698" y2="120" marker-end="url(#arrow)" data-f="5-6"/>
@@ -236,8 +236,8 @@ status:
 <text class="t-small t-muted" x="32" y="330" data-f="0">An infrastructure provider (CAPV, CAPM3) creates the claim for a machine.</text>
 <text class="t-small t-muted" x="32" y="330" data-f="5-6">Machine deleted: the claim follows.</text>
 </svg>
-<script type="application/json" class="steps">["The infrastructure provider creates the IPAddressClaim kestrel-k8s-cp-0-eth0 with poolRef BembelPrefixPool/kestrel-k8s-v4. It has no status and no finalizer.", "capi-ipam-provider sees the claim. The cluster is not paused. ipamutil adds the finalizer ipam.cluster.x-k8s.io/ReleaseAddress. If the manager stops here, the claim is safe: nothing is allocated yet.", "EnsureAddress calls allocate with the key k8s:kestrel-mgmt/capi-kestrel/kestrel-k8s-cp-0-eth0. bembel gives 10.20.64.21 and keeps the key. A retry gives the same address. The A and PTR records are derived at once.", "ipamutil creates the IPAddress with the same name, address 10.20.64.21, prefix 22 and gateway 10.20.64.1. It sets claim.status.addressRef. The condition Ready is true. The infrastructure provider reads the IPAddress and configures the machine.", "The operator runs clusterctl move to a new management cluster. The claim is recreated with a new UID and has no IPAddress. EnsureAddress sends the same key. bembel finds it and returns 10.20.64.21. The attribute claim_uid changes. The address does not.", "The Machine is deleted, so the claim has a deletionTimestamp. ReleaseAddress calls release. bembel sets the address to deprecated and keeps it for the grace time (1 h). The IPAddress is deleted and the protection finalizer is removed.", "The grace time ends. bembel releases the address and removes its records. The provider removes the claim finalizer and Kubernetes deletes the claim. The audit event of bembel names the service account of the manager and the claim key."]</script>
-<figcaption>The life of one claim. The finalizer comes first, so a deleted claim always releases its address. The key has the claim name, so a move adopts the old address.</figcaption>
+<script type="application/json" class="steps">["The infrastructure provider creates the IPAddressClaim kestrel-k8s-cp-0-eth0 with poolRef BembelPrefixPool/kestrel-k8s-v4. It has no status and no finalizer.", "capi-ipam-provider sees the claim. The cluster is not paused. ipamutil adds the finalizer ipam.cluster.x-k8s.io/ReleaseAddress. If the manager stops here, the claim is safe: nothing is allocated yet.", "EnsureAddress calls allocate with the key k8s:kestrel-mgmt:5f4e0c0a-… (cluster id and claim UID) and the external_ref k8s:kestrel-mgmt:ipaddressclaim/capi-kestrel/kestrel-k8s-cp-0-eth0. There is no claim_ttl. bembel gives 10.20.64.21 with the status allocated. A retry gives the same address. The A and PTR records are derived at once.", "ipamutil creates the IPAddress with the same name, address 10.20.64.21, prefix 22 and gateway 10.20.64.1. It sets claim.status.addressRef. The condition Ready is true. The infrastructure provider reads the IPAddress and configures the machine.", "The operator runs clusterctl move to a new management cluster. The claim is recreated with a new UID and has no IPAddress. EnsureAddress calls allocate with a new key, because the UID is new. The external_ref is the same, so bembel adopts the old address and answers 200 with 10.20.64.21. The provider PATCHes the new UID into claim_uid. The address does not change.", "The Machine is deleted, so the claim has a deletionTimestamp. ReleaseAddress calls release with grace PT1H. bembel sets the address to deprecated. The IPAddress is deleted, both finalizers are removed, and the claim is gone. The audit event of bembel names the service account of the manager and the external_ref.", "The grace time ends. The reaper frees 10.20.64.21 and removes its records. Kubernetes is not involved in this step."]</script>
+<figcaption>The life of one claim. The finalizer comes first, so a deleted claim always releases its address. The external_ref has the claim name, so a move adopts the old address.</figcaption>
 </figure>
 <figure class="diagram wide">
 <svg viewBox="0 0 1000 480" role="img" aria-labelledby="k8s-seq-t">
@@ -266,7 +266,7 @@ status:
 <text class="t-num t-accent" x="576" y="224">4</text>
 <line class="edge-accent" x1="610" y1="220" x2="858" y2="220" marker-end="url(#arrow-accent)"/>
 <text class="t-small" x="620" y="212">POST …/addresses:allocate</text>
-<text class="t-small t-muted" x="620" y="238">Idempotency-Key cluster/ns/name</text>
+<text class="t-small t-muted" x="620" y="238">key cluster:UID, ref ns/name</text>
 <line class="edge-ok" x1="858" y1="276" x2="612" y2="276" marker-end="url(#arrow)"/>
 <text class="t-small t-ok" x="640" y="268">201 10.20.64.21</text>
 <text class="t-num t-accent" x="624" y="324">5</text>
@@ -279,7 +279,7 @@ status:
 <line class="edge" x1="110" y1="420" x2="110" y2="450"/>
 <text class="t-small t-muted" x="124" y="440">configure the machine network</text>
 </svg>
-<figcaption>The path of one claim. Only step 4 leaves the cluster. The call uses the idempotency key, so a repeat after a crash changes nothing.</figcaption>
+<figcaption>The path of one claim. Only step 4 leaves the cluster. The call uses the idempotency key and the <code>external_ref</code>, so a repeat after a crash changes nothing.</figcaption>
 </figure>
 
 <h2 id="pools">Load-balancer pools</h2>
@@ -292,19 +292,18 @@ metadata:
   namespace: metallb-system
 spec:
   type: metallb                      # metallb | cilium
-  allocate:                          # bembel gives the range
-    from: { vrf: global, cidr: 10.20.64.0/22 }
-    size: 26                         # a /26 of the subnet kestrel-k8s
-    family: [4, 6]
+  allocate:                          # one lb-pool range per entry
+    - { prefix: { vrf: global, cidr: 10.20.64.0/22 },            size: 64,    hint: 10.20.66.0 }
+    - { prefix: { vrf: global, cidr: "2001:db8:4200:264::/64" }, size: 65536, hint: "2001:db8:4200:264:ffff::" }
   tags: { cluster: kestrel-k8s, role: lb-pool }
   serviceSelector:
     matchLabels: { pool: kestrel-lb }
 status:
-  prefixes: [10.20.66.0/26, "2001:db8:4200:264:ffff::/112"]
+  ranges: ["10.20.66.0-10.20.66.63", "2001:db8:4200:264:ffff::-2001:db8:4200:264:ffff::ffff"]
   rendered: IPAddressPool/metallb-system/kestrel-lb</code></pre>
 <p>The controller does these steps:</p>
 <ol class="steps">
-  <li>It calls <code>POST /v1/prefixes/{id}/prefixes:allocate</code> with the key <code>k8s:kestrel-mgmt:lbpool/metallb-system/kestrel-lb/v4</code>. bembel makes the child prefix <code>10.20.66.0/26</code> with the status <code>reserved</code> and the tags of the spec.</li>
+  <li>It calls <code>POST /v1/prefixes/{id}/ranges:allocate</code> for each entry, with <code>size</code>, <code>purpose: lb-pool</code>, <code>name</code>, <code>hint</code> and the tags of the spec. The key and the <code>external_ref</code> are <code>k8s:kestrel-mgmt:lbpool/metallb-system/kestrel-lb/v4</code> and <code>…/v6</code>. bembel makes the lb-pool range <code>10.20.66.0–10.20.66.63</code> (name <code>kestrel-lb-v4</code>) in the subnet kestrel-k8s, and the range <code>kestrel-lb-v6</code> in <code>2001:db8:4200:264::/64</code>. The allocator skips lb-pool ranges, so no node address lands in them.</li>
   <li>It renders the native pool object and applies it with the label <code>app.kubernetes.io/managed-by: bembel-k8s</code>.</li>
   <li>It watches the native object. If somebody edits it by hand, the controller overwrites the change and writes an event. It also raises a metric.</li>
 </ol>
@@ -335,7 +334,7 @@ spec:
 <p>MetalLB also needs an <code>L2Advertisement</code> or a <code>BGPAdvertisement</code>. The controller does not create it. That object belongs to the network (and to the BGP values in <a href="routing.html#vrf-rt">Routing and firewall</a>). The pool can have the tag <code>announce=campus-bgp</code>, so the prefix list of the campus router includes the range.</p>
 <aside class="callout why">
 <p class="callout-title">Why a range and not each Service</p>
-<p>A Service address is created and deleted at the speed of a deployment. MetalLB and Cilium already track them with no external call. If bembel were in that path, a bembel outage would block a Service. A reserved range is a coarse, rare allocation. Optional: the controller can mirror the Service addresses as read-only observed addresses (<code>source=k8s:kestrel-k8s</code>). They do not count for the pool.</p>
+<p>A Service address is created and deleted at the speed of a deployment. MetalLB and Cilium already track them with no external call. If bembel were in that path, a bembel outage would block a Service. A reserved range is a coarse, rare allocation. Optional: the controller can mirror the Service addresses as read-only observed addresses (<code>source=k8s:kestrel-mgmt</code>). They do not count for the pool.</p>
 </aside>
 
 <h2 id="external-dns">external-dns webhook</h2>
@@ -363,7 +362,7 @@ spec:
 <tr><td><code>targets[]</code></td><td>One record set, with one value per target</td></tr>
 <tr><td><code>recordTTL</code></td><td><code>ttl</code> (0 means the zone default)</td></tr>
 <tr><td><code>labels</code>, <code>setIdentifier</code></td><td><code>attributes.extdns_labels</code>, <code>attributes.set_identifier</code></td></tr>
-<tr><td>Cluster</td><td><code>source=k8s:kestrel-k8s</code>, <code>managed_by=external-dns:kestrel-k8s</code></td></tr>
+<tr><td>Cluster</td><td><code>source=k8s:kestrel-mgmt</code>, <code>managed_by=external-dns:kestrel-k8s</code></td></tr>
 </tbody>
 </table>
 <p>The TXT records of the external-dns ownership registry are normal records. The sidecar stores them as manual TXT records with the same source. The annotation namespace for per-record options is <code>external-dns.kubernetes.io/webhook-bembel-</code>.</p>
@@ -410,33 +409,43 @@ containers:
 
 <h3 id="identity-issuer">Trusted issuer per cluster</h3>
 <p>bembel validates the token itself. No exchange step is needed. A <em>trusted issuer</em> is an entry in the bembel config or in the table of issuers (<a href="access.html#issuers">Access control</a>):</p>
-<pre><code class="language-yaml">issuers:
-  - id: kestrel-mgmt                       # cluster id, part of the subject name
-    issuer: https://k8s-mgmt.example.org   # the --service-account-issuer of the cluster
-    jwks_uri: https://k8s-mgmt.example.org/openid/v1/jwks   # or inline "jwks:"
-    audiences: [bembel]
-    subject_template: "k8s:{id}:{namespace}:{serviceaccount}"
-    max_token_age: 1h</code></pre>
+<pre><code class="language-yaml"># /etc/bembel/bembel.yaml, under auth.issuers (excerpt)
+    - name: k8s-kestrel-mgmt
+      issuer: https://k8s-mgmt.example.org     # the client cluster's --service-account-issuer
+      audiences: [bembel]
+      jwks: discovery                          # or {file: /etc/bembel/jwks/kestrel-mgmt.json} when air-gapped
+      kind: service
+      claims: {subject: sub}
+      strip_prefix: "system:serviceaccount:"
+      subject_prefix: "k8s:kestrel-mgmt:"
+      max_token_age: 1h</code></pre>
 <ul>
 <li>bembel checks the signature, <code>iss</code>, <code>aud</code> and <code>exp</code>. The audience is mandatory. The default API audience is rejected.</li>
 <li>bembel caches the key set and refreshes it on an unknown <code>kid</code>, at most once a minute.</li>
-<li>An air-gapped cluster uploads its key set (<code>jwks:</code>). Then bembel needs no network access to the cluster.</li>
+<li>An air-gapped cluster uploads its key set (<code>jwks: {file: …}</code>). Then bembel needs no network access to the cluster.</li>
 <li>The same service account name in two clusters gives two different subjects, because the cluster id is part of the name.</li>
+<li><code>bembel config check</code> rejects two issuers with the same <code>issuer</code> URL.</li>
 </ul>
 
 <h3 id="identity-binding">Subject and binding</h3>
 <p>The subject name is <code>k8s:&lt;cluster id&gt;:&lt;namespace&gt;:&lt;service account&gt;</code>. The token claim <code>sub</code> is <code>system:serviceaccount:bembel-system:bembel-k8s</code>, so the subject is <code>k8s:kestrel-mgmt:bembel-system:bembel-k8s</code>. A binding gives it rights (<a href="access.html#bindings">Access control</a>):</p>
 <pre><code class="language-yaml">bindings:
   - subject: k8s:kestrel-mgmt:bembel-system:bembel-k8s
-    role: allocator
+    role: k8s-integration                              # custom: allocator + range:delete
     scope: { prefix: 10.20.64.0/22, vrf: global }     # AND of two terms
+  - subject: k8s:kestrel-mgmt:bembel-system:bembel-k8s
+    role: k8s-integration
+    scope: { prefix: "2001:db8:4200:264::/64", vrf: global }
+  - subject: k8s:kestrel-mgmt:bembel-system:bembel-k8s
+    role: k8s-integration
+    scope: { vrf: k8s-kestrel }                       # pod and service ranges of the cluster
   - subject: k8s:kestrel-mgmt:bembel-system:bembel-k8s
     role: dns-editor
     scope: { zone: k8s.example.org }
   - subject: k8s:kestrel-mgmt:bembel-system:bembel-k8s
     role: viewer
     scope: { global: true }</code></pre>
-<p>The manager can allocate only inside the subnet <code>kestrel-k8s</code> (<code>10.20.64.0/22</code> and its children), write records only in <code>k8s.example.org</code> and read the rest. A pattern such as <code>k8s:kestrel-mgmt:capi-system:*</code> is a group of subjects, if a site wants one binding for many service accounts. The audit event stores the cluster id, the namespace, the service account and, for a CAPI call, the claim key.</p>
+<p>The custom role <code>k8s-integration</code> is <code>allocator</code> plus <code>range:delete</code> (<a href="access.html#roles">Access control</a>). The manager can allocate addresses and lb-pool ranges only in the subnets of kestrel-k8s (<code>10.20.64.0/22</code>, <code>2001:db8:4200:264::/64</code>) and prefixes in the VRF <code>k8s-kestrel</code>, write records only in <code>k8s.example.org</code> and read the rest. The cluster prod-1 is a separate subject: its own CAPI provider is <code>k8s:prod-1:capi-system:capi-ipam</code>, with an allocator binding on <code>10.30.12.0/24</code> (<a href="access.html#examples">Access control</a>). A pattern such as <code>k8s:kestrel-mgmt:capi-system:*</code> is a group of subjects, if a site wants one binding for many service accounts. The audit event stores the cluster id, the namespace, the service account and, for a CAPI call, the <code>external_ref</code> of the claim.</p>
 <aside class="callout why">
 <p class="callout-title">Why direct trust, not token exchange</p>
 <p>Direct trust needs no client secret and no extra hop. The check works offline with a cached key set. It is also needed for CI systems such as GitHub Actions. RFC 8693 token exchange through Keycloak is possible later (<a href="#phases">phase 3</a>), when a site wants one central policy and one place to revoke.</p>
@@ -451,7 +460,7 @@ containers:
 }
 
 provider "bembel" {
-  url = "https://ipam.example.org"
+  url = "https://bembel.example.org"
   # token from BEMBEL_TOKEN, or an OIDC token from the CI job:
   # oidc_token_file = "/var/run/secrets/ci/token"
 }
@@ -496,7 +505,7 @@ output "build07_ip" {
 <table>
 <thead><tr><th>Phase</th><th>Content</th><th>Needs in bembel</th></tr></thead>
 <tbody>
-<tr><td>0 Core API</td><td>Idempotent allocate by key; list and filter by external ref; delete by reference; atomic next-free; multi-issuer OIDC with a subject mapping</td><td>The only requirement on the core</td></tr>
+<tr><td>0 Core API</td><td>Idempotent allocate by key; adoption and filter by external ref; release by reference; atomic next-free; multi-issuer OIDC with a subject mapping</td><td>The only requirement on the core</td></tr>
 <tr><td>1 Provider</td><td>CAPI IPAM provider with <code>BembelPrefixPool</code>; Terraform and OpenTofu provider</td><td>Phase 0</td></tr>
 <tr><td>2 Pools and names</td><td><code>pool-sync</code> for MetalLB, Cilium and CNI ranges; external-dns webhook (needs bembel zones in use)</td><td>Phase 1; DNS export live</td></tr>
 <tr><td>3 Extras</td><td>Generic <code>BembelAllocationClaim</code> CRD for GitOps; Crossplane through Upjet; token exchange through Keycloak</td><td>Only when a need appears</td></tr>
@@ -509,8 +518,8 @@ output "build07_ip" {
 <thead><tr><th>#</th><th>Risk</th><th>Answer</th></tr></thead>
 <tbody>
 <tr><td>1</td><td>bembel is down. Machine provisioning stalls.</td><td>Acceptable: claims wait with the reason <code>AllocationFailed</code>. HA deployment. Never put bembel in the pod-start path.</td></tr>
-<tr><td>2</td><td>Leaks and double allocation.</td><td>The key <code>cluster/namespace/name</code>, owner references, finalizers. A reconciler lists bembel addresses with a <code>k8s:</code> external ref and no live claim. First it only reports.</td></tr>
-<tr><td>3</td><td><code>clusterctl move</code> recreates the objects.</td><td>The pool has the cluster label. The provider adopts the address by key. A test in CI covers the move.</td></tr>
+<tr><td>2</td><td>Leaks and double allocation.</td><td>The <code>external_ref</code> <code>cluster/namespace/name</code>, the idempotency key, owner references, finalizers. A reconciler lists bembel addresses with a <code>k8s:</code> external ref and no live claim. First it only reports.</td></tr>
+<tr><td>3</td><td><code>clusterctl move</code> recreates the objects.</td><td>The pool has the cluster label. bembel adopts the address by <code>external_ref</code>. A test in CI covers the move.</td></tr>
 <tr><td>4</td><td>The CAPI contract changes (v1beta1, v1beta2).</td><td>The types are small. Both versions are served. Follow the CAPI release cadence.</td></tr>
 <tr><td>5</td><td>Stale key set after a key rotation of a cluster.</td><td>Refresh on an unknown <code>kid</code> with a rate limit. An alert when a refresh fails.</td></tr>
 <tr><td>6</td><td>A shared audience gives a confused deputy.</td><td>One audience <code>bembel</code> that no other service accepts. A distinct issuer entry for each cluster.</td></tr>
