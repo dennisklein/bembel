@@ -1,0 +1,30 @@
+# Development tools; run `mise install` to get the pinned versions.
+#
+# Today the repository holds the design record only. Python builds the site,
+# Node runs Playwright for the mockup screenshots. Go and the code generators
+# (ogen, sqlc, goose, golangci-lint) come with the first code commit, pinned
+# with checksums in the same way as in dennisklein/brig.
+[tools]
+python = "3.13"
+node = "22"
+
+[tasks.docs]
+description = "Build the design record into _site and fail on any problem"
+run = "python3 tools/site/build.py --strict --out _site"
+
+[tasks."docs:glossary"]
+description = "Link the glossary words in the mockups"
+run = "python3 tools/site/glossary.py mockups"
+
+[tasks."docs:check"]
+description = "Check the glossary links of the mockups (as in CI)"
+run = "python3 tools/site/glossary.py mockups --check"
+
+[tasks."docs:shots"]
+description = "Make the mockup screenshots in docs/design/img (needs Playwright)"
+run = "node tools/site/shots.mjs"
+
+[tasks."docs:serve"]
+description = "Build the site and serve it on http://localhost:8000"
+depends = ["docs"]
+run = "python3 -m http.server 8000 --directory _site"
