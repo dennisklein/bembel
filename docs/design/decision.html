@@ -93,7 +93,7 @@
 <p>The research examined five options. Each option is described with what it gives and what it does not give for the requirements.</p>
 <dl class="facts">
 <dt>NetBox 4.7 (Apache-2.0)</dt>
-<dd>The reference product for IPAM and DCIM. Rich model: VRF, prefix, IP range, IP address, VLAN groups, racks, devices, cables, VMs. REST and read-only GraphQL. Object permissions with ORM filter constraints. OIDC through python-social-auth. DNS and DHCP are not in core: plugins such as netbox-dns exist, and DHCP is an export template. Its own DCIM overlaps with FNT Command. A migration from ONA needs a custom script.</dd>
+<dd>The reference product for IPAM and DCIM. Rich model: VRF, prefix, IP range, IP address, VLAN groups, racks, devices, cables, VMs. REST and read-only GraphQL. Object permissions with ORM filter constraints. OIDC through python-social-auth. DNS and DHCP are not in core: plugins exist, netbox-plugin-dns for zones and records, and netbox-plugin-dhcp (beta, Kea-oriented, NetBox 4.7+) for DHCP. Each plugin is a separate project on its own release train. No plugin writes an ISC dhcpd export with failover. Its own DCIM overlaps with FNT Command. A migration from ONA needs a custom script.</dd>
 <dt>Nautobot (Apache-2.0)</dt>
 <dd>A NetBox fork with jobs, a GraphQL API and apps. It shares the model and the permission design of NetBox. It adds a larger platform to run (Celery, Redis) and a second plugin ecosystem.</dd>
 <dt>phpIPAM (GPL-3.0)</dt>
@@ -179,7 +179,8 @@
 <path class="edge-accent" d="M200,120 C 260,124 290,128 326,129" marker-end="url(#arrow-accent)"/>
 <path class="edge-accent" d="M200,130 C 260,160 280,174 326,175" marker-end="url(#arrow-accent)"/>
 <text class="t-small t-muted" x="540" y="90">"Noch en Schobbe?"</text>
-<text class="t-small t-muted" x="540" y="110">bembel allocate --in 10.20.4.0/22</text>
+<text class="t-small t-muted" x="540" y="110">bembel address allocate</text>
+<text class="t-small t-muted" x="540" y="128">--prefix 10.20.4.0/22</text>
 </svg>
 <figcaption>One jug, many glasses. Each consumer gets its share from one source.</figcaption>
 </figure>
