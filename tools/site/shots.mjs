@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // Screenshots of the mockups for the design record.
 //
-// Usage: node tools/site/shots.mjs [name ...] [--out DIR]
+// Usage: node tools/site/shots.mjs [name ...] [--out DIR] [--brand gsi] [--no-mobile]
 //
 //   name     ui/overview, term/status, ui-overview, term-status, or a bare name
 //            (overview, graph); a bare name matches the UI page and the
 //            terminal frame of that name. No name: all pages.
 //   --out    output directory (default docs/design/img)
+//   --brand  design system of the shots: gsi opens each page with ?brand=gsi
+//            and names the files ui-<page>-gsi.webp. Default: bembel.
+//   --no-mobile  skip the shots at phone width
 //
 // Every shot is taken at deviceScaleFactor 2, so it stays sharp on 2x screens.
 // Web UI pages: 1440x900 CSS px, light, full page -> ui-<page>.webp (2880 px wide).
@@ -63,14 +66,17 @@ print(im.width, im.height, "cut" if cut else "")
 function parseArgs(argv) {
   const names = [];
   let out = join(repo, 'docs', 'design', 'img');
+  let brand = null, mobile = true;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--out') out = resolve(argv[++i]);
+    else if (argv[i] === '--brand') brand = argv[++i] === 'bembel' ? null : argv[i];
+    else if (argv[i] === '--no-mobile') mobile = false;
     else if (argv[i] === '-h' || argv[i] === '--help') {
-      console.log('usage: node tools/site/shots.mjs [name ...] [--out DIR]');
+      console.log('usage: node tools/site/shots.mjs [name ...] [--out DIR] [--brand gsi] [--no-mobile]');
       process.exit(0);
     } else names.push(argv[i]);
   }
-  return { names, out };
+  return { names, out, brand, mobile };
 }
 
 function jobs(names) {
@@ -108,8 +114,10 @@ async function settle(page) {
 }
 
 async function main() {
-  const { names, out } = parseArgs(process.argv.slice(2));
-  const todo = jobs(names);
+  const { names, out, brand, mobile } = parseArgs(process.argv.slice(2));
+  const todo = jobs(names)
+    .filter(j => mobile || !j.mobile)
+    .map(j => brand ? { ...j, out: j.out.replace(/\.webp$/, `-${brand}.webp`) } : j);
   mkdirSync(out, { recursive: true });
   const browser = await chromium.launch();
   let done = 0, skipped = 0, bytes = 0;
@@ -129,7 +137,9 @@ async function main() {
       const ctx = await browser.newContext({ ...options, colorScheme: 'light', reducedMotion: 'reduce' });
       const page = await ctx.newPage();
       page.on('pageerror', e => console.warn(`warning: ${j.kind}/${j.name}.html: ${e.message}`));
-      await page.goto(pathToFileURL(file).href, { waitUntil: 'networkidle' });
+      const url = pathToFileURL(file);
+      if (brand) url.searchParams.set('brand', brand);
+      await page.goto(url.href, { waitUntil: 'networkidle' });
       await settle(page);
       let png;
       if (j.kind === 'term') {
