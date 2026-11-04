@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DNS and BIND export</title>
+<meta name="description" content="The DNS model of bembel: zones, views, records, derived records, reverse zones, RFC 2317 delegation, and the BIND export with checks, serials and delivery by bembel-agent.">
+</head>
+<body>
+<h1>DNS and BIND export</h1>
+<p class="lede">bembel owns the data of the zones. BIND answers the queries. This chapter describes the zone and view model, the records that bembel derives from addresses, the reverse zones that it computes from subnets, and the BIND export that carries all of it to ns1.example.org, ns2.example.org and ns3.example.org.</p>
+<ul class="keypoints">
+  <li>A zone belongs to one or more views. A record belongs to all views of its zone, or to a list of them.</li>
+  <li>An address with a name makes the A or AAAA record and the PTR record. Nobody edits these derived records. They change only when the address changes.</li>
+  <li>Reverse zones come from the subnets. This includes the ip6.arpa nibble zones and the RFC 2317 child zones, with the parent CNAME records that ONA never wrote.</li>
+  <li>The BIND export is deterministic. It writes <code>named.conf.bembel</code>, one zone file per view and zone, and a manifest. A zone serial changes only when the zone content changes.</li>
+  <li>A bundle is published only after <code>named-checkconf -z</code> and <code>named-checkzone</code> pass in a sandbox. bembel-agent pulls the bundle, verifies it, swaps a symlink and runs <code>rndc reload</code> for the changed zones.</li>
+  <li>Two modes: native mode for the clean output, compat mode for byte parity with ONA <code>build_bind</code> during the parallel run.</li>
+</ul>
+
+<aside class="callout note">
+<p class="callout-title">What is in v1</p>
+<p>v1 delivers BIND zone files and <code>named.conf</code> fragments by pull. Catalog zones, RFC 2136 updates, a PowerDNS driver and DNSSEC signing support come later (<a href="#later">later</a>). The requester requires the BIND export in v1. The Kea chapter is <a href="dhcp.html#kea">DHCP and ISC dhcpd export</a>.</p>
+</aside>
+
+<h2 id="zones">Zones</h2>
+<p>A zone is a part of the DNS name space with one set of SOA and NS data. bembel knows two kinds of zone. A forward zone, for example <code>kestrel.example.org</code>, holds names. A reverse zone, for example <code>20.10.in-addr.arpa</code>, holds PTR records. A user creates the forward zones. bembel computes the reverse zones from the subnets (<a href="#reverse">reverse</a>).</p>
+
+<figure class="diagram wide">
+<svg viewBox="0 0 960 440" role="img" aria-labelledby="fig-model-t">
+<title id="fig-model-t">The DNS model: servers, zones, views, records, and the addresses and subnets that feed the derived records</title>
+<rect class="box" x="16" y="40" width="190" height="72" rx="8"/>
+<text class="t-title" x="30" y="64">DNS server</text>
+<text class="t-small" x="30" y="84">ns1 · ns2 · ns3</text>
+<text class="t-small t-muted" x="30" y="100">role per zone</text>
+<rect class="box-accent" x="484" y="40" width="210" height="72" rx="8"/>
+<text class="t-title t-on" x="498" y="64">Zone</text>
+<text class="t-small t-on" x="498" y="84">name, kind, SOA, NS</text>
+<text class="t-small t-on" x="498" y="100">default TTL, owner team</text>
+<rect class="box" x="730" y="40" width="214" height="72" rx="8"/>
+<text class="t-title" x="744" y="64">DNS view</text>
+<text class="t-small" x="744" y="84">internal · external</text>
+<text class="t-small t-muted" x="744" y="100">ordinal, match-clients</text>
+<path class="edge" d="M206,76 L482,76" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="344" y="68" text-anchor="middle">serves (primary or secondary)</text>
+<path class="edge" d="M694,76 L728,76" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="711" y="32" text-anchor="middle">1..n</text>
+
+<rect class="box" x="16" y="190" width="190" height="72" rx="8"/>
+<text class="t-title" x="30" y="214">Subnet</text>
+<text class="t-small" x="30" y="234">10.20.4.0/22</text>
+<text class="t-small" x="30" y="250">2001:db8:4200:204::/64</text>
+<rect class="box" x="250" y="190" width="190" height="72" rx="8"/>
+<text class="t-title" x="264" y="214">Address</text>
+<text class="t-small" x="264" y="234">10.20.4.44, FQDN, status</text>
+<text class="t-small" x="264" y="250">interface, host</text>
+<rect class="box-soft" x="484" y="190" width="210" height="72" rx="8"/>
+<text class="t-title" x="498" y="214">Derived record</text>
+<text class="t-small" x="498" y="234">A, AAAA, PTR</text>
+<text class="t-small t-muted" x="498" y="250">not editable</text>
+<rect class="box-soft" x="730" y="190" width="214" height="72" rx="8"/>
+<text class="t-title" x="744" y="214">Manual record</text>
+<text class="t-small" x="744" y="234">CNAME, MX, SRV, TXT, NS</text>
+<text class="t-small t-muted" x="744" y="250">CAA, SSHFP, TLSA</text>
+<path class="edge" d="M206,226 L248,226" marker-end="url(#arrow)"/>
+<path class="edge" d="M440,226 L482,226" marker-end="url(#arrow)"/>
+<path class="edge" d="M589,190 L589,114" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="599" y="156">in zone</text>
+<path class="edge" d="M837,190 L690,112" marker-end="url(#arrow)"/>
+
+<rect class="box-warn" x="250" y="340" width="190" height="72" rx="8"/>
+<text class="t-title" x="264" y="364">Reverse zone</text>
+<text class="t-small" x="264" y="384">computed from subnets</text>
+<text class="t-small t-muted" x="264" y="400">is a Zone of kind reverse</text>
+<path class="edge" d="M111,262 L111,376 L248,376" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="120" y="312">boundary rule</text>
+<path class="edge" d="M440,376 L589,376 L589,264" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="600" y="318">PTR lands here</text>
+</svg>
+<figcaption>The DNS model. Addresses feed the derived records. The subnets decide which reverse zone receives the PTR records.</figcaption>
+</figure>
+
+<p>A zone has these fields. The API path is <code>/v1/zones/{id}</code>.</p>
+<table class="compact">
+<thead><tr><th>Field</th><th>Meaning</th><th>Default</th></tr></thead>
+<tbody>
+<tr><td><code>name</code></td><td>The zone apex as an FQDN without the final dot. Unique per view.</td><td>none</td></tr>
+<tr><td><code>kind</code></td><td><code>forward</code> or <code>reverse</code>. A reverse zone has a <code>covers</code> prefix.</td><td><code>forward</code></td></tr>
+<tr><td><code>views</code></td><td>The list of views that hold a copy of the zone.</td><td>all views</td></tr>
+<tr><td><code>default_ttl</code></td><td>The <code>$TTL</code> of the zone file, in seconds.</td><td>3600</td></tr>
+<tr><td><code>soa</code></td><td><code>mname</code>, <code>rname</code>, <code>refresh</code>, <code>retry</code>, <code>expire</code>, <code>minimum</code>.</td><td>ns1.example.org, hostmaster.example.org, 3600, 900, 1209600, 300</td></tr>
+<tr><td><code>servers</code></td><td>The DNS servers and their role for this zone: <code>primary</code>, <code>secondary</code> or <code>forward</code>.</td><td>ns1 primary, ns2 and ns3 secondary</td></tr>
+<tr><td><code>owner</code></td><td>The owner team.</td><td>team of the parent zone</td></tr>
+<tr><td><code>extra_records</code></td><td>A text block that the export appends to the zone file without change. It replaces the ONA footer files.</td><td>empty</td></tr>
+<tr><td><code>serial</code></td><td>The last published serial. Read only.</td><td>set by the export</td></tr>
+</tbody>
+</table>
+
+<pre><code class="language-json">{
+  "id": "0192f3a1-6c10-7a52-9b0e-3d2f6e1a7c44",
+  "kind": "zone",
+  "name": "kestrel.example.org",
+  "zone_kind": "forward",
+  "views": ["internal", "external"],
+  "default_ttl": 3600,
+  "soa": { "mname": "ns1.example.org", "rname": "hostmaster.example.org",
+           "refresh": 3600, "retry": 900, "expire": 1209600, "minimum": 300 },
+  "servers": [
+    { "server": "ns1.example.org", "role": "primary" },
+    { "server": "ns2.example.org", "role": "secondary" },
+    { "server": "ns3.example.org", "role": "secondary" }
+  ],
+  "owner": "hpc-ops",
+  "serial": 2026110403,
+  "revision": "W/\"41\""
+}</code></pre>
+
+<p>A zone is a normal object. It has an owner, tags, a revision and an audit trail. A user needs <code>zone:write</code> in the scope of the zone to change it. The scope type <code>zone</code> covers the zone and all zones below it by name, so a role can end at <code>kestrel.example.org</code>.</p>
+
+<p>A zone has a parent by name. The parent holds the delegation. If <code>kestrel.example.org</code> and <code>example.org</code> are zones on the same servers, bembel writes no NS delegation for the child into the parent. If the child lives on other servers, the user gives the child a <code>delegation</code> list. bembel then writes NS records and glue for the child into the parent.</p>
+
+<h2 id="views">Views</h2>
+<p>A DNS view gives different answers to different clients. The name <code>internal</code> serves the campus and the cluster. The name <code>external</code> serves the rest of the world. ONA has a <code>dns_views</code> table, but <code>build_bind</code> ignores it. In bembel the view is a real part of the output.</p>
+<table class="compact">
+<thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>name</code></td><td>The view name. Unique. It appears in <code>named.conf</code> and in file paths.</td></tr>
+<tr><td><code>ordinal</code></td><td>The order in <code>named.conf</code>. BIND uses the first view whose <code>match-clients</code> matches. bembel stores the order and refuses duplicates.</td></tr>
+<tr><td><code>match_clients</code></td><td>A list of prefixes, address groups or TSIG key names. bembel writes it as an <code>acl</code>. An address group makes the ACL follow the data.</td></tr>
+<tr><td><code>match_destinations</code></td><td>Optional. For servers with one address per view.</td></tr>
+<tr><td><code>recursion</code></td><td><code>yes</code> or <code>no</code>. Default <code>no</code> for <code>external</code>.</td></tr>
+</tbody>
+</table>
+
+<p>A zone has one copy in each of its views. Two copies of <code>example.org</code> are two files: one for <code>internal</code> and one for <code>external</code>. A record has the field <code>view</code>. The value <code>null</code> means "all views of the zone". A list, for example <code>["internal"]</code>, limits the record to these views. This is how the name <code>ib-leaf-a01.example.org</code> stays inside the campus.</p>
+
+<p>BIND has strict rules for views. bembel checks them when it builds the export.</p>
+<ul>
+  <li>When one view exists, every zone must be inside a view.</li>
+  <li>A zone name can appear once in a view.</li>
+  <li>A zone that must be the same in two views can use <code>in-view</code>. bembel uses it only when the user sets <code>share_view</code> on the zone. Then both views serve one file.</li>
+  <li>TSIG keys for transfers are bound to a view. An <code>rndc</code> command for a zone needs the view name: <code>rndc reload kestrel.example.org in internal</code>.</li>
+</ul>
+
+<aside class="callout why">
+<p class="callout-title">Why one view means no view block</p>
+<p>Most sites have one view at the start. If only one view exists, bembel writes the zones directly in <code>named.conf.bembel</code> without a <code>view</code> block. The paths still contain the view name. A later second view then changes the config, but not the paths of the existing files.</p>
+</aside>
+
+<h2 id="records">Records</h2>
+<p>A record has a name, a type, a TTL, the data and a view list. It lives in one zone. bembel picks the zone with the longest matching suffix among the zones of the view. Two kinds of record exist.</p>
+<table class="compact">
+<thead><tr><th>Type</th><th>Kind</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td>A, AAAA</td><td>derived</td><td>Made from an address that has an FQDN. A user cannot edit it. An A or AAAA record for a target outside all subnets is a manual record with the tag <code>external-address</code>.</td></tr>
+<tr><td>PTR</td><td>derived</td><td>Made from an address. One PTR per address. See <a href="#derived">derived</a>.</td></tr>
+<tr><td>CNAME</td><td>manual</td><td>An alias. The name must not hold other data.</td></tr>
+<tr><td>MX</td><td>manual</td><td>Preference 0–65535 and a target name. The target must not be a CNAME.</td></tr>
+<tr><td>SRV</td><td>manual</td><td>Priority, weight, port and a target name. The owner starts with <code>_service._proto</code>.</td></tr>
+<tr><td>TXT</td><td>manual</td><td>One or more strings. bembel splits a string longer than 255 bytes into chunks.</td></tr>
+<tr><td>NS</td><td>manual</td><td>Only at the apex, or at a delegation point of a child zone.</td></tr>
+<tr><td>CAA, SSHFP, TLSA</td><td>manual</td><td>Data is checked for syntax. TLSA and SRV owners may start with underscores.</td></tr>
+</tbody>
+</table>
+
+<p>The validation rules apply to every write through the API. The export checks them again, because import and sync write records too.</p>
+<ul>
+  <li><strong>CNAME exclusivity.</strong> A name that has a CNAME has no other record of any type. The check covers derived records, so allocating an address for a name that is a CNAME fails with <code>409 conflict</code>.</li>
+  <li><strong>No CNAME at the apex.</strong> The apex holds SOA and NS.</li>
+  <li><strong>Targets.</strong> The target of MX, NS and SRV is a name with an A or AAAA record, never a CNAME. A missing target is a warning when it is outside bembel, and an error when it is inside a zone of bembel.</li>
+  <li><strong>Name syntax.</strong> A label has 1–63 bytes. A name has at most 253 bytes. The letters are a–z, digits and the hyphen. A label does not start or end with a hyphen. bembel stores names in lower case. The underscore is valid in the owner of SRV, TXT and TLSA records only. The wildcard <code>*</code> is valid only as the first label.</li>
+  <li><strong>TTL.</strong> Allowed values are 60 to 604800 seconds. The TTL of a record comes from, in this order: the record, the address or host field <code>dns_ttl</code>, the <code>default_ttl</code> of the zone.</li>
+  <li><strong>Duplicates.</strong> The same name, type and data twice in one view is an error. A record set (same name and type) shares one TTL. A write that sets a different TTL for one member changes the whole set.</li>
+</ul>
+
+<h2 id="derived">Derived records</h2>
+<p>An address that has an FQDN makes records. The user does not write them. A host can have many addresses and each can have a name, so the rules say which record is the PTR.</p>
+
+<table class="compact">
+<thead><tr><th>Input</th><th>Output</th></tr></thead>
+<tbody>
+<tr><td>Address 10.20.4.44, FQDN <code>cn-004.kestrel.example.org</code></td><td>A record <code>cn-004</code> in zone <code>kestrel.example.org</code>, data 10.20.4.44</td></tr>
+<tr><td>Address 2001:db8:4200:204::44, same FQDN</td><td>AAAA record <code>cn-004</code>, same zone. The A and the AAAA record form no conflict.</td></tr>
+<tr><td>Both addresses, host primary FQDN <code>cn-004.kestrel.example.org</code></td><td>Two PTR records. Each address has one PTR to the primary FQDN.</td></tr>
+<tr><td>Address 10.100.4.44 on <code>ib0</code>, FQDN <code>cn-004-ib0.kestrel.example.org</code></td><td>A record in the zone. The PTR goes to the name of the address itself, because the primary FQDN belongs to the Ethernet address.</td></tr>
+</tbody>
+</table>
+
+<p>The rules are short.</p>
+<ol>
+  <li>A forward record exists for each address in status <code>allocated</code> or <code>reserved</code> that has an FQDN. An address can have more than one FQDN. Each name makes its own A or AAAA record.</li>
+  <li>The PTR target of an address is the field <code>ptr_name</code>. It defaults to the host primary FQDN when the address is the primary address of the host, and to the first FQDN of the address otherwise. The value <code>none</code> switches the PTR off.</li>
+  <li>The host primary FQDN is one name per host (ONA <code>primary_dns_id</code>). The user sets it on the host. One of the host addresses gets the flag <code>primary</code>.</li>
+  <li>A shared address (VIP, anycast) makes one A record for each name and one PTR with the field <code>ptr_name</code>.</li>
+  <li>An address in status <code>claimed</code> makes no record until an integration confirms the claim. The setting <code>dns.publish_claims</code> changes this. The default is <code>false</code>.</li>
+  <li>An address in status <code>deprecated</code> makes no record. The setting <code>dns.publish_deprecated</code> changes this. The default is <code>false</code>.</li>
+</ol>
+
+<p>The records are not stored twice. bembel calculates them from the addresses when it reads zone content, through a database view. The API lists them as read-only records with <code>derived: true</code> and a link to the address. A write to a derived record returns <code>409 derived-record</code> and names the address.</p>
+
+<h3 id="derived-moves">What changes when an address moves</h3>
+<p>A change of the address data changes the derived records in the same transaction. The serial of each zone that changes goes up at the next export.</p>
+<table class="compact">
+<thead><tr><th>Change</th><th>Forward zone</th><th>Reverse zone</th></tr></thead>
+<tbody>
+<tr><td>Allocate 10.20.4.77 for <code>vm-ci-04.kestrel.example.org</code></td><td>A added to <code>kestrel.example.org</code></td><td>PTR added to <code>20.10.in-addr.arpa</code></td></tr>
+<tr><td>Rename the address to <code>build-07.kestrel.example.org</code></td><td>A removed under the old name, added under the new</td><td>PTR data changes</td></tr>
+<tr><td>Move the interface from 10.20.4.77 to 10.20.5.12 (same /22)</td><td>A data changes</td><td>Old PTR removed, new PTR added. The zone is the same /16 zone, so it is one serial change.</td></tr>
+<tr><td>Move to 10.20.8.12 (osprey-gpu)</td><td>A data changes</td><td>Both PTR changes happen in the same /16 zone</td></tr>
+<tr><td>Move to a subnet whose reverse zone is another zone</td><td>A data changes</td><td>PTR removed from one zone and added to the other. Both serials change.</td></tr>
+<tr><td>Rename the host primary FQDN</td><td>Nothing, when the address names stay</td><td>PTR data of the primary address changes</td></tr>
+<tr><td>Release or deprecate the address</td><td>A or AAAA removed</td><td>PTR removed</td></tr>
+</tbody>
+</table>
+<p>A manual CNAME that points to a renamed host does not change. bembel shows it in the finding list as <code>cname-dangling</code>, because the target name no longer exists. The user fixes it or the rename wizard offers to rewrite the CNAME.</p>
+
+<h2 id="reverse">Reverse zones</h2>
+<p>bembel computes the reverse zones from the prefix tree. The user can state one rule: a prefix can carry <code>reverse_zone: true</code> and then it is the top of one reverse zone. If no prefix above a subnet has this flag, the defaults apply.</p>
+
+<table class="compact">
+<thead><tr><th>Family</th><th>Subnet</th><th>Zone</th></tr></thead>
+<tbody>
+<tr><td>IPv4</td><td>Prefix length 8, 16 or 24</td><td>One zone: <code>10.in-addr.arpa</code>, <code>20.10.in-addr.arpa</code> or <code>4.20.10.in-addr.arpa</code></td></tr>
+<tr><td>IPv4</td><td>Between the boundaries, for example 10.20.4.0/22</td><td>One zone per /24 it covers (<code>4.20.10.in-addr.arpa</code> to <code>7.20.10.in-addr.arpa</code>), unless a container above has <code>reverse_zone: true</code></td></tr>
+<tr><td>IPv4</td><td>Longer than /24, for example 198.51.100.64/27</td><td>PTR records go in the /24 zone. With <code>reverse_mode: classless</code> the subnet gets an RFC 2317 child zone (<a href="#classless">classless</a>).</td></tr>
+<tr><td>IPv6</td><td>Prefix length is a multiple of 4</td><td>One zone with <code>prefix_length / 4</code> nibbles</td></tr>
+<tr><td>IPv6</td><td>Other length, for example /62</td><td>Zones of the next longer multiple of 4 that cover it. A /62 gives four /64 zones.</td></tr>
+</tbody>
+</table>
+
+<p>The story has a container 10.20.0.0/16 with <code>reverse_zone: true</code>. Its zone is <code>20.10.in-addr.arpa</code>. All subnets below it put their PTR records in this one zone. The IPv6 subnet 2001:db8:4200:204::/64 has a zone with 16 nibbles.</p>
+
+<pre><code class="language-plaintext">address 2001:db8:4200:204::44
+ = 2001:0db8:4200:0204:0000:0000:0000:0044
+reversed, one nibble per label:
+4.4.0.0.0.0.0.0.0.0.0.0.0.0.0.0.4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.
+|--- 16 nibbles: name in the zone --||--- 16 nibbles: zone name ----------|
+
+zone: 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.</code></pre>
+
+<p>Each reverse zone follows the same rules as a forward zone: SOA, NS, servers, views and an owner. The zone name is the key. If the user creates a reverse zone by hand with the same name, it replaces the computed one and keeps the settings. The difference is that bembel adds and removes a computed zone when subnets come and go. bembel never removes a zone that holds a manual record. It reports a finding instead.</p>
+
+<aside class="callout warn">
+<p class="callout-title">Two subnets, one PTR name</p>
+<p>The PTR owner of an address is unique per view. When two addresses in two VRFs have the same IP (for example 10.100.4.44 in <code>hpc-fabric</code> and in another VRF), only one VRF can publish PTR records for the zone. The zone has a field <code>vrf</code>. The reverse computation uses the addresses of that VRF only. The default is <code>global</code>.</p>
+</aside>
+
+<h2 id="classless">Classless delegation (RFC 2317)</h2>
+<p>A /27 holds 32 addresses. A normal reverse zone cannot be delegated for a part of a /24. RFC 2317 solves this with CNAME records. The parent /24 zone holds one CNAME for each address. The CNAME points into a child zone, and the child zone is delegated to the owner of the /27.</p>
+<p>ONA writes the child zone, with the owner names such as <code>5-27.0.168.192.in-addr.arpa.</code>. ONA does not write the CNAME records and the NS delegation in the parent zone. The user must add them by hand in the parent. bembel makes them from the data.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 900 320" role="img" aria-labelledby="fig-2317-t">
+<title id="fig-2317-t">RFC 2317: the parent /24 zone holds the CNAME records and the delegation, the child zone holds the PTR records</title>
+<rect class="box" x="16" y="40" width="400" height="150" rx="10"/>
+<text class="t-title" x="32" y="64">100.51.198.in-addr.arpa (parent, ns1)</text>
+<text class="t-small t-mono" x="32" y="90">64-27   NS    ns-lab.example.org.</text>
+<text class="t-small t-mono" x="32" y="110">65      CNAME 65.64-27.100.51.198.in-addr.arpa.</text>
+<text class="t-small t-mono" x="32" y="130">66      CNAME 66.64-27.100.51.198.in-addr.arpa.</text>
+<text class="t-small t-muted" x="32" y="150">... one CNAME per address, 64 to 95</text>
+<text class="t-small t-muted" x="32" y="172">bembel writes these lines. ONA does not.</text>
+<rect class="box-accent" x="484" y="40" width="400" height="150" rx="10"/>
+<text class="t-title t-on" x="500" y="64">64-27.100.51.198.in-addr.arpa (child)</text>
+<text class="t-small t-mono t-on" x="500" y="90">@   SOA ns-lab.example.org. ...</text>
+<text class="t-small t-mono t-on" x="500" y="110">@   NS  ns-lab.example.org.</text>
+<text class="t-small t-mono t-on" x="500" y="130">65  PTR lab-gw.example.org.</text>
+<text class="t-small t-mono t-on" x="500" y="150">66  PTR lab-nas.example.org.</text>
+<path class="edge-accent" d="M416,110 L482,110" marker-end="url(#arrow-accent)"/>
+<text class="t-small t-muted" x="449" y="100" text-anchor="middle">CNAME</text>
+<rect class="box-soft" x="16" y="230" width="400" height="64" rx="8"/>
+<text class="t-title" x="32" y="254">Resolver asks for 65.100.51.198.in-addr.arpa</text>
+<text class="t-small" x="32" y="274">gets CNAME, asks the child zone, gets the PTR</text>
+<path class="edge-muted" d="M216,230 L216,192" marker-end="url(#arrow-muted)"/>
+<rect class="box-muted" x="484" y="230" width="400" height="64" rx="8"/>
+<text class="t-title" x="500" y="254">Label style</text>
+<text class="t-small" x="500" y="274">hyphen "64-27" (default) or slash "64/27"</text>
+</svg>
+<figcaption>RFC 2317 with the documentation prefix 198.51.100.64/27. The hyphen label is the default, because it is safe in file names.</figcaption>
+</figure>
+
+<p>The rules for a classless subnet:</p>
+<ul>
+  <li>The subnet is longer than /24 and has <code>reverse_mode: classless</code>. A /25 to /31 subnet is valid.</li>
+  <li>The child zone is named <code>FIRST-LEN.C.B.A.in-addr.arpa</code>. For 198.51.100.64/27 this is <code>64-27.100.51.198.in-addr.arpa</code>. The setting <code>reverse.label_style: slash</code> changes the hyphen to a slash. The file name always uses the hyphen.</li>
+  <li>The parent zone is the /24 zone that covers the subnet. bembel writes an NS record at the label <code>64-27</code> for each server of the child zone.</li>
+  <li>The parent zone holds a CNAME for each address of the subnet, from <code>.64</code> to <code>.95</code>. The CNAME targets the same number in the child zone.</li>
+  <li>The PTR records of the addresses are in the child zone. The child zone has the usual SOA and NS data.</li>
+  <li>If the child zone has the same servers as the parent, the export writes both zones to the same server. If the child is delegated to other servers, bembel writes the NS and the CNAME records only, and the child zone is marked <code>external</code>.</li>
+</ul>
+<p>The check "CNAME exclusivity" covers the parent: the label <code>65</code> in the parent zone cannot hold a PTR when it holds the CNAME. A conflict is an error for the zone build.</p>
+
+<h2 id="export">The BIND export</h2>
+<p>The BIND export turns the DNS data into files for one DNS server. The command is <code>bembel export bind</code>. The server runs it as a job, and a user can run it from the CLI for a dry run.</p>
+
+<pre><code class="language-bash"># dry run: write the files of ns1 to a directory
+bembel export bind --server ns1.example.org --out ./out/ns1
+
+# the same through the API: a bundle for one server
+curl -H "Authorization: Bearer $BEMBEL_TOKEN" \
+     -o bundle.tar https://bembel.example.org/v1/dns-servers/ns1.example.org/bundle</code></pre>
+
+<figure class="diagram wide">
+<svg viewBox="0 0 960 300" role="img" aria-labelledby="fig-pipe-t">
+<title id="fig-pipe-t">The export pipeline: snapshot, model, render, checks, sign, publish. A failed check keeps the old bundle</title>
+<rect class="box" x="16" y="50" width="136" height="84" rx="8"/>
+<text class="t-title" x="28" y="74">snapshot</text>
+<text class="t-small" x="28" y="94">one read-only</text>
+<text class="t-small" x="28" y="110">transaction</text>
+<rect class="box" x="176" y="50" width="136" height="84" rx="8"/>
+<text class="t-title" x="188" y="74">model</text>
+<text class="t-small" x="188" y="94">zones, views,</text>
+<text class="t-small" x="188" y="110">records per server</text>
+<rect class="box" x="336" y="50" width="136" height="84" rx="8"/>
+<text class="t-title" x="348" y="74">render</text>
+<text class="t-small" x="348" y="94">templates, sorted,</text>
+<text class="t-small" x="348" y="110">serial on change</text>
+<rect class="box-accent" x="496" y="50" width="152" height="84" rx="8"/>
+<text class="t-title t-on" x="508" y="74">checks</text>
+<text class="t-small t-on" x="508" y="94">named-checkzone,</text>
+<text class="t-small t-on" x="508" y="110">named-checkconf -z</text>
+<rect class="box" x="672" y="50" width="120" height="84" rx="8"/>
+<text class="t-title" x="684" y="74">bundle</text>
+<text class="t-small" x="684" y="94">tar, manifest,</text>
+<text class="t-small" x="684" y="110">signature</text>
+<rect class="box-ok" x="816" y="50" width="128" height="84" rx="8"/>
+<text class="t-title" x="828" y="74">publish</text>
+<text class="t-small" x="828" y="94">new ETag,</text>
+<text class="t-small" x="828" y="110">event emitted</text>
+<path class="edge" d="M152,92 L174,92" marker-end="url(#arrow)"/>
+<path class="edge" d="M312,92 L334,92" marker-end="url(#arrow)"/>
+<path class="edge" d="M472,92 L494,92" marker-end="url(#arrow)"/>
+<path class="edge" d="M648,92 L670,92" marker-end="url(#arrow)"/>
+<path class="edge" d="M792,92 L814,92" marker-end="url(#arrow)"/>
+<rect class="box-err" x="496" y="196" width="152" height="72" rx="8"/>
+<text class="t-title" x="508" y="220">check failed</text>
+<text class="t-small" x="508" y="240">keep the old bundle,</text>
+<text class="t-small" x="508" y="256">alert, show findings</text>
+<path class="edge-err" d="M572,134 L572,194" marker-end="url(#arrow)"/>
+<rect class="box-soft" x="336" y="196" width="136" height="72" rx="8"/>
+<text class="t-title" x="348" y="220">no change</text>
+<text class="t-small" x="348" y="240">same bytes, same</text>
+<text class="t-small" x="348" y="256">ETag, no new event</text>
+<path class="edge-muted" d="M404,134 L404,194" marker-end="url(#arrow-muted)"/>
+<rect class="box-warn" x="672" y="196" width="272" height="72" rx="8"/>
+<text class="t-title" x="684" y="220">guard: more than N % deleted</text>
+<text class="t-small" x="684" y="240">hold the bundle, open a change request,</text>
+<text class="t-small" x="684" y="256">an approver releases it</text>
+<path class="edge-muted" d="M732,134 L732,194" marker-end="url(#arrow-muted)"/>
+</svg>
+<figcaption>The export pipeline for one DNS server. Only a bundle that passes every check becomes the latest bundle.</figcaption>
+</figure>
+
+<p>The export has these properties.</p>
+<ul>
+  <li><strong>Consistent.</strong> The export reads one database snapshot. A change that happens during the build goes into the next build.</li>
+  <li><strong>Deterministic.</strong> The same data gives the same bytes. The render code sorts names in canonical DNS order, then by type and by data. The line endings are LF. The column widths are fixed. No map order reaches the output.</li>
+  <li><strong>Per server.</strong> The model for ns1 holds the zones that ns1 serves, with the role of ns1 for each zone. A secondary gets a <code>type secondary</code> stanza and no zone file.</li>
+  <li><strong>Secret free.</strong> A bundle holds no key material. A TSIG key is a file on the server. The config only names it and includes it.</li>
+</ul>
+
+<h2 id="files">Files in a bundle</h2>
+<p>A bundle for ns1.example.org has this tree. The names are the same for every server.</p>
+
+<pre><code class="language-plaintext">b-20261104-1431-9e2/
+├── manifest.json
+├── named.conf.bembel        # include this file from named.conf
+├── acls.conf                 # one acl per view and per address group
+├── views/
+│   ├── internal.conf         # zone stanzas of the view
+│   └── external.conf
+└── zones/
+    ├── internal/
+    │   ├── example.org.zone
+    │   ├── kestrel.example.org.zone
+    │   ├── 20.10.in-addr.arpa.zone
+    │   └── 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.zone
+    └── external/
+        └── example.org.zone</code></pre>
+
+<p>The file <code>named.conf.bembel</code> holds the views and the includes. The administrator of ns1 adds one line to the own <code>named.conf</code>:</p>
+<pre><code class="language-plaintext">include "/var/lib/bembel-agent/bind/current/named.conf.bembel";</code></pre>
+
+<pre><code class="language-plaintext">// bembel bundle b-20261104-1431-9e2 for ns1.example.org
+// generator bembel 0.1.0, mode native. Do not edit.
+include "/var/lib/bembel-agent/bind/current/acls.conf";
+
+view "internal" {
+    match-clients { "bembel-internal"; };
+    recursion no;
+    ixfr-from-differences yes;
+    include "/var/lib/bembel-agent/bind/current/views/internal.conf";
+};
+
+view "external" {
+    match-clients { any; };
+    recursion no;
+    ixfr-from-differences yes;
+    include "/var/lib/bembel-agent/bind/current/views/external.conf";
+};</code></pre>
+
+<pre><code class="language-plaintext">// views/internal.conf
+zone "kestrel.example.org" {
+    type primary;
+    file "/var/lib/bembel-agent/bind/current/zones/internal/kestrel.example.org.zone";
+    notify yes;
+    also-notify { 10.20.2.54; 10.20.2.55; };
+    allow-transfer { key "xfer.example.org"; };
+};
+
+zone "20.10.in-addr.arpa" {
+    type primary;
+    file "/var/lib/bembel-agent/bind/current/zones/internal/20.10.in-addr.arpa.zone";
+    notify yes;
+    also-notify { 10.20.2.54; 10.20.2.55; };
+    allow-transfer { key "xfer.example.org"; };
+};</code></pre>
+
+<p>On ns2 the same export gives stanzas of <code>type secondary</code> with <code>primaries { 10.20.2.53 key "xfer.example.org"; };</code> and a <code>file</code> in a local directory that BIND owns. ns2 needs no bundle pull for zone content. It still pulls the bundle, because the bundle holds its config. In a hidden-primary setup, only the primary has the zone files.</p>
+
+<p>A zone file for <code>kestrel.example.org</code> in the view <code>internal</code> looks like this.</p>
+<pre><code class="language-plaintext">; kestrel.example.org, view internal. Generated by bembel. Do not edit.
+$ORIGIN kestrel.example.org.
+$TTL 3600
+@                IN SOA  ns1.example.org. hostmaster.example.org. (
+                         2026110403 ; serial
+                         3600       ; refresh
+                         900        ; retry
+                         1209600    ; expire
+                         300 )      ; minimum
+                 IN NS   ns1.example.org.
+                 IN NS   ns2.example.org.
+                 IN NS   ns3.example.org.
+
+; derived from addresses
+cn-004           IN A     10.20.4.44
+cn-004           IN AAAA  2001:db8:4200:204::44
+cn-004-ib0       IN A     10.100.4.44
+cn-004-bmc       IN A     172.16.4.44
+gpu-001          IN A     10.20.8.11
+
+; manual records
+build            IN CNAME vm-ci-04
+slurm            IN CNAME cn-004
+_ssh._tcp        IN SRV   10 0 22 cn-004.kestrel.example.org.
+@                IN TXT   "owner=hpc-ops" "v=bembel1"</code></pre>
+
+<p>A reverse zone file has the same shape. The file below is the head of <code>20.10.in-addr.arpa</code>.</p>
+<pre><code class="language-plaintext">; 20.10.in-addr.arpa, view internal. Generated by bembel. Do not edit.
+$ORIGIN 20.10.in-addr.arpa.
+$TTL 3600
+@     IN SOA  ns1.example.org. hostmaster.example.org. (
+              2026110402 3600 900 1209600 300 )
+      IN NS   ns1.example.org.
+      IN NS   ns2.example.org.
+      IN NS   ns3.example.org.
+
+44.4  IN PTR  cn-004.kestrel.example.org.
+11.8  IN PTR  gpu-001.kestrel.example.org.</code></pre>
+
+<p>The IPv6 zone has the same pattern with nibble labels:</p>
+<pre><code class="language-plaintext">; 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa, view internal
+$ORIGIN 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.
+4.4.0.0.0.0.0.0.0.0.0.0.0.0.0.0  IN PTR  cn-004.kestrel.example.org.</code></pre>
+
+<p>The native format has these rules.</p>
+<ul>
+  <li>The header holds no date and no build number. A timestamp would change the file on each build.</li>
+  <li>The file prints a TTL on a record line only when it differs from the zone <code>$TTL</code>.</li>
+  <li>The owner names are relative to <code>$ORIGIN</code>. The data names are absolute with a final dot.</li>
+  <li>The sections "derived from addresses" and "manual records" have comment headers. An <code>extra_records</code> block follows at the end under its own header.</li>
+  <li>A note on a record becomes a trailing comment. bembel removes line breaks from it.</li>
+</ul>
+
+<figure class="diagram">
+<svg viewBox="0 0 900 260" role="img" aria-labelledby="fig-views-t">
+<title id="fig-views-t">One zone in two views gives two files; a record can be limited to internal</title>
+<rect class="box" x="16" y="40" width="250" height="160" rx="10"/>
+<text class="t-title" x="32" y="64">Zone example.org</text>
+<text class="t-small" x="32" y="88">www        A      198.51.100.10</text>
+<text class="t-small" x="32" y="108">gw-a01     A      10.20.1.1</text>
+<text class="t-small" x="32" y="128">ib-leaf    A      10.100.0.2</text>
+<text class="t-small t-muted" x="32" y="152">gw-a01, ib-leaf: view internal</text>
+<text class="t-small t-muted" x="32" y="172">www: all views</text>
+<rect class="box-accent" x="360" y="30" width="250" height="84" rx="10"/>
+<text class="t-title t-on" x="376" y="54">view internal</text>
+<text class="t-small t-on" x="376" y="74">zones/internal/example.org.zone</text>
+<text class="t-small t-on" x="376" y="94">3 records</text>
+<rect class="box" x="360" y="140" width="250" height="84" rx="10"/>
+<text class="t-title" x="376" y="164">view external</text>
+<text class="t-small" x="376" y="184">zones/external/example.org.zone</text>
+<text class="t-small" x="376" y="204">1 record (www)</text>
+<path class="edge-accent" d="M266,100 L358,76" marker-end="url(#arrow-accent)"/>
+<path class="edge" d="M266,150 L358,180" marker-end="url(#arrow)"/>
+<rect class="box-soft" x="680" y="30" width="204" height="84" rx="10"/>
+<text class="t-title" x="696" y="54">clients 10.0.0.0/8</text>
+<text class="t-small" x="696" y="74">see 3 records</text>
+<rect class="box-soft" x="680" y="140" width="204" height="84" rx="10"/>
+<text class="t-title" x="696" y="164">all other clients</text>
+<text class="t-small" x="696" y="184">see www only</text>
+<path class="edge-muted" d="M610,72 L678,72" marker-end="url(#arrow-muted)"/>
+<path class="edge-muted" d="M610,182 L678,182" marker-end="url(#arrow-muted)"/>
+</svg>
+<figcaption>Split horizon. The record field <code>view</code> decides which copy of the zone holds a record.</figcaption>
+</figure>
+
+<h3 id="manifest">The manifest</h3>
+<p>The manifest lists every file with its sha256 and the zone serials. bembel-agent uses it to decide which zones to reload.</p>
+<pre><code class="language-json">{
+  "bundle": "b-20261104-1431-9e2",
+  "server": "ns1.example.org",
+  "generator": "bembel 0.1.0",
+  "mode": "native",
+  "created_at": "2026-11-04T14:31:08Z",
+  "snapshot": 48213,
+  "files": [
+    { "path": "named.conf.bembel", "sha256": "5e1c…a07" },
+    { "path": "zones/internal/kestrel.example.org.zone", "sha256": "9b4d…c12" }
+  ],
+  "zones": [
+    { "name": "kestrel.example.org", "view": "internal", "serial": 2026110403,
+      "records": 187, "changed": true },
+    { "name": "20.10.in-addr.arpa", "view": "internal", "serial": 2026110402,
+      "records": 412, "changed": false }
+  ],
+  "config_changed": false
+}</code></pre>
+
+<h2 id="serial">Serial rule</h2>
+<p>A zone serial is a 32-bit number. A secondary transfers a zone only when the serial of the primary is higher (RFC 1982 arithmetic). bembel sets the serial with these rules.</p>
+<ol>
+  <li><strong>Bump only on a change.</strong> The export renders the zone body without the SOA serial. It compares the sha256 of the body with the hash of the last published body. If the hashes are equal, the serial stays. The bytes stay equal, the ETag stays, and no one reloads.</li>
+  <li><strong>Date based.</strong> The new serial is <code>YYYYMMDDnn</code> with the UTC date and a two-digit counter. The first change of the day gives <code>nn = 01</code>.</li>
+  <li><strong>Never below the current serial.</strong> If <code>YYYYMMDD01</code> is not higher than the current serial, the new serial is the current serial plus one. This happens after 99 changes in one day, or after a clock error. The serial then runs ahead of the date. This is valid.</li>
+  <li><strong>One writer.</strong> Only the export job sets serials. The servers never stamp them. All servers that serve a zone get the same serial.</li>
+</ol>
+
+<p>The serial of a zone depends on the content in each view. The zone <code>example.org</code> in <code>internal</code> and in <code>external</code> has two serials. They can differ.</p>
+
+<h3 id="serial-cutover">Cutover from the ONA serial</h3>
+<p>ONA writes the Unix time as the serial. On 2026-11-04 this is about 1 793 700 000. The date-based form of the same day, 2026110401, is a larger number (2 026 110 401). The difference is about 232 million. This is less than 2<sup>31</sup>, so a secondary treats the new serial as higher. No manual step is needed on the secondary.</p>
+<ul>
+  <li>At import, bembel reads the highest serial it sees in the ONA zone files and stores it as <code>serial</code> of the zone.</li>
+  <li>The first export in bembel mode uses <code>max(YYYYMMDD01, serial + 1)</code>.</li>
+  <li>The cutover check stops the export with an error when the new serial is not higher than the last serial the secondaries have. The agent reports the serial that the server answers for the SOA.</li>
+</ul>
+<aside class="callout warn">
+<p class="callout-title">Do not change to a smaller scheme</p>
+<p>A serial that goes down makes secondaries ignore the primary. A counter that starts at 1 is lower than the Unix time by a factor of a billion. bembel never produces such a serial. The runbook in <a href="migration.html#cutover">migration.html#cutover</a> tells the administrator to keep the date-based scheme for the lifetime of the zone.</p>
+</aside>
+
+<h2 id="checks">Checks</h2>
+<p>A bundle is published only after its checks pass. The checks run in the export job on the bembel side, in a sandbox. BIND binaries of the version of the servers (BIND 9.18 or 9.20, set per server) are in the image of the job. The agent runs the same checks again on the server before it swaps the symlink.</p>
+<table class="compact">
+<thead><tr><th>Step</th><th>Tool or rule</th><th>What it catches</th></tr></thead>
+<tbody>
+<tr><td>1. Model</td><td>bembel checks</td><td>CNAME conflicts, a missing apex NS, names that are too long, TTL out of range, an address in two reverse zones, a view without a zone</td></tr>
+<tr><td>2. Each zone</td><td><code>named-checkzone -k fail -n fail -m fail ORIGIN FILE</code></td><td>Syntax errors, CNAME and other data, MX or NS that point to a CNAME, NS without address in the zone</td></tr>
+<tr><td>3. The config</td><td><code>named-checkconf -z named.conf</code></td><td>Syntax of the fragment, and a load of every zone. The sandbox <code>named.conf</code> is a copy of the real one with the include pointed at the bundle.</td></tr>
+<tr><td>4. Semantic</td><td>bembel checks</td><td>A zone with more than N % of its records removed. A zone without SOA change but with other changes. A serial that goes down.</td></tr>
+</tbody>
+</table>
+
+<p>The mass-delete guard is part of step 4. The setting is <code>export.guard.max_delete_percent</code>. The default is 10 %. It applies to a zone with at least 20 records. When one build removes more records than the limit, bembel does not publish. It creates a change request of the type <code>export-guard</code>. An approver in the scope of the zone, for example <code>m.huber</code>, looks at the diff and releases the bundle or rejects it. The state of the old bundle stays <code>latest</code> in the meantime.</p>
+
+<p>Every failed check gives a finding on the export page (<a href="ui-dns.html#exports">ui-dns.html#exports</a>) and an alert in the metric <code>bembel_export_last_success_timestamp_seconds</code>. The diff view shows the unified diff of the new bundle against the latest bundle. A user reads it before the next build or from the list of bundles.</p>
+
+<h2 id="delivery">Delivery</h2>
+<p>A DNS server pulls its bundle. The pull works through firewalls, and the server keeps its last good state when bembel is down. A bundle has three parts: <code>bundle.tar</code>, <code>manifest.json</code> and a detached signature <code>bundle.tar.sig</code> (Ed25519). The key pair belongs to the installation. The public key is in the config of every agent.</p>
+
+<figure class="diagram wide">
+<svg viewBox="0 0 960 520" role="img" aria-labelledby="fig-seq-t">
+<title id="fig-seq-t">Delivery sequence between bembel, bembel-agent, named on ns1 and the secondaries</title>
+<rect class="box" x="60" y="20" width="150" height="44" rx="8"/>
+<text class="t-title" x="135" y="48" text-anchor="middle">bembel</text>
+<rect class="box-accent" x="330" y="20" width="170" height="44" rx="8"/>
+<text class="t-title t-on" x="415" y="48" text-anchor="middle">bembel-agent (ns1)</text>
+<rect class="box" x="590" y="20" width="130" height="44" rx="8"/>
+<text class="t-title" x="655" y="48" text-anchor="middle">named (ns1)</text>
+<rect class="box" x="790" y="20" width="140" height="44" rx="8"/>
+<text class="t-title" x="860" y="48" text-anchor="middle">ns2 · ns3</text>
+<path class="edge-muted" d="M135,64 L135,500"/>
+<path class="edge-muted" d="M415,64 L415,500"/>
+<path class="edge-muted" d="M655,64 L655,500"/>
+<path class="edge-muted" d="M860,64 L860,500"/>
+<path class="edge" d="M413,100 L137,100" marker-end="url(#arrow)"/>
+<text class="t-small t-mono" x="275" y="92" text-anchor="middle">GET …/bundle  If-None-Match: "b-…9e1"</text>
+<path class="edge" d="M137,136 L413,136" marker-end="url(#arrow)"/>
+<text class="t-small t-mono" x="275" y="128" text-anchor="middle">200 ETag "b-…9e2"  (or 304)</text>
+<rect class="box-soft" x="425" y="156" width="215" height="58" rx="8"/>
+<text class="t-small" x="435" y="176">verify sha256 and signature,</text>
+<text class="t-small" x="435" y="194">unpack to releases/b-…9e2</text>
+<rect class="box-soft" x="425" y="228" width="215" height="58" rx="8"/>
+<text class="t-small" x="435" y="248">named-checkconf -z and</text>
+<text class="t-small" x="435" y="266">named-checkzone on the server</text>
+<rect class="box-soft" x="425" y="300" width="215" height="44" rx="8"/>
+<text class="t-small" x="435" y="326">swap symlink current (atomic)</text>
+<path class="edge" d="M417,372 L653,372" marker-end="url(#arrow)"/>
+<text class="t-small t-mono" x="535" y="364" text-anchor="middle">rndc reload ZONE in VIEW</text>
+<path class="edge" d="M657,404 L858,404" marker-end="url(#arrow)"/>
+<text class="t-small t-mono" x="758" y="396" text-anchor="middle">NOTIFY, then IXFR</text>
+<path class="edge" d="M413,448 L137,448" marker-end="url(#arrow)"/>
+<text class="t-small t-mono" x="275" y="440" text-anchor="middle">POST …/deployments  status ok</text>
+<text class="t-small t-muted" x="425" y="488">keep the last 5 releases</text>
+</svg>
+<figcaption>The agent pulls, verifies, swaps and reloads. If a step fails, the symlink stays, the agent reports the error, and named keeps its zones.</figcaption>
+</figure>
+
+<p>The agent works in these steps.</p>
+<ol>
+  <li>Every 60 seconds (with jitter) the agent calls <code>GET /v1/dns-servers/ns1.example.org/bundle</code> with the header <code>If-None-Match</code> and its bearer token. bembel answers <code>304</code> when the ETag is the same.</li>
+  <li>On <code>200</code> the agent saves the bundle, checks the sha256 of every file against the manifest, and verifies the signature with the public key.</li>
+  <li>The agent unpacks the bundle to <code>/var/lib/bembel-agent/bind/releases/b-20261104-1431-9e2/</code>. It runs <code>named-checkconf -z</code> against a copy of the real config with the include pointed to this release, and <code>named-checkzone</code> for each changed zone.</li>
+  <li>If the checks pass, the agent replaces the symlink <code>current</code> with a new symlink through <code>rename(2)</code>. The swap is atomic.</li>
+  <li>The agent compares the manifest with the one of the last release. If <code>config_changed</code> is true, it runs <code>rndc reconfig</code>. For each zone with <code>changed: true</code> it runs <code>rndc reload ZONE in VIEW</code>.</li>
+  <li>The agent sends the status to <code>POST /v1/dns-servers/ns1.example.org/deployments</code>: the bundle id, the time, the result per zone and the serial that <code>named</code> answers.</li>
+  <li>The agent keeps the last 5 releases and removes older ones.</li>
+</ol>
+
+<p>If a step from 3 to 5 fails, the agent keeps the old symlink (or swaps back to the previous release) and reports the error. A rollback is a swap to an older release and a reload. The command is <code>bembel-agent rollback --to b-20261104-1412-7c3</code>. A user can also set the bundle that the server must pull with <code>PUT /v1/dns-servers/ns1.example.org/pin</code>. This is the way to hold a server on a known good bundle while a fix is made.</p>
+
+<p>The deployment status gives a drift view. The server page in the UI shows the bundle id of each server, the age of the last pull, and the serial per zone that the server answers against the serial that bembel expects. The metric <code>bembel_agent_last_pull_age_seconds</code> has an alert rule.</p>
+
+<aside class="callout why">
+<p class="callout-title">Why pull and not push</p>
+<p>A pull needs no inbound firewall rule on the DNS servers. The agent can run on a server that bembel cannot reach. A broken bembel leaves the servers with the last good bundle. The ONA script wrote files in place and checked them afterwards, so a bad zone was already live on disk. The agent checks first and swaps after.</p>
+</aside>
+
+<h3 id="explainer">One change from address to name server</h3>
+<figure class="diagram wide explainer">
+<svg viewBox="0 0 960 420" role="img" aria-labelledby="fig-exp-t">
+<title id="fig-exp-t">One change: an address is allocated, bembel derives records, bumps two serials, builds a bundle, the agent pulls it and named reloads</title>
+<rect class="box" x="16" y="40" width="206" height="110" rx="8"/>
+<text class="t-title" x="30" y="64">address</text>
+<text class="t-small t-mono" x="30" y="86">vm-ci-04</text>
+<text class="t-small t-mono" x="30" y="106">10.20.4.77</text>
+<text class="t-small t-muted" x="30" y="128">status: allocated</text>
+<rect class="box-soft" data-f="1-5" x="262" y="40" width="226" height="110" rx="8"/>
+<text class="t-title" data-f="1-5" x="276" y="64">derived records</text>
+<text class="t-small t-mono" data-f="1-5" x="276" y="86">A  vm-ci-04 → 10.20.4.77</text>
+<text class="t-small t-mono" data-f="1-5" x="276" y="106">PTR 77.4 → vm-ci-04…</text>
+<text class="t-small t-muted" data-f="1-5" x="276" y="128">no one edits these</text>
+<rect class="box-warn" data-f="2-5" x="528" y="40" width="200" height="110" rx="8"/>
+<text class="t-title" data-f="2-5" x="542" y="64">serials</text>
+<text class="t-small t-mono" data-f="2-5" x="542" y="86">kestrel…  …03 → …04</text>
+<text class="t-small t-mono" data-f="2-5" x="542" y="106">20.10.in-… …02 → …03</text>
+<text class="t-small t-muted" data-f="2-5" x="542" y="128">other zones: no change</text>
+<rect class="box-accent" data-f="3-5" x="768" y="40" width="176" height="110" rx="8"/>
+<text class="t-title t-on" data-f="3-5" x="782" y="64">bundle</text>
+<text class="t-small t-mono t-on" data-f="3-5" x="782" y="86">b-…1431-9e2</text>
+<text class="t-small t-on" data-f="3-5" x="782" y="106">signed, new ETag</text>
+<text class="t-small t-on" data-f="3-5" x="782" y="128">2 zones changed</text>
+<path class="edge" data-f="1-5" d="M222,95 L260,95" marker-end="url(#arrow)"/>
+<path class="edge" data-f="2-5" d="M488,95 L526,95" marker-end="url(#arrow)"/>
+<path class="edge" data-f="3-5" d="M728,95 L766,95" marker-end="url(#arrow)"/>
+<path class="edge-accent" data-f="1" d="M222,95 L260,95" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" data-f="2" d="M488,95 L526,95" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" data-f="3" d="M728,95 L766,95" marker-end="url(#arrow-accent)"/>
+<rect class="box" data-f="4-5" x="262" y="260" width="226" height="110" rx="8"/>
+<text class="t-title" data-f="4-5" x="276" y="284">bembel-agent (ns1)</text>
+<text class="t-small" data-f="4-5" x="276" y="306">GET with If-None-Match</text>
+<text class="t-small" data-f="4-5" x="276" y="326">verify, checks, swap</text>
+<text class="t-small t-muted" data-f="4-5" x="276" y="348">release b-…9e2</text>
+<rect class="box-ok" data-f="5" x="528" y="260" width="200" height="110" rx="8"/>
+<text class="t-title" data-f="5" x="542" y="284">named (ns1)</text>
+<text class="t-small t-mono" data-f="5" x="542" y="306">rndc reload kestrel…</text>
+<text class="t-small t-mono" data-f="5" x="542" y="326">rndc reload 20.10…</text>
+<text class="t-small t-muted" data-f="5" x="542" y="348">NOTIFY ns2, ns3</text>
+<rect class="box-muted" data-f="5" x="768" y="260" width="176" height="110" rx="8"/>
+<text class="t-title" data-f="5" x="782" y="284">ns2 · ns3</text>
+<text class="t-small" data-f="5" x="782" y="306">IXFR from old serial</text>
+<text class="t-small t-muted" data-f="5" x="782" y="326">answer vm-ci-04</text>
+<path class="edge" data-f="4-5" d="M856,150 L856,200 L375,200 L375,258" marker-end="url(#arrow)"/>
+<path class="edge-accent" data-f="4" d="M856,150 L856,200 L375,200 L375,258" marker-end="url(#arrow-accent)"/>
+<path class="edge" data-f="5" d="M488,315 L526,315" marker-end="url(#arrow)"/>
+<path class="edge-accent" data-f="5" d="M488,315 L526,315" marker-end="url(#arrow-accent)"/>
+<path class="edge" data-f="5" d="M728,315 L766,315" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" data-f="4-5" x="620" y="192" text-anchor="middle">pull, 60 s</text>
+</svg>
+<script type="application/json" class="steps">["A user runs bembel vm prepare for vm-ci-04. The allocation gives the address 10.20.4.77 in kestrel-compute with the FQDN vm-ci-04.kestrel.example.org.", "bembel derives two records from the address: the A record in kestrel.example.org and the PTR record in 20.10.in-addr.arpa. A user cannot edit them.", "The next export finds that the body of two zones changed. It raises the serial of kestrel.example.org to 2026110404 and of 20.10.in-addr.arpa to 2026110403. All other zones keep their serial.", "The export builds the bundle b-20261104-1431-9e2, runs named-checkzone and named-checkconf -z, signs the bundle and sets the new ETag.", "bembel-agent on ns1 calls GET with If-None-Match, gets 200, verifies the files, runs the checks again and swaps the symlink current.", "The agent runs rndc reload for the two changed zones. named sends NOTIFY to ns2 and ns3. They fetch the change by IXFR and answer for vm-ci-04 within seconds."]</script>
+<figcaption>From address to answer. Two zones change, so only two zones reload.</figcaption>
+</figure>
+
+<h2 id="compat">Compat mode</h2>
+<p>The compat mode writes the same bytes as ONA <code>build_bind</code> (v1.6, <code>build_bind_conf</code> and <code>build_bind_domain</code> v1.51). The parallel run compares the two outputs every night. When the diff is empty or explained, the cutover can start (<a href="migration.html#parallel">migration.html#parallel</a>). The export setting <code>mode</code> is <code>compat-ona</code> or <code>native</code>, per DNS server.</p>
+
+<table class="compact">
+<thead><tr><th>Item</th><th>ONA build_bind</th><th>compat mode</th><th>native mode</th></tr></thead>
+<tbody>
+<tr><td>Files</td><td><code>named.conf.ona</code>, <code>zone_data/named-FQDN</code></td><td>same names</td><td><code>named.conf.bembel</code>, <code>zones/VIEW/FQDN.zone</code></td></tr>
+<tr><td>Header</td><td>Date line, <code>TOTAL RECORDS (count=N)</code></td><td>same, with the date of the build</td><td>No date, no count</td></tr>
+<tr><td>Serial</td><td>Unix time of the build. Changes every build.</td><td>same (normalised in the diff)</td><td>Date based, on change only</td></tr>
+<tr><td>Record line</td><td><code>printf("%-50s %-8s IN  %-8s %-30s %s\n")</code>, TTL blank if equal to the default</td><td>same format</td><td>Aligned columns by zone, TTL only if it differs</td></tr>
+<tr><td>Order</td><td>By type only. The order inside a type is undefined.</td><td>By type, then canonical order</td><td>Canonical DNS order</td></tr>
+<tr><td>Roles</td><td><code>type master</code>, <code>slave</code>, <code>forward</code></td><td>same words</td><td><code>primary</code>, <code>secondary</code>, <code>forward</code></td></tr>
+<tr><td>Forward stanza</td><td>Malformed: no semicolon, no forwarders</td><td>Valid stanza (known deviation)</td><td>Valid stanza with <code>forwarders</code></td></tr>
+<tr><td>Views</td><td>Ignored. The table <code>dns_views</code> is data only.</td><td>One flat set: the first view only. bembel warns when there is more than one view.</td><td>Full <code>view</code> blocks</td></tr>
+<tr><td>Classless PTR</td><td>Owner <code>5-27.0.168.192.in-addr.arpa.</code>. No parent CNAME.</td><td>same owner. Parent CNAMEs are written to a separate file <code>parent-cnames.txt</code> for review.</td><td>Child zone and parent CNAME and NS</td></tr>
+<tr><td>TXT</td><td>Raw text in quotes. No split at 255 bytes, no escaping.</td><td>same (known deviation when data is invalid)</td><td>Split and escaped</td></tr>
+<tr><td>Time-gated records</td><td>Skipped when <code>ebegin</code> is 0 or in the future</td><td>Import maps them to inactive records, which the export skips</td><td>Inactive records are skipped</td></tr>
+<tr><td>Notes</td><td><code>; note</code> at the end, line breaks to <code>; </code></td><td>same</td><td>same</td></tr>
+<tr><td>SOA admin</td><td>Raw text of <code>admin_email</code>, must already be in <code>host.domain.</code> form</td><td>same</td><td>rname normalised</td></tr>
+<tr><td>Footer files</td><td>Fetched from a URL, appended</td><td>The import copies them to <code>extra_records</code></td><td><code>extra_records</code></td></tr>
+</tbody>
+</table>
+
+<p>The nightly diff normalises three things on both sides: the date in line 1, the SOA serial, and the order of the record lines. It keeps <code>TOTAL RECORDS (count=N)</code> as an assertion. The list of known deviations is a file in the repository. It names each difference with a reason. A diff that is not in the list fails the run. The level 2 diff compares the zones as records (<code>named-compilezone -f text -F text -s unchanged</code>), which finds a difference that survives the byte normalisation.</p>
+
+<aside class="callout tip">
+<p class="callout-title">When compat mode ends</p>
+<p>At cutover, the administrator sets the mode of each server to <code>native</code> one server at a time. The file paths change, and the agent handles the move. The first native bundle contains a one-time include for the new paths. ONA stays able to build for the rollback window.</p>
+</aside>
+
+<h2 id="later">Later</h2>
+<p>The BIND file export is the base. The next steps use the same data model and the same agent.</p>
+<table class="compact">
+<thead><tr><th>Step</th><th>What it adds</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>Catalog zones (RFC 9432)</td><td>bembel makes one catalog zone per view. A secondary adds and removes zones itself when the catalog changes.</td><td>BIND 9.18 or newer has catalog zone support. The catalog only lists zones. The data still moves by IXFR. Not verified in this sandbox.</td></tr>
+<tr><td>RFC 2136 update with TSIG</td><td>Fast incremental updates instead of a reload. bembel reconciles: it reads the zone by AXFR, computes the difference and sends an UPDATE.</td><td>A dynamic zone cannot be edited by hand without <code>rndc freeze</code>. The update has no atomic multi-zone change. This is why the file export comes first.</td></tr>
+<tr><td>PowerDNS API driver</td><td>A DNS server of kind <code>powerdns</code>. bembel patches RRsets through the API.</td><td>The model does not change. Views need PowerDNS Authoritative 5.0 or newer. Not verified.</td></tr>
+<tr><td>DNSSEC</td><td>bembel does not sign zones. The generated zone stanza names a <code>dnssec-policy</code> and sets <code>inline-signing yes</code>. BIND keeps and rolls the keys.</td><td>The serial of the unsigned file must still go up. BIND keeps its own serial for the signed zone. bembel may record DS records as data for the parent zone, but does not publish them.</td></tr>
+</tbody>
+</table>
+
+<p>A zone stanza with a DNSSEC policy looks like this:</p>
+<pre><code class="language-plaintext">zone "kestrel.example.org" {
+    type primary;
+    file "/var/lib/bembel-agent/bind/current/zones/internal/kestrel.example.org.zone";
+    dnssec-policy "default";
+    inline-signing yes;
+};</code></pre>
+
+<p>Every later step is a new <em>delivery kind</em> of the DNS server object. The data, the views, the derived records and the checks stay the same. The roadmap lists the order (<a href="roadmap.html#v1-1">roadmap.html#v1-1</a>).</p>
+</body>
+</html>
