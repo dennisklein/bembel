@@ -1,0 +1,1382 @@
+openapi: 3.1.0
+info:
+  title: bembel API
+  version: 1.0.0-draft.1
+  summary: REST API of bembel, the IPAM, DNS, DHCP and asset-view service.
+  description: |
+    Sketch of the contract. The real document is reviewed before any code.
+    The web UI, the CLI and all integrations use only this API.
+
+    Conventions:
+    - Paths are plural and in kebab-case. Fields are in snake_case. Ids are UUIDv7.
+    - Custom methods use a colon, for example `addresses:allocate` (AIP-136 style).
+    - Errors use RFC 9457 `application/problem+json`.
+    - Lists use cursor pagination (`page_size`, `page_token`).
+    - Every resource has a strong `ETag`. Writes use `If-Match` (412 or 428).
+    - Allocations and claims need an `Idempotency-Key` header (24 h, 422 on a changed body).
+
+    Authentication: OpenID Connect. The web UI uses a BFF session (authorization
+    code with PKCE). The CLI uses the device authorization grant (RFC 8628).
+    Services send a JWT of a trusted issuer or a personal access token
+    (`bem_pat_...`) as a bearer token.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+  contact:
+    name: bembel design record
+    url: https://github.com/dennisklein/bembel
+servers:
+  - url: https://bembel.example.org
+    description: Production
+  - url: http://localhost:8080
+    description: Local development (bembel serve --dev)
+security:
+  - oidc: []
+  - bearer: []
+tags:
+  - name: access
+    description: Identity, permissions, roles, bindings, change requests, audit.
+  - name: addressing
+    description: VRF, prefix, address, claim, range, VLAN.
+  - name: hosts
+    description: Hosts and interfaces.
+  - name: dns
+    description: Zones, views, records.
+  - name: dhcp
+    description: DHCP scopes and servers.
+  - name: exports
+    description: BIND, dhcpd, OpenSM, prefix lists and address-group feeds.
+  - name: events
+    description: Event list and SSE stream.
+paths:
+  /v1/me:
+    get:
+      tags: [access]
+      operationId: getMe
+      summary: Show the identity of the caller
+      responses:
+        "200": { description: "The caller.", content: { application/json: { schema: { $ref: "#/components/schemas/Me" } } } }
+        "401": { $ref: "#/components/responses/Problem" }
+  /v1/me/permissions:
+    get:
+      tags: [access]
+      operationId: listMyPermissions
+      summary: List the effective grants of the caller
+      parameters:
+        - name: permission
+          in: query
+          description: Only grants that include this permission, for example `prefix:allocate`.
+          schema: { type: string, pattern: "^[a-z-]+:[a-z-]+$" }
+      responses:
+        "200":
+          description: Effective grants, one row per binding.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [grants]
+                properties:
+                  grants:
+                    type: array
+                    items: { $ref: "#/components/schemas/Grant" }
+        "401": { $ref: "#/components/responses/Problem" }
+  /v1/me/permissions:check:
+    post:
+      tags: [access]
+      operationId: checkMyPermissions
+      summary: Check a batch of actions for the caller
+      description: Uses the same predicate as the list queries. Max 100 checks per call.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checks]
+              properties:
+                checks:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [permission, resource]
+                    properties:
+                      permission: { type: string, examples: ["prefix:allocate"] }
+                      resource:
+                        type: object
+                        required: [kind, id]
+                        properties:
+                          kind: { type: string }
+                          id: { type: string, format: uuid }
+      responses:
+        "200":
+          description: One result for each check, in order.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        allowed: { type: boolean }
+                        via_binding: { type: [string, "null"], format: uuid }
+        "401": { $ref: "#/components/responses/Problem" }
+  /v1/auth/config:
+    get:
+      tags: [access]
+      operationId: getAuthConfig
+      summary: Public login settings for the CLI
+      security: []
+      responses:
+        "200":
+          description: Issuer and public client id.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  issuer: { type: string, format: uri }
+                  cli_client_id: { type: string, examples: [bembel-cli] }
+                  audience: { type: string, examples: [bembel] }
+  /v1/me/tokens:
+    get:
+      tags: [access]
+      operationId: listMyTokens
+      summary: List own personal access tokens (without secrets)
+      responses:
+        "200": { description: The tokens., content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Token" } } } } }
+    post:
+      tags: [access]
+      operationId: createMyToken
+      summary: Create a personal access token
+      description: The secret shows once in the answer. A token never gets token, binding, role or approve permissions.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/Token" } } }
+      responses:
+        "201": { description: Created. The `token` field holds `bem_pat_<id>_<secret>`., content: { application/json: { schema: { $ref: "#/components/schemas/Token" } } } }
+        "422": { $ref: "#/components/responses/Problem" }
+  /v1/webhooks:
+    get:
+      tags: [events]
+      operationId: listWebhooks
+      summary: List webhook endpoints
+      responses:
+        "200": { description: The endpoints., content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Webhook" } } } } }
+    post:
+      tags: [events]
+      operationId: createWebhook
+      summary: Register a webhook endpoint
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/Webhook" } } }
+      responses:
+        "201": { description: Created. The signing secret shows once., content: { application/json: { schema: { $ref: "#/components/schemas/Webhook" } } } }
+  /v1/roles:
+    get:
+      tags: [access]
+      operationId: listRoles
+      summary: List roles with their permissions
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of roles.", content: { application/json: { schema: { $ref: "#/components/schemas/RolePage" } } } }
+        "403": { $ref: "#/components/responses/Problem" }
+  /v1/bindings:
+    get:
+      tags: [access]
+      operationId: listBindings
+      summary: List bindings
+      parameters:
+        - name: subject
+          in: query
+          description: Subject key, for example `kc:netops`.
+          schema: { type: string }
+        - name: role
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of bindings.", content: { application/json: { schema: { $ref: "#/components/schemas/BindingPage" } } } }
+        "403": { $ref: "#/components/responses/Problem" }
+    post:
+      tags: [access]
+      operationId: createBinding
+      summary: Create a binding
+      description: |
+        The caller can grant only a role that the caller holds, inside the scope
+        of the caller. A binding with the role `admin` needs a change request.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/BindingInput" } } }
+      responses:
+        "201": { description: "Created.", content: { application/json: { schema: { $ref: "#/components/schemas/Binding" } } } }
+        "202": { $ref: "#/components/responses/Held" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /v1/bindings/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    delete:
+      tags: [access]
+      operationId: deleteBinding
+      summary: Delete a binding
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204": { description: Deleted. }
+        "202": { $ref: "#/components/responses/Held" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "412": { $ref: "#/components/responses/Problem" }
+  /v1/change-requests:
+    get:
+      tags: [access]
+      operationId: listChangeRequests
+      summary: List change requests
+      parameters:
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, executed, failed, rejected, withdrawn, expired]
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of change requests.", content: { application/json: { schema: { $ref: "#/components/schemas/ChangeRequestPage" } } } }
+  /v1/change-requests/{id}:approve:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      tags: [access]
+      operationId: approveChangeRequest
+      summary: Approve and execute a change request
+      description: The approver must be another subject than the proposer.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment: { type: string, maxLength: 1000 }
+      responses:
+        "200": { description: "The change ran. The body shows the final state.", content: { application/json: { schema: { $ref: "#/components/schemas/ChangeRequest" } } } }
+        "403": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/audit-events:
+    get:
+      tags: [access]
+      operationId: listAuditEvents
+      summary: Query the audit log
+      parameters:
+        - { name: actor, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: decision, in: query, schema: { type: string, enum: [allow, deny, pending] } }
+        - { name: origin, in: query, schema: { type: string, enum: [ui, cli, api, assistant, agent, sync] } }
+        - { name: since, in: query, schema: { type: string, format: date-time } }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of audit events.", content: { application/json: { schema: { $ref: "#/components/schemas/AuditEventPage" } } } }
+        "403": { $ref: "#/components/responses/Problem" }
+  /v1/vrfs:
+    get:
+      tags: [addressing]
+      operationId: listVrfs
+      summary: List VRFs
+      parameters:
+        - { name: name, in: query, schema: { type: string } }
+        - { name: owner, in: query, schema: { type: string } }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of VRFs.", content: { application/json: { schema: { $ref: "#/components/schemas/VrfPage" } } } }
+    post:
+      tags: [addressing]
+      operationId: createVrf
+      summary: Create a VRF
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/VrfInput" } } }
+      responses:
+        "201":
+          description: Created.
+          headers:
+            ETag: { $ref: "#/components/headers/ETag" }
+            Location: { schema: { type: string, format: uri-reference } }
+          content: { application/json: { schema: { $ref: "#/components/schemas/Vrf" } } }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/vrfs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [addressing]
+      operationId: getVrf
+      summary: Get a VRF
+      responses:
+        "200": { description: "The VRF.", headers: { ETag: { $ref: "#/components/headers/ETag" } }, content: { application/json: { schema: { $ref: "#/components/schemas/Vrf" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+    patch:
+      tags: [addressing]
+      operationId: updateVrf
+      summary: Change a VRF (JSON Merge Patch)
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content: { application/merge-patch+json: { schema: { $ref: "#/components/schemas/VrfInput" } } }
+      responses:
+        "200": { description: "The changed VRF.", content: { application/json: { schema: { $ref: "#/components/schemas/Vrf" } } } }
+        "412": { $ref: "#/components/responses/Problem" }
+        "428": { $ref: "#/components/responses/Problem" }
+  /v1/prefixes:
+    get:
+      tags: [addressing]
+      operationId: listPrefixes
+      summary: List prefixes
+      description: |
+        Filters combine with AND. A comma in one value means OR.
+        `contains` returns the prefixes that contain an address or a prefix.
+        `within` returns the prefixes under a CIDR (all depths).
+      parameters:
+        - { name: vrf, in: query, description: VRF name or id, schema: { type: string } }
+        - { name: contains, in: query, schema: { type: string }, example: 10.20.4.44 }
+        - { name: within, in: query, schema: { type: string, format: cidr }, example: 10.20.0.0/16 }
+        - { name: kind, in: query, schema: { type: string, enum: [container, subnet] } }
+        - { name: status, in: query, schema: { type: string }, example: "active,reserved" }
+        - { name: fabric, in: query, schema: { type: string } }
+        - { name: team, in: query, schema: { type: string } }
+        - name: tag
+          in: query
+          description: "`key:value`. Repeat the parameter to AND tags."
+          schema: { type: array, items: { type: string, pattern: "^[a-z0-9._-]+:.+$" } }
+          style: form
+          explode: true
+        - { name: q, in: query, description: Text search, schema: { type: string } }
+        - { name: order_by, in: query, schema: { type: string, default: cidr } }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of prefixes.", content: { application/json: { schema: { $ref: "#/components/schemas/PrefixPage" } } } }
+        "400": { $ref: "#/components/responses/Problem" }
+    post:
+      tags: [addressing]
+      operationId: createPrefix
+      summary: Create a prefix
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PrefixInput" } } }
+      responses:
+        "201": { description: "Created.", headers: { ETag: { $ref: "#/components/headers/ETag" } }, content: { application/json: { schema: { $ref: "#/components/schemas/Prefix" } } } }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/prefixes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [addressing]
+      operationId: getPrefix
+      summary: Get a prefix
+      responses:
+        "200": { description: "The prefix.", headers: { ETag: { $ref: "#/components/headers/ETag" } }, content: { application/json: { schema: { $ref: "#/components/schemas/Prefix" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+    patch:
+      tags: [addressing]
+      operationId: updatePrefix
+      summary: Change a prefix (JSON Merge Patch)
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content: { application/merge-patch+json: { schema: { $ref: "#/components/schemas/PrefixInput" } } }
+      responses:
+        "200": { description: "The changed prefix.", content: { application/json: { schema: { $ref: "#/components/schemas/Prefix" } } } }
+        "412": { $ref: "#/components/responses/Problem" }
+        "428": { $ref: "#/components/responses/Problem" }
+    delete:
+      tags: [addressing]
+      operationId: deletePrefix
+      summary: Delete a prefix
+      description: A prefix with children needs a change request (202).
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204": { description: Deleted. }
+        "202": { $ref: "#/components/responses/Held" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/prefixes/{id}/free:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [addressing]
+      operationId: listFreeRanges
+      summary: Preview the free ranges of a prefix
+      description: A preview only. It is not a reservation. Use `:allocate` to take an address.
+      parameters:
+        - { name: length, in: query, description: Show free child prefixes of this length, schema: { type: integer, minimum: 1, maximum: 128 } }
+      responses:
+        "200":
+          description: Free ranges.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  free:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        first: { type: string }
+                        last: { type: string }
+                        count: { type: string, description: Decimal string, because IPv6 counts exceed 64 bits. }
+  /v1/prefixes/{id}/addresses:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [addressing]
+      operationId: listPrefixAddresses
+      summary: List the addresses of a subnet
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of addresses.", content: { application/json: { schema: { $ref: "#/components/schemas/AddressPage" } } } }
+  /v1/prefixes/{id}/addresses:allocate:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      tags: [addressing]
+      operationId: allocateAddress
+      summary: Allocate the next free address
+      description: |
+        The server chooses the address. Race-free: the database arbitrates.
+        Give `address` to take one specific address (409 `address.conflict` if taken).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AllocateAddress" } } }
+      responses:
+        "201":
+          description: Allocated.
+          headers:
+            ETag: { $ref: "#/components/headers/ETag" }
+            Location: { schema: { type: string, format: uri-reference } }
+          content: { application/json: { schema: { $ref: "#/components/schemas/Address" } } }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /v1/prefixes/{id}/prefixes:allocate:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      tags: [addressing]
+      operationId: allocatePrefix
+      summary: Allocate a child prefix from a pool
+      description: The parent must be a container marked as pool.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [length, name]
+              properties:
+                length: { type: integer, minimum: 1, maximum: 128, examples: [26] }
+                name: { type: string }
+                kind: { type: string, enum: [container, subnet], default: subnet }
+                status: { type: string, enum: [planned, active, reserved], default: planned }
+                owner: { type: string, description: Team name. }
+                tags: { $ref: "#/components/schemas/Tags" }
+      responses:
+        "201": { description: "Allocated.", content: { application/json: { schema: { $ref: "#/components/schemas/Prefix" } } } }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/addresses:
+    get:
+      tags: [addressing]
+      operationId: listAddresses
+      summary: List addresses across prefixes
+      parameters:
+        - { name: vrf, in: query, schema: { type: string } }
+        - { name: address, in: query, schema: { type: string } }
+        - { name: within, in: query, schema: { type: string, format: cidr } }
+        - { name: mac, in: query, schema: { type: string } }
+        - { name: fqdn, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of addresses.", content: { application/json: { schema: { $ref: "#/components/schemas/AddressPage" } } } }
+  /v1/addresses/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [addressing]
+      operationId: getAddress
+      summary: Get an address
+      responses:
+        "200": { description: "The address.", headers: { ETag: { $ref: "#/components/headers/ETag" } }, content: { application/json: { schema: { $ref: "#/components/schemas/Address" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+    patch:
+      tags: [addressing]
+      operationId: updateAddress
+      summary: Change an address (name, status, tags)
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content: { application/merge-patch+json: { schema: { $ref: "#/components/schemas/Address" } } }
+      responses:
+        "200": { description: "The changed address.", content: { application/json: { schema: { $ref: "#/components/schemas/Address" } } } }
+        "412": { $ref: "#/components/responses/Problem" }
+  /v1/addresses/{id}:release:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      tags: [addressing]
+      operationId: releaseAddress
+      summary: Release an address
+      description: |
+        The address goes back to the free pool. With `grace` it becomes
+        `deprecated` first. DNS records and the DHCP reservation go with it.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                grace: { type: string, format: duration, examples: [P7D] }
+      responses:
+        "200": { description: "Released or deprecated.", content: { application/json: { schema: { $ref: "#/components/schemas/Address" } } } }
+        "412": { $ref: "#/components/responses/Problem" }
+  /v1/claims:
+    get:
+      tags: [addressing]
+      operationId: listClaims
+      summary: List claims
+      parameters:
+        - { name: state, in: query, schema: { type: string, enum: [open, confirmed, expired, released] } }
+        - { name: owner_ref, in: query, schema: { type: string } }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of claims.", content: { application/json: { schema: { $ref: "#/components/schemas/ClaimPage" } } } }
+    post:
+      tags: [addressing]
+      operationId: createClaim
+      summary: Claim an address for a short time
+      description: |
+        The claim holds an address with a TTL. An integration confirms it.
+        The reaper releases an expired claim. `owner_ref` makes the call
+        idempotent for controllers: one open claim per `owner_ref`.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ClaimInput" } } }
+      responses:
+        "201": { description: "Claimed.", content: { application/json: { schema: { $ref: "#/components/schemas/Claim" } } } }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/claims/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [addressing]
+      operationId: getClaim
+      summary: Get a claim
+      responses:
+        "200": { description: "The claim.", content: { application/json: { schema: { $ref: "#/components/schemas/Claim" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+    delete:
+      tags: [addressing]
+      operationId: deleteClaim
+      summary: Release a claim that no one confirmed
+      responses:
+        "204": { description: Released. }
+  /v1/claims/{id}:confirm:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      tags: [addressing]
+      operationId: confirmClaim
+      summary: Confirm a claim
+      description: The address becomes `allocated`. Late confirm of an expired claim gives 409 `claim.expired`.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fqdn: { type: string }
+                mac: { type: string }
+      responses:
+        "200": { description: "The allocated address.", content: { application/json: { schema: { $ref: "#/components/schemas/Address" } } } }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/hosts:
+    get:
+      tags: [hosts]
+      operationId: listHosts
+      summary: List hosts
+      parameters:
+        - { name: kind, in: query, schema: { type: string, enum: [physical, vm, hypervisor, appliance, container-node] } }
+        - { name: runs_on, in: query, description: Host name of a hypervisor, schema: { type: string } }
+        - { name: platform, in: query, schema: { type: string, enum: [libvirt, openstack, other] } }
+        - { name: team, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of hosts.", content: { application/json: { schema: { $ref: "#/components/schemas/HostPage" } } } }
+    post:
+      tags: [hosts]
+      operationId: createHost
+      summary: Create a host
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/Host" } } }
+      responses:
+        "201": { description: "Created.", content: { application/json: { schema: { $ref: "#/components/schemas/Host" } } } }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/hosts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [hosts]
+      operationId: getHost
+      summary: Get a host with its interfaces
+      responses:
+        "200": { description: "The host.", headers: { ETag: { $ref: "#/components/headers/ETag" } }, content: { application/json: { schema: { $ref: "#/components/schemas/Host" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /v1/interfaces:
+    get:
+      tags: [hosts]
+      operationId: listInterfaces
+      summary: List interfaces
+      parameters:
+        - { name: mac, in: query, schema: { type: string } }
+        - { name: guid, in: query, description: InfiniBand port GUID, schema: { type: string } }
+        - { name: host, in: query, schema: { type: string } }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of interfaces.", content: { application/json: { schema: { $ref: "#/components/schemas/InterfacePage" } } } }
+  /v1/zones:
+    get:
+      tags: [dns]
+      operationId: listZones
+      summary: List zones
+      parameters:
+        - { name: view, in: query, schema: { type: string } }
+        - { name: under, in: query, description: Zone subtree, for example `example.org`, schema: { type: string } }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of zones.", content: { application/json: { schema: { $ref: "#/components/schemas/ZonePage" } } } }
+  /v1/zones/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [dns]
+      operationId: getZone
+      summary: Get a zone
+      responses:
+        "200": { description: "The zone.", content: { application/json: { schema: { $ref: "#/components/schemas/Zone" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+    delete:
+      tags: [dns]
+      operationId: deleteZone
+      summary: Delete a zone
+      description: Always needs a change request (202).
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "202": { $ref: "#/components/responses/Held" }
+        "204": { description: Deleted by an approved change request. }
+  /v1/zones/{id}/records:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [dns]
+      operationId: listRecords
+      summary: List the records of a zone
+      parameters:
+        - { name: type, in: query, schema: { type: string, examples: [CNAME] } }
+        - { name: name, in: query, schema: { type: string } }
+        - { name: derived, in: query, schema: { type: boolean } }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of records.", content: { application/json: { schema: { $ref: "#/components/schemas/RecordPage" } } } }
+    post:
+      tags: [dns]
+      operationId: createRecord
+      summary: Create a manual record
+      description: Derived records (A, AAAA, PTR) come from addresses. 409 `record.derived` if you try to write one.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/Record" } } }
+      responses:
+        "201": { description: "Created.", content: { application/json: { schema: { $ref: "#/components/schemas/Record" } } } }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/dhcp-scopes:
+    get:
+      tags: [dhcp]
+      operationId: listDhcpScopes
+      summary: List DHCP scopes
+      parameters:
+        - { name: server, in: query, schema: { type: string } }
+        - { name: enabled, in: query, schema: { type: boolean } }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of DHCP scopes.", content: { application/json: { schema: { $ref: "#/components/schemas/DhcpScopePage" } } } }
+  /v1/dhcp-scopes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags: [dhcp]
+      operationId: updateDhcpScope
+      summary: Change a DHCP scope
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content: { application/merge-patch+json: { schema: { $ref: "#/components/schemas/DhcpScope" } } }
+      responses:
+        "200": { description: "The changed scope.", content: { application/json: { schema: { $ref: "#/components/schemas/DhcpScope" } } } }
+        "412": { $ref: "#/components/responses/Problem" }
+  /v1/exports:
+    get:
+      tags: [exports]
+      operationId: listExports
+      summary: List export targets
+      responses:
+        "200":
+          description: Export targets with the state of the last build.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Export" }
+  /v1/exports/{id}:build:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      tags: [exports]
+      operationId: buildExport
+      summary: Build an export now
+      responses:
+        "202": { description: "The build runs. Poll the export.", content: { application/json: { schema: { $ref: "#/components/schemas/Export" } } } }
+  /v1/exports/{id}/artifact:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [exports]
+      operationId: getExportArtifact
+      summary: Download the current export
+      description: Servers pull this with `If-None-Match`. 304 when nothing changed.
+      parameters:
+        - { name: If-None-Match, in: header, schema: { type: string } }
+      responses:
+        "200": { description: "The files as tar.gz, or one file for single-file targets.", headers: { ETag: { $ref: "#/components/headers/ETag" } }, content: { application/gzip: { schema: { type: string, format: binary } }, text/plain: { schema: { type: string } } } }
+        "304": { description: Not modified. }
+  /v1/search:
+    get:
+      tags: [addressing]
+      operationId: search
+      summary: Search all objects
+      description: |
+        Exact parse first (IP, CIDR, MAC, GUID, FQDN, VLAN id), then full text,
+        then vector similarity when the embedding service runs. Only objects
+        that the caller can read appear.
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
+        - { name: kind, in: query, schema: { type: string } }
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Hits in rank order.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kind: { type: string }
+                        id: { type: string, format: uuid }
+                        title: { type: string }
+                        match: { type: string, enum: [exact, text, vector] }
+  /v1/events:
+    get:
+      tags: [events]
+      operationId: listEvents
+      summary: List events (CloudEvents, JSON)
+      parameters:
+        - { name: type, in: query, schema: { type: string } }
+        - { name: after_seq, in: query, schema: { type: integer, format: int64 } }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200": { description: "A page of events.", content: { application/json: { schema: { $ref: "#/components/schemas/EventPage" } } } }
+  /v1/events/stream:
+    get:
+      tags: [events]
+      operationId: streamEvents
+      summary: Server-sent events
+      description: Resume with the `Last-Event-ID` header. The id is the event sequence number.
+      parameters:
+        - { name: types, in: query, description: Comma list of type globs, schema: { type: string } }
+        - { name: Last-Event-ID, in: header, schema: { type: string } }
+      responses:
+        "200": { description: "An open stream of `event: bembel` frames. The data is one CloudEvent.", content: { text/event-stream: { schema: { type: string } } } }
+components:
+  securitySchemes:
+    oidc:
+      type: oauth2
+      description: |
+        OpenID Connect at the issuer of the site, for example
+        `https://id.example.org/realms/main`.
+        Browser: authorization code with PKCE through the BFF (the browser
+        holds only an HttpOnly session cookie). CLI: device authorization
+        grant (RFC 8628). Services: client credentials, or a JWT of a trusted issuer.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://id.example.org/realms/main/protocol/openid-connect/auth
+          tokenUrl: https://id.example.org/realms/main/protocol/openid-connect/token
+          scopes:
+            openid: Identity
+            bembel: Use the API with the permissions of the user
+        clientCredentials:
+          tokenUrl: https://id.example.org/realms/main/protocol/openid-connect/token
+          scopes:
+            bembel: Use the API with the permissions of the service
+    bearer:
+      type: http
+      scheme: bearer
+      description: |
+        A JWT of a trusted issuer (audience `bembel`) or a personal access
+        token in the form `bem_pat_<id>_<secret>`.
+  headers:
+    ETag:
+      description: Strong entity tag. Use it in `If-Match`.
+      schema: { type: string, examples: ['"7"'] }
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    PageSize:
+      name: page_size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+    PageToken:
+      name: page_token
+      in: query
+      description: Opaque cursor from `next_page_token`. Valid 24 h.
+      schema: { type: string }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: |
+        Required on allocate, claim and confirm calls. Max 255 characters.
+        Kept 24 h per subject. The same key with another body gives 422.
+      schema: { type: string, minLength: 8, maxLength: 255 }
+    IfMatch:
+      name: If-Match
+      in: header
+      description: The `ETag` of the resource. 412 if it changed, 428 if missing.
+      schema: { type: string }
+  responses:
+    Problem:
+      description: Error (RFC 9457).
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    Held:
+      description: |
+        The action needs a second subject. A change request holds it.
+        Send `Bembel-Change-Request: never` to get 409 `change-request.required` instead.
+      headers:
+        Location: { schema: { type: string, format: uri-reference } }
+      content: { application/json: { schema: { $ref: "#/components/schemas/ChangeRequest" } } }
+  schemas:
+    Tags:
+      type: object
+      description: Key and value labels.
+      additionalProperties: { type: string }
+      examples: [{ role: login }]
+    Meta:
+      type: object
+      description: Fields of every object. Read only, except `owner`, `tags`, `attributes`.
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        kind: { type: string, readOnly: true }
+        owner: { type: [string, "null"], description: Team name. }
+        tags: { $ref: "#/components/schemas/Tags" }
+        attributes: { type: object, additionalProperties: true }
+        source: { type: string, readOnly: true, examples: [local, "openstack:os-prod", "k8s:prod-1", "libvirt:hv-03"] }
+        external_ref: { type: [string, "null"], readOnly: true }
+        managed_by: { type: [string, "null"], readOnly: true }
+        created_at: { type: string, format: date-time, readOnly: true }
+        created_by: { type: string, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
+        updated_by: { type: string, readOnly: true }
+        revision: { type: integer, format: int64, readOnly: true }
+        allowed_actions:
+          type: array
+          readOnly: true
+          description: Verbs the caller may use on this object. The server checks again on each call.
+          items: { type: string }
+    Vrf:
+      allOf:
+        - $ref: "#/components/schemas/Meta"
+        - type: object
+          required: [name]
+          properties:
+            name: { type: string, examples: [hpc-fabric] }
+            description: { type: string }
+            route_distinguisher: { type: [string, "null"], examples: ["64512:100"] }
+            import_targets: { type: array, items: { type: string } }
+            export_targets: { type: array, items: { type: string } }
+    VrfInput:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        owner: { type: [string, "null"] }
+        route_distinguisher: { type: [string, "null"] }
+        tags: { $ref: "#/components/schemas/Tags" }
+    Prefix:
+      allOf:
+        - $ref: "#/components/schemas/Meta"
+        - type: object
+          required: [cidr, vrf, kind, status]
+          properties:
+            cidr: { type: string, format: cidr, examples: [10.20.4.0/22, "2001:db8:4200:204::/64"] }
+            vrf: { type: string, description: VRF name, examples: [global] }
+            vrf_id: { type: string, format: uuid }
+            parent_id: { type: [string, "null"], format: uuid, readOnly: true }
+            kind: { type: string, enum: [container, subnet] }
+            status: { type: string, enum: [planned, active, reserved, deprecated] }
+            is_pool: { type: boolean, description: "Allocate child prefixes from here." }
+            name: { type: string, examples: [kestrel-compute] }
+            description: { type: string }
+            fabric: { type: [string, "null"], examples: [kestrel-ib, osprey-roce] }
+            vlan: { type: [integer, "null"], minimum: 1, maximum: 4094 }
+            gateway: { type: [string, "null"] }
+            site: { type: [string, "null"] }
+            announce: { type: boolean }
+            utilisation:
+              type: object
+              readOnly: true
+              properties:
+                used: { type: string }
+                size: { type: string }
+                percent: { type: number }
+    PrefixInput:
+      type: object
+      properties:
+        cidr: { type: string, format: cidr }
+        vrf: { type: string }
+        kind: { type: string, enum: [container, subnet] }
+        status: { type: string, enum: [planned, active, reserved, deprecated] }
+        is_pool: { type: boolean }
+        name: { type: string }
+        description: { type: string }
+        fabric: { type: [string, "null"] }
+        vlan: { type: [integer, "null"] }
+        gateway: { type: [string, "null"] }
+        owner: { type: [string, "null"] }
+        tags: { $ref: "#/components/schemas/Tags" }
+    Address:
+      allOf:
+        - $ref: "#/components/schemas/Meta"
+        - type: object
+          required: [address, status]
+          properties:
+            address: { type: string, format: ip, examples: [10.20.4.44] }
+            prefix_id: { type: string, format: uuid }
+            vrf: { type: string }
+            status: { type: string, enum: [allocated, reserved, claimed, deprecated] }
+            fqdn: { type: [string, "null"], examples: [cn-004.kestrel.example.org] }
+            interface_id: { type: [string, "null"], format: uuid }
+            mac: { type: [string, "null"], examples: ["3c:ec:ef:12:0a:44"] }
+            shared: { type: boolean }
+            description: { type: string }
+            expires_at: { type: [string, "null"], format: date-time }
+            derived_records:
+              type: array
+              readOnly: true
+              items: { type: string, examples: ["A cn-004.kestrel.example.org", "PTR 44.4.20.10.in-addr.arpa"] }
+    AllocateAddress:
+      type: object
+      properties:
+        address: { type: string, description: Take this address instead of the next free one. }
+        fqdn: { type: string }
+        description: { type: string }
+        range_role: { type: string, enum: [static, infrastructure, dhcp-pool], description: Take the address from a range with this role. }
+        interface:
+          type: object
+          description: Create or find the host and the interface in the same call.
+          properties:
+            host: { type: string }
+            name: { type: string, examples: [eno1] }
+            mac: { type: string }
+            guid: { type: string, description: InfiniBand port GUID. }
+        tags: { $ref: "#/components/schemas/Tags" }
+        reservation: { type: boolean, description: Also write a DHCP reservation (needs the MAC). }
+    Claim:
+      type: object
+      required: [id, state, address, expires_at]
+      properties:
+        id: { type: string, format: uuid }
+        state: { type: string, enum: [open, confirmed, expired, released] }
+        prefix_id: { type: string, format: uuid }
+        address: { type: string }
+        owner_ref: { type: string, examples: ["k8s:prod-1:ipaddressclaim/uid-31ac"] }
+        mac: { type: [string, "null"] }
+        fqdn: { type: [string, "null"] }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        created_by: { type: string }
+    ClaimInput:
+      type: object
+      required: [prefix_id, ttl]
+      properties:
+        prefix_id: { type: string, format: uuid }
+        ttl: { type: string, format: duration, examples: [PT10M], description: "ISO 8601 duration. Max PT24H." }
+        owner_ref: { type: string }
+        mac: { type: string }
+        fqdn: { type: string }
+    Host:
+      allOf:
+        - $ref: "#/components/schemas/Meta"
+        - type: object
+          required: [name, kind]
+          properties:
+            name: { type: string, description: Primary FQDN., examples: [cn-004.kestrel.example.org] }
+            kind: { type: string, enum: [physical, vm, hypervisor, appliance, container-node] }
+            role: { type: string, examples: [compute] }
+            platform: { type: [string, "null"], enum: [libvirt, openstack, other, null] }
+            runs_on: { type: [string, "null"], description: Host name of the hypervisor. }
+            asset_link: { type: [string, "null"], description: FNT device ELID., readOnly: true }
+            interfaces:
+              type: array
+              readOnly: true
+              items: { $ref: "#/components/schemas/Interface" }
+    Interface:
+      type: object
+      required: [name]
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        host_id: { type: string, format: uuid }
+        name: { type: string, examples: [eno1, ib0, bmc] }
+        mac: { type: [string, "null"], examples: ["3c:ec:ef:12:0a:44"] }
+        guid: { type: [string, "null"], description: "InfiniBand port GUID (8 bytes).", examples: ["0x506b4b0300a1b2c3"] }
+        lid: { type: [integer, "null"], readOnly: true, description: Observed from the subnet manager. }
+        port_id: { type: [string, "null"], format: uuid }
+        addresses:
+          type: array
+          readOnly: true
+          items: { type: string }
+    Zone:
+      allOf:
+        - $ref: "#/components/schemas/Meta"
+        - type: object
+          required: [name]
+          properties:
+            name: { type: string, examples: [kestrel.example.org] }
+            direction: { type: string, enum: [forward, reverse] }
+            views: { type: array, items: { type: string }, examples: [[internal, external]] }
+            serial: { type: integer, format: int64, readOnly: true }
+            soa:
+              type: object
+              properties:
+                primary_ns: { type: string }
+                hostmaster: { type: string }
+                refresh: { type: integer }
+                retry: { type: integer }
+                expire: { type: integer }
+                minimum: { type: integer }
+            servers: { type: array, items: { type: string }, examples: [[ns1.example.org, ns2.example.org]] }
+    Record:
+      type: object
+      required: [name, type, data]
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        zone_id: { type: string, format: uuid, readOnly: true }
+        name: { type: string, examples: [login] }
+        type: { type: string, enum: [A, AAAA, CNAME, MX, TXT, SRV, NS, CAA, PTR] }
+        ttl: { type: integer, minimum: 0, examples: [300] }
+        data: { type: string, examples: [cn-004.kestrel.example.org.] }
+        view: { type: string, examples: [internal] }
+        derived: { type: boolean, readOnly: true, description: Made from an address. Not editable. }
+        revision: { type: integer, format: int64, readOnly: true }
+    DhcpScope:
+      allOf:
+        - $ref: "#/components/schemas/Meta"
+        - type: object
+          properties:
+            prefix_id: { type: string, format: uuid }
+            cidr: { type: string, readOnly: true }
+            enabled: { type: boolean }
+            failover_pair: { type: [string, "null"], examples: [dhcp-a] }
+            lease_time: { type: integer, examples: [86400] }
+            options:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string, examples: [routers] }
+                  value: { type: string, examples: [10.20.4.1] }
+            pools:
+              type: array
+              readOnly: true
+              items:
+                type: object
+                properties:
+                  first: { type: string }
+                  last: { type: string }
+    Export:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        target: { type: string, enum: [bind, dhcpd, opensm, prefix-list, address-group] }
+        name: { type: string, examples: [ns1.example.org] }
+        format: { type: string, examples: [zone-files, dhcpd.conf, frr] }
+        state: { type: string, enum: [idle, building, ok, failed, stale] }
+        etag: { type: string }
+        last_success_at: { type: [string, "null"], format: date-time }
+        last_error: { type: [string, "null"] }
+    Role:
+      type: object
+      properties:
+        name: { type: string, examples: [allocator] }
+        builtin: { type: boolean }
+        description: { type: string }
+        permissions: { type: array, items: { type: string }, examples: [["prefix:read", "address:allocate"]] }
+    ScopeTerm:
+      type: object
+      description: One scope term. A binding ANDs its terms.
+      required: [type]
+      properties:
+        type: { type: string, enum: [global, vrf, prefix, zone, site, team, tag] }
+        value: { type: string, examples: ["hpc-fabric", "10.20.0.0/16", "example.org", "hpc-ops", "role:login"] }
+        vrf: { type: string, description: VRF name for a prefix term in a VRF other than global. }
+    BindingInput:
+      type: object
+      required: [subject, role, scope]
+      properties:
+        subject: { type: string, description: Subject key., examples: ["kc:netops", "k8s:prod-1:capi-system:capi-ipam"] }
+        role: { type: string }
+        scope:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/ScopeTerm" }
+        expires_at: { type: [string, "null"], format: date-time }
+        reason: { type: string }
+    Binding:
+      allOf:
+        - $ref: "#/components/schemas/BindingInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid, readOnly: true }
+            created_at: { type: string, format: date-time, readOnly: true }
+            created_by: { type: string, readOnly: true }
+            revision: { type: integer, format: int64, readOnly: true }
+    Grant:
+      type: object
+      properties:
+        binding_id: { type: string, format: uuid }
+        via: { type: string, description: Subject that carries the binding., examples: ["kc:netops"] }
+        role: { type: string }
+        scope: { type: array, items: { $ref: "#/components/schemas/ScopeTerm" } }
+        permissions: { type: array, items: { type: string } }
+    Me:
+      type: object
+      properties:
+        subject: { type: string, examples: ["kc:a.berger"] }
+        kind: { type: string, enum: [user, service] }
+        issuer: { type: string, examples: ["https://id.example.org/realms/main"] }
+        display_name: { type: string }
+        groups: { type: array, items: { type: string }, examples: [["kc:hpc-ops"]] }
+        token_kind: { type: string, enum: [session, oidc, pat] }
+        token_expires_at: { type: string, format: date-time }
+    ChangeRequest:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        state: { type: string, enum: [pending, approved, executed, failed, rejected, withdrawn, expired] }
+        action: { type: string, examples: [zone:delete] }
+        resource: { type: string, examples: ["zone/kestrel.example.org"] }
+        reason: { type: string }
+        proposer: { type: string }
+        approver: { type: [string, "null"] }
+        impact: { type: object, additionalProperties: true, description: "Counts that the approver sees, for example {records: 1204}." }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+    AuditEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        ts: { type: string, format: date-time }
+        request_id: { type: string }
+        actor: { type: string }
+        on_behalf_of: { type: [string, "null"] }
+        token_kind: { type: string }
+        origin: { type: string, enum: [ui, cli, api, assistant, agent, sync] }
+        action: { type: string, examples: [address:allocate] }
+        resource_kind: { type: string }
+        resource_id: { type: [string, "null"], format: uuid }
+        decision: { type: string, enum: [allow, deny, pending] }
+        via_binding_id: { type: [string, "null"], format: uuid }
+        change_request_id: { type: [string, "null"], format: uuid }
+        before: { type: [object, "null"] }
+        after: { type: [object, "null"] }
+    Page:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: {} }
+        next_page_token:
+          type: [string, "null"]
+          description: Null on the last page.
+    RolePage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Role" } } } }
+    BindingPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Binding" } } } }
+    ChangeRequestPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/ChangeRequest" } } } }
+    AuditEventPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/AuditEvent" } } } }
+    VrfPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Vrf" } } } }
+    PrefixPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Prefix" } } } }
+    AddressPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Address" } } } }
+    ClaimPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Claim" } } } }
+    HostPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Host" } } } }
+    InterfacePage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Interface" } } } }
+    ZonePage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Zone" } } } }
+    RecordPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Record" } } } }
+    DhcpScopePage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/DhcpScope" } } } }
+    EventPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - { type: object, properties: { items: { type: array, items: { $ref: "#/components/schemas/Event" } } } }
+    Token:
+      type: object
+      required: [name, expires_at]
+      properties:
+        id: { type: string, readOnly: true, examples: [8Kd2mQvX] }
+        name: { type: string }
+        token: { type: string, readOnly: true, description: Shown once. }
+        expires_at: { type: string, format: date-time }
+        permissions: { type: array, items: { type: string } }
+        scope: { type: array, items: { $ref: "#/components/schemas/ScopeTerm" } }
+        last_used_at: { type: [string, "null"], format: date-time, readOnly: true }
+    Webhook:
+      type: object
+      required: [url, types]
+      properties:
+        id: { type: string, format: uuid, readOnly: true }
+        url: { type: string, format: uri }
+        types: { type: array, items: { type: string }, examples: [["org.example.bembel.address.*"]] }
+        secret: { type: string, readOnly: true, description: "HMAC key, `whsec_...`. Shown once." }
+        enabled: { type: boolean }
+        last_delivery_state: { type: string, readOnly: true, enum: [ok, retrying, failed] }
+    Problem:
+      type: object
+      description: RFC 9457 problem details with bembel members.
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri, examples: ["urn:bembel:problem:prefix.exhausted"] }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string, description: Same as the end of `type`., examples: [prefix.exhausted] }
+        request_id: { type: string }
+        required_permission: { type: string, examples: ["prefix:allocate"] }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              pointer: { type: string, examples: ["/length"] }
+              detail: { type: string }
+    Event:
+      type: object
+      description: CloudEvents 1.0, JSON format.
+      required: [specversion, id, source, type]
+      properties:
+        specversion: { type: string, const: "1.0" }
+        id: { type: string }
+        source: { type: string, examples: ["https://bembel.example.org"] }
+        type: { type: string, examples: [org.example.bembel.address.allocated] }
+        subject: { type: string, examples: ["/v1/addresses/0197c3a2-5b7e-7c1d-9a40-3f6e2d81b5c4"] }
+        time: { type: string, format: date-time }
+        datacontenttype: { type: string, const: application/json }
+        bembelseq: { type: integer, format: int64, description: Gap-free order number. }
+        actor: { type: string }
+        data: { type: object, additionalProperties: true }
