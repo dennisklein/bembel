@@ -13,7 +13,7 @@
 <li>Each page uses the public API only. Each action shows the CLI command that does the same.</li>
 <li>The UI shows what the user cannot do, and why. A disabled button tells the missing permission and the binding that would give it.</li>
 <li>Colours have a meaning: one colour per domain, and fixed state colours. The UI never uses colour as the only signal.</li>
-<li>Keys for all frequent actions. <kbd>/</kbd> opens the jump box, <kbd>?</kbd> opens the help, <kbd>a</kbd> opens the assistant.</li>
+<li>Keys for all frequent actions. <kbd>/</kbd> opens the jump box, <kbd>?</kbd> opens the help pane, <kbd>Shift</kbd> <kbd>A</kbd> opens the assistant, <kbd>a</kbd> opens the Allocate dialog. No single key allocates, deletes or approves.</li>
 <li>Light and dark themes with the same tokens as the design record. Readable on a phone for on-call lookups.</li>
 </ul>
 
@@ -22,12 +22,12 @@
 <thead><tr><th>Principle</th><th>Rule</th><th>Example</th></tr></thead>
 <tbody>
 <tr><td>Data first</td><td>The page opens with the data, not with a form. Numbers are right aligned and in a monospace font.</td><td>The prefix page opens with the utilisation bar and the address map.</td></tr>
-<tr><td>One click to the next free</td><td>Each subnet and each pool has an "Allocate" button. The dialog proposes the next free address or prefix.</td><td>Allocate in <code>10.20.4.0/22</code> proposes <code>10.20.4.45</code>.</td></tr>
+<tr><td>One click to the next free</td><td>Each subnet and each pool has an "Allocate" button. The dialog proposes the next free address or prefix.</td><td>Allocate in <code>10.20.4.0/22</code> proposes <code>10.20.4.213</code>.</td></tr>
 <tr><td>Show the source</td><td>Each object shows its source and, if set, <code>managed_by</code>. A managed object has no edit buttons.</td><td>A Neutron port shows "managed by openstack:os-prod".</td></tr>
 <tr><td>Preview before change</td><td>Each change that affects DNS, DHCP or an export shows the effect before the user applies it.</td><td>The record dialog shows the BIND lines that change.</td></tr>
 <tr><td>Explain the denial</td><td>A disabled action has a "why not" text.</td><td>"Needs <code>prefix:delete</code> on 10.20.0.0/16. Ask hpc-ops admins."</td></tr>
 <tr><td>Same words everywhere</td><td>The UI uses the glossary words. A dotted word opens a hint.</td><td>"claim", not "lease" or "hold".</td></tr>
-<tr><td>CLI parity</td><td>Each dialog shows the equivalent <code>bembel</code> command, ready to copy.</td><td><code>bembel allocate --in 10.20.4.0/22 --host cn-045</code></td></tr>
+<tr><td>CLI parity</td><td>Each dialog shows the equivalent <code>bembel</code> command, ready to copy.</td><td><code>bembel address allocate --prefix 10.20.4.0/22 --name cn-622.kestrel.example.org --mac 3c:ec:ef:7a:10:22 --reservation</code></td></tr>
 </tbody>
 </table>
 
@@ -40,7 +40,7 @@
 <text class="t-small t-on" x="30" y="45">bembel</text>
 <text class="t-small t-on" x="110" y="45">VRF: global ▾</text>
 <text class="t-small t-on" x="230" y="45">/ Jump to IP, prefix, host, MAC, zone …</text>
-<text class="t-small t-on" x="640" y="45">2 to approve</text>
+<text class="t-small t-on" x="640" y="45">1 to approve</text>
 <text class="t-small t-on" x="750" y="45">Assistant</text>
 <text class="t-small t-on" x="840" y="45">● live</text>
 <text class="t-small t-on" x="900" y="45">d.klein</text>
@@ -69,13 +69,13 @@
 <text class="t-small" x="776" y="146">how do I…, keys, hints on/off</text>
 <text class="t-small" x="776" y="180">or assistant: advisory buttons,</text>
 <text class="t-small" x="776" y="198">chat, tool calls, drafts</text>
-<text class="t-small t-muted" x="776" y="232">opens with ? or a, closes with Esc</text>
+<text class="t-small t-muted" x="776" y="232">opens with ? or Shift A, closes with Esc</text>
 <text class="t-small t-muted" x="776" y="250">width 360–480 px, remembered</text>
 </svg>
 <figcaption>The shell. The right panel holds the help pane or the assistant, never both.</figcaption>
 </figure>
 <dl class="facts">
-<dt>Top bar</dt><dd>Brand, VRF switcher (filters all lists, the URL carries <code>?vrf=global</code>), jump box, change request chip with the number of requests that the user can approve, assistant button, live dot (the event stream is connected), user menu, help, theme.</dd>
+<dt>Top bar</dt><dd>Brand, VRF switcher (filters all lists, the URL carries <code>?vrf=global</code>), jump box, change request chip with the number of requests that the user can approve (own requests do not count, because the approver must differ from the requester; the story chip reads "1 to approve"), assistant button, live dot (the event stream is connected), user menu, help, theme.</dd>
 <dt>Jump box</dt><dd>It parses the input first: IP, CIDR, MAC, port GUID, FQDN, VLAN id, ELID. An exact hit opens the object. Otherwise it shows the hybrid search results (<a href="assistant.html#embeddings">assistant.html#embeddings</a>).</dd>
 <dt>Sidebar</dt><dd>Six groups that follow the domains. Each group has the colour of its domain on the active item.</dd>
 <dt>Main area</dt><dd>Breadcrumb (VRF › container › subnet), title, source chip, the actions on the right. Then a summary strip and tabs.</dd>
@@ -86,7 +86,7 @@
 <p>The UI and the design record follow the GSI design system. They share one set of tokens (<code>docs/design/mockups/assets/bembel.css</code> for the UI, <code>docs/assets/site.css</code> for the record), in light and in dark. Two rules apply:</p>
 <ul>
 <li>The brand colours are decoration. The house orange <code>#FABE5D</code> marks the line under the top bar, the brand mark, the active sidebar item, square bullets and the primary button. The primary button has black text on orange (10.4:1). The house orange is never text on a light surface.</li>
-<li>Everything that a user reads uses the AA-safe GSI web palette: text, links, icons, small badges, focus and form states. Each colour has at least 4.5:1 on white.</li>
+<li>Everything that a user reads uses the AA-safe GSI web palette: text, links, icons, small badges, focus and form states. Each text or badge colour has at least 4.5:1 against the background it sits on: white, the surface, or its own -bg tint.</li>
 </ul>
 <table>
 <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Use</th></tr></thead>
@@ -102,19 +102,19 @@
 <tr><td><code>--d-integ</code></td><td><code>#9a6304</code></td><td><code>#FABE5D</code></td><td>Integrations: source, sync, export. GSI orange.</td></tr>
 </tbody>
 </table>
-<p>State colours are separate from domain colours. Each state also has an icon or a word, so colour is never the only signal.</p>
+<p>State colours are separate from domain colours. Each state also has an icon or a word, so colour is never the only signal. A state pill puts the state colour as text on its own light tint (<code>--s-ok-bg</code> and so on); each pair has at least 5.4:1.</p>
 <table>
 <thead><tr><th>State</th><th>Light</th><th>Meaning</th><th>Example</th></tr></thead>
 <tbody>
-<tr><td><code>ok</code></td><td><code>#3f7e28</code></td><td>Healthy, in sync, active.</td><td>Export ns1: applied 18:02.</td></tr>
-<tr><td><code>warn</code></td><td><code>#9a6304</code></td><td>Needs attention soon.</td><td>Subnet 92 % full. Claim expires in 10 minutes.</td></tr>
-<tr><td><code>failed</code></td><td><code>#c92a1b</code></td><td>Broken, blocked, rejected.</td><td>Export dhcp2: <code>dhcpd -t</code> failed.</td></tr>
+<tr><td><code>ok</code></td><td><code>#356b21</code></td><td>Healthy, in sync, active.</td><td>Export frr-core: current.</td></tr>
+<tr><td><code>warn</code></td><td><code>#855503</code></td><td>Needs attention soon.</td><td>Subnet 77 % full. Claim expires in 10 minutes.</td></tr>
+<tr><td><code>failed</code></td><td><code>#b02415</code></td><td>Broken, blocked, rejected.</td><td>Export dhcp2: <code>dhcpd -t</code> failed. Subnet 92 % full.</td></tr>
 <tr><td><code>info</code></td><td><code>#005ea8</code></td><td>A neutral fact with weight.</td><td>Observed address (SLAAC).</td></tr>
-<tr><td><code>pending</code></td><td><code>#0d7c9b</code></td><td>Waits for a person or a job.</td><td>Change request waits for approval.</td></tr>
-<tr><td><code>neutral</code></td><td><code>#6e6e6e</code></td><td>No state.</td><td>Planned prefix.</td></tr>
+<tr><td><code>pending</code></td><td><code>#0a6680</code></td><td>Waits for a person or a job.</td><td>Change request waits for approval.</td></tr>
+<tr><td><code>neutral</code></td><td><code>#5f5f5f</code></td><td>No state.</td><td>Planned prefix.</td></tr>
 </tbody>
 </table>
-<p>The utilisation meter uses <code>ok</code> up to 80 %, <code>warn</code> from 80 % and <code>failed</code> from 95 %. The thresholds are settings per prefix pool.</p>
+<p>The utilisation meter is <code>ok</code> below 70 %, <code>warn</code> from 70 % to 90 % and <code>failed</code> above 90 %. The thresholds are the same on every page and are not settings.</p>
 <dl>
 <dt>Surfaces</dt><dd>White and neutral greys (<code>#f6f6f6</code>, <code>#ededed</code>, <code>#dddddd</code> hairlines). The dark theme uses the navy of the GSI master (<code>#131519</code>, <code>#20242b</code>, <code>#292d35</code>). The footer of the design record is the navy bar.</dd>
 <dt>Type</dt><dd>Helvetica, then Arial. Headings are bold. Addresses, ids and code use a monospaced font (IBM Plex Mono in the UI, JetBrains Mono in the record), because GSI has no monospaced font.</dd>
@@ -127,23 +127,25 @@
 <thead><tr><th>Key</th><th>Action</th><th>Where</th></tr></thead>
 <tbody>
 <tr><td><kbd>/</kbd></td><td>Focus the jump box.</td><td>all pages</td></tr>
-<tr><td><kbd>?</kbd></td><td>Open help for the element under the pointer, else for the page.</td><td>all pages</td></tr>
-<tr><td><kbd>a</kbd></td><td>Open the assistant panel.</td><td>all pages</td></tr>
-<tr><td><kbd>g</kbd> then <kbd>p</kbd>, <kbd>h</kbd>, <kbd>z</kbd>, <kbd>d</kbd>, <kbd>r</kbd>, <kbd>c</kbd></td><td>Go to prefixes, hosts, zones, DHCP, racks, changes.</td><td>all pages</td></tr>
+<tr><td><kbd>?</kbd></td><td>Open the help pane (right panel) for the element under the pointer, else for the page.</td><td>all pages</td></tr>
+<tr><td><kbd>Shift</kbd> <kbd>A</kbd></td><td>Open the assistant panel (only when the assistant is on).</td><td>all pages</td></tr>
+<tr><td><kbd>g</kbd> then <kbd>o</kbd> <kbd>p</kbd> <kbd>h</kbd> <kbd>f</kbd> <kbd>z</kbd> <kbd>d</kbd> <kbd>e</kbd> <kbd>r</kbd> <kbd>b</kbd> <kbd>c</kbd> <kbd>a</kbd> <kbd>i</kbd> <kbd>m</kbd></td><td>Go to Overview, Prefixes, Hosts, Fabrics, Zones, DHCP scopes, Exports, Racks, Roles and bindings, Change requests, Audit log, Sources and syncs, ONA migration.</td><td>all pages</td></tr>
 <tr><td><kbd>v</kbd></td><td>Open the VRF switcher.</td><td>all pages</td></tr>
-<tr><td><kbd>n</kbd></td><td>Allocate the next free address or prefix.</td><td>prefix page</td></tr>
+<tr><td><kbd>a</kbd></td><td>Open the Allocate dialog. <kbd>Ctrl</kbd> <kbd>Enter</kbd> confirms it.</td><td>pages with an Allocate button: Overview, Prefixes, prefix, address</td></tr>
+<tr><td><kbd>n</kbd></td><td>New host.</td><td>Hosts</td></tr>
 <tr><td><kbd>e</kbd></td><td>Edit the selected object.</td><td>object pages</td></tr>
 <tr><td><kbd>j</kbd> / <kbd>k</kbd></td><td>Next and previous row.</td><td>tables</td></tr>
 <tr><td><kbd>x</kbd></td><td>Select the row.</td><td>tables</td></tr>
-<tr><td><kbd>Esc</kbd></td><td>Close the dialog or the right panel.</td><td>all pages</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Close the dialog, the menu or the right panel.</td><td>all pages</td></tr>
 </tbody>
 </table>
+<p>No single key allocates, deletes or approves. A key opens a dialog or a panel, and the user confirms in it.</p>
 
 <h2 id="permissions">Permissions in the UI</h2>
 <p>The UI asks the API what the user can do. The API returns, with each object, the list of allowed verbs for the current user (<code>allowed_actions: ["read","update","allocate"]</code>, <a href="access.html#allowed-actions">access.html#allowed-actions</a>). The UI uses it as follows:</p>
 <ul>
 <li>An allowed action is a normal button.</li>
-<li>An action that needs a change request has the label "Request" and opens the change request form.</li>
+<li>An action that needs a change request keeps its label (for example "Delete…") and shows the note "Needs a change request". It opens the form with a reason field, and the confirm button of the form is "Request approval".</li>
 <li>A denied action is a disabled button with a "why not" text: the missing permission, the scope and the teams that can give it.</li>
 <li>The UI never hides an object that the user can read. It hides actions only on objects that the user cannot change at all, to keep the page calm.</li>
 </ul>
@@ -152,23 +154,23 @@
 <title id="pm-t">Three button states: allowed, needs change request, denied with explanation</title>
 <rect class="box-accent" x="16" y="30" width="200" height="44" rx="8"/><text class="t-title t-on" x="116" y="57" text-anchor="middle">Allocate</text>
 <text class="t-small" x="16" y="100">allowed</text>
-<text class="t-small t-muted" x="16" y="118">binding hpc-ops-addr on 10.20.0.0/16</text>
-<rect class="box-warn" x="280" y="30" width="200" height="44" rx="8"/><text class="t-title" x="380" y="57" text-anchor="middle">Request delete</text>
-<text class="t-small" x="280" y="100">needs a change request</text>
-<text class="t-small t-muted" x="280" y="118">prefix:delete is a guarded verb</text>
+<text class="t-small t-muted" x="16" y="118">binding b-0004 (allocator) on 10.20.0.0/16</text>
+<rect class="box-warn" x="280" y="30" width="200" height="44" rx="8"/><text class="t-title" x="380" y="57" text-anchor="middle">Delete…</text>
+<text class="t-small" x="280" y="100">Needs a change request</text>
+<text class="t-small t-muted" x="280" y="118">deletes a prefix with children</text>
 <rect class="box-muted" x="544" y="30" width="200" height="44" rx="8"/><text class="t-title t-muted" x="644" y="57" text-anchor="middle">Edit zone</text>
 <text class="t-small" x="544" y="100">denied</text>
 <text class="t-small t-muted" x="544" y="118">needs zone:update on example.org</text>
-<text class="t-small t-muted" x="544" y="136">ask: dns-admins (m.huber)</text>
+<text class="t-small t-muted" x="544" y="136">ask: m.huber (dns-editor)</text>
 <rect class="box-soft" x="16" y="160" width="728" height="40" rx="8"/><text class="t-small" x="30" y="185">The API gives allowed_actions per object. The UI never guesses permissions from roles.</text>
 </svg>
 <figcaption>The UI shows what the user can do, what needs a second person and what is denied, with the reason.</figcaption>
 </figure>
 
 <h2 id="pages">Pages</h2>
-<p>The mockups are high-fidelity HTML pages with the story data. Each page is in <a href="mockups/index.html">Mockups</a>.</p>
+<p>The mockups are high-fidelity HTML pages with the story data. Each page is in <a href="mockups/index.html">Mockups</a>. The table groups the pages by the chapter that describes them. The sidebar groups pages differently: Routing and address groups, Fabrics and VLANs are in the sidebar group Addressing.</p>
 <table>
-<thead><tr><th>Group</th><th>Page</th><th>Mockup</th><th>Chapter</th></tr></thead>
+<thead><tr><th>Chapter group</th><th>Page</th><th>Mockup</th><th>Chapter</th></tr></thead>
 <tbody>
 <tr><td>Overview</td><td>Needs you, address space, exports, syncs</td><td><a href="mockups/ui/overview.html">overview</a></td><td>this chapter</td></tr>
 <tr><td rowspan="7">Addressing</td><td>Prefix tree</td><td><a href="mockups/ui/prefixes.html">prefixes</a></td><td rowspan="7"><a href="ui-addr.html">Addressing pages</a></td></tr>
@@ -205,7 +207,7 @@
 </table>
 
 <h2 id="mobile">Mobile</h2>
-<p>The UI is for desks first. On call, a user needs fast lookups on a phone. Below 720 px the shell changes:</p>
+<p>The UI is for desks first. On call, a user needs fast lookups on a phone. Below 760 px the shell changes:</p>
 <ul>
 <li>The sidebar becomes a menu button. The top bar keeps the brand, the jump box and the user menu.</li>
 <li>Tables show the key columns only (IP, name, state). A row opens the object page.</li>

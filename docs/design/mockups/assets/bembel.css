@@ -16,13 +16,14 @@
   --c-border:#dddddd; --c-border-strong:#c6c6c6; --c-border-control:#9b9b9b;
   --c-text:#1a1a1a; --c-text-2:#4d4d4d; --c-text-3:#6e6e6e;
   --c-focus:#005ea8; --c-scrim:rgba(19,21,25,.5);
-  /* states: ok, warn, failed, info, neutral, pending (reserved, planned, claimed) */
-  --s-ok:#3f7e28;      --s-ok-bg:#e7f2e1;
-  --s-warn:#9a6304;    --s-warn-bg:#fdebcb;
-  --s-failed:#c92a1b;  --s-failed-bg:#fbe3e0;
+  /* states: ok, warn, failed, info, neutral, pending (reserved, planned, claimed).
+     Each state text colour has at least 4.5:1 on white and on its own -bg tint (pills are 11.5 px). */
+  --s-ok:#356b21;      --s-ok-bg:#e7f2e1;
+  --s-warn:#855503;    --s-warn-bg:#fdebcb;
+  --s-failed:#b02415;  --s-failed-bg:#fbe3e0;
   --s-info:#005ea8;    --s-info-bg:#dcebf6;
-  --s-neutral:#6e6e6e; --s-neutral-bg:#ededed;
-  --s-pending:#0d7c9b; --s-pending-bg:#ddf0f5;
+  --s-neutral:#5f5f5f; --s-neutral-bg:#ededed;
+  --s-pending:#0a6680; --s-pending-bg:#ddf0f5;
   --shadow-1:0 1px 2px rgba(19,21,25,.06);
   --shadow-2:0 12px 32px rgba(19,21,25,.14);
   /* glossary domains (sidebar icons, nav tint, hover card, domain chips). A domain colour marks a domain, never a state. */
@@ -110,6 +111,8 @@ h1{font-size:22px}h2{font-size:15px}h3{font-size:14px}
 p{margin:0 0 .6em}
 :focus-visible{outline:2px solid var(--c-focus);outline-offset:2px}
 [hidden]{display:none!important}
+/* the help pane (right panel) shows only while body[data-help="open"]; shell.js sets it on ? and the help button */
+body:not([data-help]) .helppane{display:none}
 button{font:inherit;color:inherit}
 img,svg{max-width:100%}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}

@@ -12,7 +12,7 @@
     var cur = root.dataset.theme || "auto";
     var next = { auto: "light", light: "dark", dark: "auto" }[cur];
     if (next === "auto") delete root.dataset.theme; else root.dataset.theme = next;
-    try { doc.cookie = "bembel_theme=" + next + ";path=/;samesite=strict"; } catch (_) {}
+    try { doc.cookie = "bembel_theme=" + next + ";path=/;samesite=lax"; } catch (_) {}
     t.setAttribute("aria-label", "Theme: " + next);
   });
 
@@ -63,19 +63,31 @@
   if (tog) tog.addEventListener("click", function (e) { e.preventDefault(); setNav(body.dataset.nav !== "open"); });
   doc.addEventListener("click", function (e) { if (e.target.closest("[data-nav-close]")) setNav(false); });
 
-  // 5. Keyboard help and toasts.
-  function help() { var h = doc.getElementById("help"); if (h && h.showModal && !h.open) h.showModal(); }
+  // 5. Help and toasts. ? and the help button open the help pane (#helppane, the right panel).
+  //    A page without the pane opens the modal key table (#help) instead.
+  var pane = doc.getElementById("helppane");
+  function setHelp(open) {
+    if (!pane) return;
+    if (open) body.dataset.help = "open"; else delete body.dataset.help;
+  }
+  function help() {
+    if (pane) { setHelp(true); var c = pane.querySelector("[data-help-close]"); if (c) c.focus(); return; }
+    var h = doc.getElementById("help"); if (h && h.showModal && !h.open) h.showModal();
+  }
   doc.addEventListener("click", function (e) {
+    if (e.target.closest("[data-help-close]")) { e.preventDefault(); setHelp(false); return; }
     if (e.target.closest("[data-help]")) { e.preventDefault(); help(); }
     var x = e.target.closest(".toast .x");
     if (x) x.closest(".toast").remove();
   });
 
-  // 6. Keys: g + letter goes to the sidebar link with that data-key; / jump; ? help; a assistant;
-  //    v VRF switcher. Ignored in inputs and with Ctrl, Alt or Meta. No key deletes or applies a change.
+  // 6. Keys (the key map of ui.html#keys): g + letter goes to the sidebar link with that data-key;
+  //    / jump box; ? help pane; Shift A assistant; a opens the Allocate dialog ([data-allocate]);
+  //    v VRF switcher; Esc closes. Ignored in inputs and with Ctrl, Alt or Meta.
+  //    No single key allocates, deletes or approves.
   var pending = null;
   doc.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") { closePops(null); if (body.dataset.nav === "open") setNav(false); }
+    if (e.key === "Escape") { closePops(null); if (body.dataset.nav === "open") setNav(false); if (body.dataset.help === "open" && body.dataset.page !== "help-pane") setHelp(false); }
     if (e.ctrlKey || e.altKey || e.metaKey) return;
     var tag = (e.target.tagName || "").toLowerCase();
     if (tag === "input" || tag === "textarea" || tag === "select" || e.target.isContentEditable) {
@@ -91,11 +103,12 @@
     if (e.key === "g") { pending = setTimeout(function () { pending = null; }, 1200); return; }
     if (e.key === "/") { var j = doc.querySelector(".jump input"); if (j) { e.preventDefault(); j.focus(); } return; }
     if (e.key === "?") { e.preventDefault(); help(); return; }
-    if (e.key === "a") { var as = doc.querySelector("[data-assistant]"); if (as) { e.preventDefault(); as.click(); } return; }
+    if (e.key === "A" && e.shiftKey) { var as = doc.querySelector(".asst-btn[data-assistant]") || doc.querySelector("[data-assistant]"); if (as) { e.preventDefault(); as.click(); } return; }
+    if (e.key === "a") { var al = doc.querySelector("[data-allocate]"); if (al) { e.preventDefault(); al.click(); } return; }
     if (e.key === "v") { var vs = doc.querySelector("details.set-menu, details.vrf"); if (vs) { e.preventDefault(); vs.open = true; } return; }
   });
 
-  // 7. Live updates. The product holds one EventSource on /v1/events (server-sent events).
+  // 7. Live updates. The product holds one EventSource on /v1/events/stream (server-sent events).
   //    After 30 s without a message (2 missed heartbeats) or an error, the page is marked offline
   //    and the live dot in the top bar turns grey. Mockups have no server, so this part is idle.
   var es = body.dataset.events && window.EventSource ? new EventSource(body.dataset.events, { withCredentials: true }) : null;
