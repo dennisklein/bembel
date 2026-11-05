@@ -152,7 +152,7 @@
 <thead><tr><th>Object</th><th>Fields</th><th>Rule</th></tr></thead>
 <tbody>
 <tr><td>VLAN domain</td><td>name, site, VID range</td><td>A VID is unique in the domain.</td></tr>
-<tr><td>VLAN</td><td>VID, name, domain, status, MTU</td><td>One VLAN can carry one IPv4 and one IPv6 subnet of a dual stack pair, and more subnets in a shared network.</td></tr>
+<tr><td>VLAN</td><td>VID, name, domain, status, MTU, VNI</td><td>One VLAN can carry one IPv4 and one IPv6 subnet of a dual stack pair, and more subnets in a shared network. The VNI is optional and comes from a VNI range (<a href="routing.html#vni">routing.html#vni</a>).</td></tr>
 <tr><td>Subnet</td><td>fabric, VLAN, gateway</td><td>The subnet VLAN must be in the domain of its fabric.</td></tr>
 <tr><td>Interface</td><td>name, MAC, port link</td><td>The MAC is unique in the VRF. A duplicate MAC is an import finding.</td></tr>
 </tbody>
@@ -276,7 +276,7 @@ done</code></pre>
 <table class="compact">
 <thead><tr><th>Item</th><th>In bembel</th><th>Source</th></tr></thead>
 <tbody>
-<tr><td>Partition</td><td>Object with name, P_Key, ipoib flag, MTU, rate, members</td><td>User, or export from the SM later</td></tr>
+<tr><td>Partition</td><td>Object with name, P_Key, ipoib flag, MTU, rate, members</td><td>User, or an export from the SM</td></tr>
 <tr><td>Port GUID</td><td>Field of the IB interface. 8 bytes.</td><td>User, import, or the host agent</td></tr>
 <tr><td>Node GUID</td><td>Field of the IB interface (the HCA). 8 bytes.</td><td>Same</td></tr>
 <tr><td>IPoIB hardware address</td><td>20 bytes. Read only. Built from the GID.</td><td>Observed by the host agent</td></tr>
@@ -428,15 +428,15 @@ kestrel-lustre=0x0002, rate=16, mtu=5, defmember=limited :
   "qos": { "roce_dscp": 26, "roce_priority": 3, "pfc_priorities": [3],
            "ecn": true, "cnp_dscp": 48, "cnp_priority": 6, "min_path_mtu": 4200 },
   "vlans": [
-    { "vid": 3101, "name": "osprey-roce-r1", "subnet": "10.110.1.0/24", "gateway": "10.110.1.254" },
-    { "vid": 3108, "name": "osprey-roce-r8", "subnet": "10.110.8.0/24", "gateway": "10.110.8.254" }
+    { "vid": 3101, "name": "osprey-roce-r1", "subnet": "10.110.1.0/24", "gateway": "10.110.1.254", "vni": null },
+    { "vid": 3108, "name": "osprey-roce-r8", "subnet": "10.110.8.0/24", "gateway": "10.110.8.254", "vni": null }
   ],
   "ports": [
     { "switch": "osp-leaf-1", "port": "Eth1/1", "vid": 3101,
       "host": "gpu-001", "interface": "roce1", "mac": "b8:3f:d2:9a:01:01" }
   ]
 }</code></pre>
-<p>The list <code>ports</code> is the join of the interface, its port link and the asset mirror. The data for a switch, then, is: which port is on which VLAN, with which MTU and which QoS values. A generic template for a leaf switch:</p>
+<p>A VLAN of an EVPN overlay has its VNI in <code>vni</code>. The rails of <code>osprey-roce</code> are routed at the leaf and have no VNI. The list <code>ports</code> is the join of the interface, its port link and the asset mirror. The data for a switch, then, is: which port is on which VLAN, with which MTU and which QoS values. A generic template for a leaf switch:</p>
 <pre><code class="language-plaintext">{% for v in intent.vlans %}
 vlan {{ v.vid }}
   name {{ v.name }}

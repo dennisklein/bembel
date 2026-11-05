@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <title>OpenStack</title>
-<meta name="description" content="How bembel works with OpenStack: a read-only sync of Neutron and Ironic in phase 1, the networking-bembel IPAM driver in phase 2, Keystone federation, Designate and the risks.">
+<meta name="description" content="How bembel works with OpenStack: a read-only sync of Neutron and Ironic, the networking-bembel IPAM driver, Keystone federation, Designate and the risks.">
 </head>
 <body>
 <h1>OpenStack</h1>
-<p class="lede">This chapter specifies how bembel works with an OpenStack cloud. Phase 1 reads the cloud and shows what it uses. Phase 2 replaces the address allocation of Neutron with a driver that calls the bembel API. The example cloud is <code>os-prod</code>.</p>
+<p class="lede">This chapter specifies how bembel works with an OpenStack cloud. The sync reads the cloud and shows what it uses. The IPAM driver replaces the address allocation of Neutron with calls to the bembel API. The example cloud is <code>os-prod</code>.</p>
 <ul class="keypoints">
-  <li>Phase 1 is read-only. A sync worker polls Neutron and Ironic with a Keystone application credential. Objects get <code>source=openstack:os-prod</code> and a managed-by mark, so a user cannot edit them.</li>
+  <li>The sync is read-only. A sync worker polls Neutron and Ironic with a Keystone application credential. Objects get <code>source=openstack:os-prod</code> and a managed-by mark, so a user cannot edit them.</li>
   <li>The sync finds conflicts: an OpenStack subnet that overlaps a prefix that bembel manages becomes a finding.</li>
-  <li>Phase 2 is the Python package <code>networking-bembel</code>. It registers the entry point <code>neutron.ipam_drivers</code> and calls only the public REST API.</li>
+  <li>The IPAM driver is the Python package <code>networking-bembel</code>. It registers the entry point <code>neutron.ipam_drivers</code> and calls only the public REST API.</li>
   <li>The driver makes a claim with a time to live (TTL). The sync confirms the claim when it sees the port. A reaper releases an expired claim only after a later successful poll has not found the port.</li>
   <li>Keystone and bembel trust the same Keycloak. A Keystone project maps to a bembel team. The driver has its own service identity.</li>
   <li>Each DNS zone has one writer. bembel owns the campus zones through the BIND export. Designate owns only the tenant zones.</li>
@@ -19,12 +19,12 @@
 </ul>
 
 <h2 id="summary">Summary</h2>
-<p>OpenStack has its own address management. Neutron stores networks, subnets, ports and floating IPs in its own database. A campus IPAM that does not know this data cannot find an overlap, a double use or a stale address. bembel joins the two worlds in two steps.</p>
+<p>OpenStack has its own address management. Neutron stores networks, subnets, ports and floating IPs in its own database. A campus IPAM that does not know this data cannot find an overlap, a double use or a stale address. bembel joins the two worlds in two modes.</p>
 <ol class="steps">
-  <li>Phase 1 reads. bembel shows every OpenStack subnet, port and floating IP next to the campus data, and reports conflicts. Nothing in OpenStack changes.</li>
-  <li>Phase 2 writes. Neutron asks bembel for each address and each subnet. bembel becomes the one place that decides which address is free.</li>
+  <li>The sync reads. bembel shows every OpenStack subnet, port and floating IP next to the campus data, and reports conflicts. Nothing in OpenStack changes.</li>
+  <li>The driver writes. Neutron asks bembel for each address and each subnet. bembel becomes the one place that decides which address is free.</li>
 </ol>
-<p>Phase 2 is optional. A site can stay in phase 1 for ever. The two phases use the same data model: a VM is a host with <code>host_kind=vm</code>, <code>platform=openstack</code> and a <code>runs_on</code> link to its hypervisor. Debian hypervisors with libvirt use the same model (<a href="vms.html#model">Virtual machines</a>).</p>
+<p>The driver is optional. A site can use the sync alone. Both modes use the same data model: a VM is a host with <code>host_kind=vm</code>, <code>platform=openstack</code> and a <code>runs_on</code> link to its hypervisor. Debian hypervisors with libvirt use the same model (<a href="vms.html#model">Virtual machines</a>).</p>
 <figure class="diagram wide">
 <svg viewBox="0 0 1000 420" role="img" aria-labelledby="os-arch-t">
 <title id="os-arch-t">Architecture: the os-prod cloud on the left, bembel on the right, Keycloak above</title>
@@ -42,7 +42,7 @@
 <text class="t-title" x="48" y="188">Neutron</text>
 <rect class="box-accent" x="52" y="204" width="340" height="56" rx="8"/>
 <text class="t-title t-on" x="68" y="228">networking-bembel</text>
-<text class="t-small t-on" x="68" y="248">IPAM driver, phase 2</text>
+<text class="t-small t-on" x="68" y="248">IPAM driver (optional)</text>
 <rect class="box" x="32" y="316" width="170" height="44" rx="8"/>
 <text class="t-title" x="117" y="344" text-anchor="middle">Ironic</text>
 <rect class="box-muted" x="242" y="316" width="170" height="44" rx="8"/>
@@ -83,7 +83,7 @@
 <figcaption>The cloud os-prod and bembel. The driver (orange) is on the API path of Neutron. The sync worker only reads. The campus DNS zones go to ns1 through the BIND export. Designate serves only the tenant zones.</figcaption>
 </figure>
 
-<h2 id="sync">Phase 1: read-only sync</h2>
+<h2 id="sync">Read-only sync</h2>
 <p>The sync worker is a job of the bembel binary. A source <code>os-prod</code> in the bembel config starts it. The worker needs no change in OpenStack, except one Keystone application credential. It polls the REST APIs and writes <em>observed</em> objects. An observed object has <code>source=openstack:os-prod</code>, an <code>external_ref</code> and <code>managed_by=openstack-sync</code>. A user cannot edit it in bembel; the cloud is the owner. The worker runs inside bembel as the built-in subject <code>system:sync-os-prod</code> (<a href="#keystone-svc">Service identities</a>).</p>
 
 <h3 id="sync-config">Source configuration</h3>
@@ -138,7 +138,7 @@ sources:
 </ol>
 <aside class="callout why">
 <p class="callout-title">Why poll first</p>
-<p>Neutron sends notifications through RabbitMQ (<code>port.create.end</code>, <code>floatingip.update.end</code>). A consumer needs access to the broker, and a notification is lost when no queue exists. Polling needs only the REST API. It lags by minutes, which is enough for a view. Phase 3 adds a notification consumer to reduce the lag. The full list stays the source of truth.</p>
+<p>Neutron sends notifications through RabbitMQ (<code>port.create.end</code>, <code>floatingip.update.end</code>). A consumer needs access to the broker, and a notification is lost when no queue exists. Polling needs only the REST API. It lags by minutes, which is enough for a view. An optional notification consumer reduces the lag. The full list stays the source of truth.</p>
 </aside>
 <p>Tenant networks can overlap. Two projects can both use <code>192.168.1.0/24</code>. The database does not allow two equal prefixes in one VRF. A subnet with an address scope goes to the VRF of that scope. A subnet from a subnet pool without an address scope goes to one VRF per pool (<code>os-pool-&lt;first 8 hex of the pool id&gt;</code>). Any other tenant subnet goes to one VRF per network, for example <code>os-net-7d41c2e9</code> for a network of the project physics-lab. This is the VRF rule list in the config above; the first match wins. The worker or the driver creates a missing VRF with <code>POST /v1/vrfs</code> and the header <code>If-None-Match: *</code>; 412 means that it exists already. Every VRF and prefix that the driver or the sync creates carries the tag <code>os_cloud=os-prod</code>. A subnet that still overlaps inside one VRF is stored as a finding with the raw data. The finding list shows both owners.</p>
 <table class="compact">
@@ -152,7 +152,7 @@ sources:
 </tbody>
 </table>
 
-<h2 id="driver">Phase 2: the Neutron IPAM driver</h2>
+<h2 id="driver">The Neutron IPAM driver</h2>
 <p>Neutron has a pluggable IPAM interface (<code>neutron/ipam/driver.py</code>). The option <code>ipam_driver</code> names a Python entry point in the group <code>neutron.ipam_drivers</code>. The default is <code>internal</code>. bembel ships the package <code>networking-bembel</code> with the entry point <code>bembel</code>. The package has no logic about addresses. It translates each call to the bembel REST API.</p>
 <pre><code class="language-ini"># setup.cfg of networking-bembel
 [entry_points]
@@ -370,8 +370,8 @@ n           index of the allocate call inside this request (0, 1, ...)</code></p
 <tr><td>Subnet without a pool</td><td>Prefix in the VRF per network (see <a href="#sync-loop">above</a>)</td><td><code>os-net-7d41c2e9: 192.168.1.0/24</code> (project physics-lab)</td></tr>
 </tbody>
 </table>
-<p>Neutron keeps its own copy of the pool prefixes in its database. The driver cannot hide it. The rule is: bembel owns the prefix tree and Neutron mirrors it. An operator changes the pool in bembel; the sync then updates the Neutron subnet pool through a small admin command (<code>bembel sync openstack push-pools os-prod</code>, a phase 2 task). A change of the pool in Neutron by hand is a finding.</p>
-<p>Neutron allows only one IPAM driver for the whole cloud. It is not a setting per subnet pool. To start without risk, the site first runs the driver on a test cloud <code>os-test</code>. A cut-over on <code>os-prod</code> needs the existing allocations in bembel. Phase 1 already has them as observed objects. The switch is one step for the whole cloud:</p>
+<p>Neutron keeps its own copy of the pool prefixes in its database. The driver cannot hide it. The rule is: bembel owns the prefix tree and Neutron mirrors it. An operator changes the pool in bembel; the sync then updates the Neutron subnet pool through a small admin command (<code>bembel sync openstack push-pools os-prod</code>, with the driver). A change of the pool in Neutron by hand is a finding.</p>
+<p>Neutron allows only one IPAM driver for the whole cloud. It is not a setting per subnet pool. To start without risk, the site first runs the driver on a test cloud <code>os-test</code>. A cut-over on <code>os-prod</code> needs the existing allocations in bembel. The sync already has them as observed objects. The switch is one step for the whole cloud:</p>
 <ol class="steps">
   <li>Adopt every os-prod subnet and fixed IP first, and check each one against Neutron while the internal driver runs.</li>
   <li>In one maintenance window, with a freeze on port and subnet changes, set <code>managed_by=openstack-driver</code> on all of them in one bembel transaction.</li>
@@ -423,7 +423,7 @@ n           index of the allocate call inside this request (0, 1, ...)</code></p
 <table>
 <thead><tr><th>Option</th><th>Idea</th><th>Verdict</th></tr></thead>
 <tbody>
-<tr><td>A. bembel reads</td><td>Designate owns its zones. bembel reads record sets (<code>/v2/zones/{id}/recordsets</code>) and shows them next to the addresses.</td><td>Phase 3. Good for visibility and for findings.</td></tr>
+<tr><td>A. bembel reads</td><td>Designate owns its zones. bembel reads record sets (<code>/v2/zones/{id}/recordsets</code>) and shows them next to the addresses.</td><td>Optional, next to C. Good for visibility and for findings.</td></tr>
 <tr><td>B. bembel writes to Designate</td><td>bembel pushes records through the Designate API. Designate serves them.</td><td>No. Two systems keep the zone.</td></tr>
 <tr><td>C. Split by zone</td><td>bembel owns the campus zones. Designate owns only the tenant zones, in a sub-domain that bembel delegates.</td><td><strong>Recommended.</strong></td></tr>
 </tbody>
@@ -459,21 +459,21 @@ allow_reverse_dns_lookup = False</code></pre>
 <ol class="steps">
   <li><strong>Learn MACs.</strong> The worker polls <code>GET /v1/ports?detail=true</code>. For each port it finds the host by MAC. If the host exists (for example <code>cn-004.kestrel.example.org</code> with <code>eno1</code> <code>3c:ec:ef:12:0a:44</code>), the Ironic node becomes an attribute of the host. If not, the worker makes an observed host and an asset link candidate.</li>
   <li><strong>Provisioning networks.</strong> The provisioning, cleaning and rescue networks of Ironic are Neutron networks. Their addresses come through the Neutron driver. No extra hook is needed.</li>
-  <li><strong>Pre-reserved addresses.</strong> bembel can set <code>fixed_ips</code> on the Neutron port for a given MAC. The result: a node always gets the same address in the provisioning network. This is a phase 3 option.</li>
+  <li><strong>Pre-reserved addresses.</strong> bembel can set <code>fixed_ips</code> on the Neutron port for a given MAC. The result: a node always gets the same address in the provisioning network. This is optional.</li>
 </ol>
 <p>The node field <code>driver_info.redfish_address</code> (or <code>ipmi_address</code>) names the BMC. The worker looks it up in the VRF <code>oob</code>. If the address is <code>172.16.4.44</code> and the host <code>cn-004</code> has the interface <code>bmc</code> with that address, the worker links node and host. If the address is not in a managed subnet, it writes a finding.</p>
 <p>An Ironic port with <code>local_link_connection</code> data (switch id and port id from LLDP) feeds the asset link between the interface and the switch port from FNT Command. The match order stays: serial, asset tag, MAC, host name. A conflict goes to the review list.</p>
 <p>Standalone Ironic (no Neutron, external DHCP) is a special case. There bembel is the DHCP source: the dhcpd export has a reservation for each Ironic MAC that has an address (<a href="dhcp.html#export">ISC dhcpd export</a>).</p>
 
-<h2 id="phases">Phases</h2>
+<h2 id="parts">Parts and dependencies</h2>
 <table>
-<thead><tr><th>Phase</th><th>Content</th><th>Needs in bembel</th><th>Risk</th></tr></thead>
+<thead><tr><th>Part</th><th>Content</th><th>Needs in bembel</th><th>Risk</th></tr></thead>
 <tbody>
-<tr><td>0 Model</td><td>External refs, observed objects, <code>managed_by</code>, VM host kind, claims with TTL, idempotency keys, multi-issuer OIDC</td><td>Core API (<a href="api.html">REST API</a>)</td><td>Low</td></tr>
-<tr><td>1 Sync</td><td>Poll Neutron, Ironic and Keystone. Observed subnets, ports, floating IPs, VM hosts. Findings for overlaps</td><td>Phase 0, the source worker</td><td>Low. Read-only.</td></tr>
-<tr><td>2a Driver on a test cloud</td><td><code>networking-bembel</code> on <code>os-test</code>. Test with Tempest and a load test</td><td>Phase 1 stable, reaper</td><td>Medium. Fail closed.</td></tr>
-<tr><td>2b Driver on <code>os-prod</code></td><td>One cut-over per cloud in a maintenance window (<a href="#driver-pools">above</a>). Subnet pools mirror bembel pools. <code>[designate] allow_reverse_dns_lookup = False</code> in neutron.conf</td><td>Phase 2a, HA bembel</td><td>High. On the API path.</td></tr>
-<tr><td>3 Extras</td><td>Notification consumer, Designate read, Ironic reservations, Keystone dynamic mapping</td><td>Phase 2</td><td>Low</td></tr>
+<tr><td>Model</td><td>External refs, observed objects, <code>managed_by</code>, VM host kind, claims with TTL, idempotency keys, multi-issuer OIDC</td><td>Core API (<a href="api.html">REST API</a>)</td><td>Low</td></tr>
+<tr><td>Sync</td><td>Poll Neutron, Ironic and Keystone. Observed subnets, ports, floating IPs, VM hosts. Findings for overlaps</td><td>The model, the source worker</td><td>Low. Read-only.</td></tr>
+<tr><td>Driver on a test cloud</td><td><code>networking-bembel</code> on <code>os-test</code>. Test with Tempest and a load test</td><td>A stable sync, the reaper</td><td>Medium. Fail closed.</td></tr>
+<tr><td>Driver on <code>os-prod</code></td><td>One cut-over per cloud in a maintenance window (<a href="#driver-pools">above</a>). Subnet pools mirror bembel pools. <code>[designate] allow_reverse_dns_lookup = False</code> in neutron.conf</td><td>The driver passes on the test cloud, HA bembel</td><td>High. On the API path.</td></tr>
+<tr><td>Optional parts</td><td>Notification consumer, Designate read, Ironic reservations, Keystone dynamic mapping</td><td>The sync; the driver for Ironic reservations</td><td>Low</td></tr>
 </tbody>
 </table>
 <p>The package <code>networking-bembel</code> needs CI against Neutron master and against the two last stable releases. The pool-level interface has few tests upstream and some TODO notes in its docstrings.</p>

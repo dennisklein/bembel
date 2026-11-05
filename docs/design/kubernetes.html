@@ -390,7 +390,7 @@ spec:
 </tbody>
 </table>
 <p>Pod and service ranges that are not routed outside the cluster live in one VRF for each cluster, for example <code>k8s-kestrel</code>. This lets two clusters use the same CIDR without a finding. A routed pod range (BGP mode) lives in the VRF <code>global</code> or <code>hpc-fabric</code>. It carries the tag <code>announce=campus-bgp</code>.</p>
-<p>Per-pod addresses are not in bembel. A later option is a read-only reflection, asynchronous and never authoritative. The ranges for a cluster that uses InfiniBand follow the fabric rules (<a href="model.html#fabrics">Core model</a>): a pod range on <code>kestrel-ib</code> is a subnet with the fabric <code>infiniband</code>.</p>
+<p>Per-pod addresses are not in bembel. An option is a read-only reflection, asynchronous and never authoritative. The ranges for a cluster that uses InfiniBand follow the fabric rules (<a href="model.html#fabrics">Core model</a>): a pod range on <code>kestrel-ib</code> is a subnet with the fabric <code>infiniband</code>.</p>
 
 <h2 id="identity">Identity</h2>
 <p>A workload proves who it is with a <em>projected service account token</em>. The pod spec asks for a token with the audience <code>bembel</code> and a short life. The kubelet rotates it. The token is a JWT, signed by the API server of the cluster.</p>
@@ -448,7 +448,7 @@ containers:
 <p>The custom role <code>k8s-integration</code> is <code>allocator</code> plus <code>range:delete</code> (<a href="access.html#roles">Access control</a>). The manager can allocate addresses and lb-pool ranges only in the subnets of kestrel-k8s (<code>10.20.64.0/22</code>, <code>2001:db8:4200:264::/64</code>) and prefixes in the VRF <code>k8s-kestrel</code>, write records only in <code>k8s.example.org</code> and read the rest. The cluster prod-1 is a separate subject: its own CAPI provider is <code>k8s:prod-1:capi-system:capi-ipam</code>, with an allocator binding on <code>10.30.12.0/24</code> (<a href="access.html#examples">Access control</a>). A pattern such as <code>k8s:kestrel-mgmt:capi-system:*</code> is a group of subjects, if a site wants one binding for many service accounts. The audit event stores the cluster id, the namespace, the service account and, for a CAPI call, the <code>external_ref</code> of the claim.</p>
 <aside class="callout why">
 <p class="callout-title">Why direct trust, not token exchange</p>
-<p>Direct trust needs no client secret and no extra hop. The check works offline with a cached key set. It is also needed for CI systems such as GitHub Actions. RFC 8693 token exchange through Keycloak is possible later (<a href="#phases">phase 3</a>), when a site wants one central policy and one place to revoke.</p>
+<p>Direct trust needs no client secret and no extra hop. The check works offline with a cached key set. It is also needed for CI systems such as GitHub Actions. RFC 8693 token exchange through Keycloak is an optional part (<a href="#parts">parts</a>), when a site wants one central policy and one place to revoke.</p>
 </aside>
 
 <h2 id="terraform">Terraform and OpenTofu</h2>
@@ -499,16 +499,16 @@ output "build07_ip" {
 <tr><td><code>data.bembel_prefix</code>, <code>data.bembel_address</code></td><td>Search by name, CIDR or external ref</td><td>Read-only.</td></tr>
 </tbody>
 </table>
-<p>Crossplane can use the provider without more work from bembel, through Upjet generation, or it can use <code>provider-http</code> against the REST API. A native Crossplane provider is a later, optional step. The Terraform provider is its base.</p>
+<p>Crossplane can use the provider without more work from bembel, through Upjet generation, or it can use <code>provider-http</code> against the REST API. A native Crossplane provider is optional. The Terraform provider is its base.</p>
 
-<h2 id="phases">Phases</h2>
+<h2 id="parts">Parts and dependencies</h2>
 <table>
-<thead><tr><th>Phase</th><th>Content</th><th>Needs in bembel</th></tr></thead>
+<thead><tr><th>Part</th><th>Content</th><th>Needs in bembel</th></tr></thead>
 <tbody>
-<tr><td>0 Core API</td><td>Idempotent allocate by key; adoption and filter by external ref; release by reference; atomic next-free; multi-issuer OIDC with a subject mapping</td><td>The only requirement on the core</td></tr>
-<tr><td>1 Provider</td><td>CAPI IPAM provider with <code>BembelPrefixPool</code>; Terraform and OpenTofu provider</td><td>Phase 0</td></tr>
-<tr><td>2 Pools and names</td><td><code>pool-sync</code> for MetalLB, Cilium and CNI ranges; external-dns webhook (needs bembel zones in use)</td><td>Phase 1; DNS export live</td></tr>
-<tr><td>3 Extras</td><td>Generic <code>BembelAllocationClaim</code> CRD for GitOps; Crossplane through Upjet; token exchange through Keycloak</td><td>Only when a need appears</td></tr>
+<tr><td>Core API</td><td>Idempotent allocate by key; adoption and filter by external ref; release by reference; atomic next-free; multi-issuer OIDC with a subject mapping</td><td>The only requirement on the core</td></tr>
+<tr><td>Providers</td><td>CAPI IPAM provider with <code>BembelPrefixPool</code>; Terraform and OpenTofu provider</td><td>The core API</td></tr>
+<tr><td>Pools and names</td><td><code>pool-sync</code> for MetalLB, Cilium and CNI ranges; external-dns webhook (needs bembel zones in use)</td><td>The providers; the DNS export in use</td></tr>
+<tr><td>Optional parts</td><td>Generic <code>BembelAllocationClaim</code> CRD for GitOps; Crossplane through Upjet; token exchange through Keycloak</td><td>Only when a need appears</td></tr>
 </tbody>
 </table>
 <p>The manager is a separate repository and chart, because its release cadence follows Cluster API and not the bembel server. It works with the bembel server of the same major API version.</p>
@@ -526,7 +526,7 @@ output "build07_ip" {
 <tr><td>7</td><td>Someone edits a native pool by hand.</td><td>The controller owns the object, overwrites it and counts the drift.</td></tr>
 <tr><td>8</td><td>external-dns semantics: the TXT registry, the pairing of <code>UpdateOld</code> and <code>UpdateNew</code>, the 32 MiB limit.</td><td>One batch call per <code>ApplyChanges</code>. The sidecar keeps a test suite with the conformance cases of external-dns.</td></tr>
 <tr><td>9</td><td>Several clusters write into one zone.</td><td>Separate <code>managed_by</code> values and owner ids. Prefer one sub-zone for each cluster.</td></tr>
-<tr><td>10</td><td>Facts not verified from code: the details of CAPM3 and CAPO as consumers, the Keycloak version of token exchange, the config of kube-vip.</td><td>Check before phase 1 starts.</td></tr>
+<tr><td>10</td><td>Facts not verified from code: the details of CAPM3 and CAPO as consumers, the Keycloak version of token exchange, the config of kube-vip.</td><td>Check before the providers are built.</td></tr>
 </tbody>
 </table>
 </body>

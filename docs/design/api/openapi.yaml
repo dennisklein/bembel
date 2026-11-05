@@ -19,8 +19,11 @@ info:
     - A claim is an address in status `claimed` with `expires_at`. There is no claim resource.
 
     Not yet in the sketch: /vlans, /vlan-domains, /fabrics, /ib-partitions, /views,
-    /asns, /static-routes, /address-groups, /assets/*, /teams, /tags, /attributes,
-    /sources, /operations, /drafts, /assistant/*, /imports, and the CRUD of
+    /asns, /vni-ranges, /static-routes, /address-groups, /assets/*, /teams, /tags,
+    /attributes, /sources, /operations, /drafts, /assistant/*, /imports,
+    /interfaces/{id}:move, /prefixes/{id}:renumber, :resize and :split,
+    /vpn-profiles, /vpn-sessions, /notes, /link-templates, /saved-filters,
+    /reports, /inventory/ansible, /sd/prometheus, and the CRUD of
     /dns-servers, /dhcp-servers and /dhcp-failover-pairs (only their agent paths
     are in it). They follow the same conventions.
 
@@ -876,7 +879,7 @@ paths:
       summary: List ranges
       parameters:
         - { name: prefix_id, in: query, schema: { type: string, format: uuid } }
-        - { name: purpose, in: query, schema: { type: string, enum: [dhcp-pool, reserved, static, infrastructure, lb-pool] } }
+        - { name: purpose, in: query, schema: { type: string, enum: [dhcp-pool, reserved, static, infrastructure, lb-pool, vpn-pool] } }
         - $ref: "#/components/parameters/PageSize"
         - $ref: "#/components/parameters/PageToken"
       responses:
@@ -1063,6 +1066,36 @@ paths:
         "200": { description: "Deprecated until `deprecated_until`.", content: { application/json: { schema: { $ref: "#/components/schemas/Address" } } } }
         "204": { description: "The row is deleted: a claim, or `grace` PT0S. Event `address.released`." }
         "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "412": { $ref: "#/components/responses/Problem" }
+  /v1/addresses/{id}:move:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    post:
+      tags: [addressing]
+      operationId: moveAddress
+      summary: Move an address to another subnet or another address
+      description: |
+        The names, the interface and the reservation stay. The derived records
+        follow. Needs `address:release` on the old subnet and
+        `address:allocate` on the new one. With `validate_only` the answer is a
+        plan and nothing changes.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prefix_id: { type: string, format: uuid, description: The target subnet. Omit it for a move in the same subnet. }
+                address: { type: string, format: ip, description: Take exactly this address. Omit it for the next free. }
+                validate_only: { type: boolean, default: false }
+                plan_hash: { type: string, description: The hash of a plan from a call with validate_only. 409 plan.stale if the data changed. }
+      responses:
+        "200": { description: "The moved address, or the plan with validate_only.", content: { application/json: { schema: { oneOf: [{ $ref: "#/components/schemas/Address" }, { $ref: "#/components/schemas/Plan" }] } } } }
         "409": { $ref: "#/components/responses/Problem" }
         "412": { $ref: "#/components/responses/Problem" }
   /v1/hosts:
@@ -1357,6 +1390,30 @@ paths:
               type: array
               maxItems: 5000
               items: { $ref: "#/components/schemas/LeaseObservation" }
+      responses:
+        "204": { description: Stored. }
+        "422": { $ref: "#/components/responses/Problem" }
+  /v1/observations:batch:
+    post:
+      tags: [addressing]
+      operationId: batchCreateObservations
+      summary: Report addresses that a source saw in use
+      description: |
+        One call for all sources: agent sweeps, nmap imports, VPN nodes and
+        syncs. A known address gets last-seen data. An unknown IPv6 address in
+        a subnet becomes an observed address. An unknown IPv4 address outside a
+        vpn-pool range gives the finding `address.unknown-seen`. Needs
+        `observation:create` on the subnet of each address.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source, items]
+              properties:
+                source: { type: string, examples: ["sweep:agent-ns1", "eduvpn:vpn-01", nmap] }
+                items: { type: array, maxItems: 5000, items: { $ref: "#/components/schemas/Observation" } }
       responses:
         "204": { description: Stored. }
         "422": { $ref: "#/components/responses/Problem" }
@@ -1755,7 +1812,7 @@ components:
               type: object
               readOnly: true
               properties:
-                used: { type: string, description: "Decimal string. Address rows plus addresses in dhcp-pool, reserved, infrastructure and lb-pool ranges, each counted once." }
+                used: { type: string, description: "Decimal string. Address rows plus addresses in dhcp-pool, reserved, infrastructure, lb-pool and vpn-pool ranges, each counted once." }
                 size: { type: string, description: Decimal string of the usable addresses. }
                 percent: { type: [number, "null"], description: "used/usable × 100; null for IPv6 subnets larger than a /112" }
     PrefixInput:
@@ -1790,10 +1847,11 @@ components:
             name: { type: string, examples: [kestrel-lb-v4, os-pool-1] }
             purpose:
               type: string
-              enum: [dhcp-pool, reserved, static, infrastructure, lb-pool]
+              enum: [dhcp-pool, reserved, static, infrastructure, lb-pool, vpn-pool]
               description: |
                 Allocation without `range` skips dhcp-pool, reserved,
-                infrastructure and lb-pool, and may use static.
+                infrastructure, lb-pool and vpn-pool, and may use static.
+                Allocation never takes an address from a vpn-pool range.
             first_addr: { type: string, format: ip, examples: [10.20.66.0] }
             last_addr: { type: string, format: ip, examples: [10.20.66.63] }
             size: { type: string, readOnly: true, description: Decimal string., examples: ["64"] }
@@ -1802,7 +1860,7 @@ components:
       required: [size, purpose, name]
       properties:
         size: { type: integer, minimum: 1, maximum: 65536, description: "A power of two.", examples: [64, 65536] }
-        purpose: { type: string, enum: [dhcp-pool, reserved, static, infrastructure, lb-pool], examples: [lb-pool] }
+        purpose: { type: string, enum: [dhcp-pool, reserved, static, infrastructure, lb-pool, vpn-pool], examples: [lb-pool] }
         name: { type: string, examples: [kestrel-lb-v4] }
         hint: { type: string, format: ip, description: Take exactly this aligned block if it is free., examples: [10.20.66.0] }
         external_ref: { type: string, examples: ["k8s:kestrel-mgmt:lbpool/metallb-system/kestrel-lb/v4"] }
@@ -1816,6 +1874,7 @@ components:
             domain: { type: string, examples: [campus-hall2] }
             vid: { type: integer, minimum: 1, maximum: 4094, examples: [204] }
             name: { type: string, examples: [kestrel-compute] }
+            vni: { type: [integer, "null"], minimum: 1, maximum: 16777215, description: "L2 VNI from a VNI range. Unique in the instance.", examples: [10204] }
     VlanDomain:
       allOf:
         - $ref: "#/components/schemas/Meta"
@@ -1869,6 +1928,9 @@ components:
             observed: { type: boolean, readOnly: true }
             last_seen_at: { type: [string, "null"], format: date-time, readOnly: true }
             last_seen_source: { type: [string, "null"], readOnly: true, description: "Agent, sync or lease source." }
+            last_seen_mac: { type: [string, "null"], readOnly: true }
+            nat_outside_id: { type: [string, "null"], format: uuid, description: "The outside address of a NAT. Set on the inside address." }
+            dns_disabled: { type: boolean, default: false, description: "True: the address makes no derived records." }
             derived_records:
               type: array
               readOnly: true
@@ -1964,6 +2026,7 @@ components:
               name: { type: string, examples: [kestrel-ipoib] }
               pkey: { type: string, pattern: "^0x[0-9a-f]{4}$", examples: ["0x0001"] }
               membership: { type: string, enum: [full, limited] }
+        wg_public_key: { type: [string, "null"], pattern: "^[A-Za-z0-9+/]{43}=$", description: "Public key of a WireGuard interface. bembel never stores a private key." }
         lid: { type: [integer, "null"], readOnly: true, description: Observed from the subnet manager., examples: [41] }
         lid_observed_at: { type: [string, "null"], format: date-time, readOnly: true }
         port_id: { type: [string, "null"], format: uuid }
@@ -2021,6 +2084,8 @@ components:
         data: { type: string, examples: [cn-004.kestrel.example.org.] }
         view: { type: [array, "null"], items: { type: string }, description: Null means all views of the zone., examples: [[internal]] }
         derived: { type: boolean, readOnly: true, description: Made from an address. Not editable. }
+        disabled: { type: boolean, default: false, description: "Manual records only. A disabled record stays in bembel and leaves the export." }
+        active_from: { type: [string, "null"], format: date-time, description: "Manual records only. The record goes into the first export build after this time." }
         revision: { type: integer, format: int64, readOnly: true }
     DhcpScope:
       allOf:
@@ -2223,6 +2288,31 @@ components:
         change_request_id: { type: [string, "null"], format: uuid }
         before: { type: [object, "null"] }
         after: { type: [object, "null"] }
+    Observation:
+      type: object
+      required: [vrf, address, seen_at, method]
+      properties:
+        vrf: { type: string, examples: [global] }
+        address: { type: string, format: ip, examples: [10.20.4.44] }
+        mac: { type: [string, "null"], examples: ["3c:ec:ef:12:0a:44"] }
+        seen_at: { type: string, format: date-time }
+        method: { type: string, enum: [lease, dhcp-ack, arp, nd, icmp, nmap, libvirt, vpn, sync] }
+    Plan:
+      type: object
+      description: The answer to a call with validate_only. Nothing changed.
+      properties:
+        plan_hash: { type: string, examples: [p-7c1e] }
+        counts: { type: object, additionalProperties: { type: integer }, examples: [{ create: 38, none: 2 }] }
+        held: { type: boolean, description: "True: the apply becomes a change request (bulk threshold)." }
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              key: { type: string, examples: [cn-640.kestrel.example.org] }
+              action: { type: string, enum: [create, update, delete, none] }
+              changes: { type: object, additionalProperties: true }
+              findings: { type: array, items: { type: string } }
     Page:
       type: object
       required: [items]

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VPN and Wi-Fi</title>
+<meta name="description" content="How bembel holds the address space of remote access: eduVPN profiles and their pools, VPN sessions from the connection hook, plain WireGuard peers, and the data of a Wi-Fi network with a read-only mirror of ExtremeCloud IQ.">
+</head>
+<body>
+<h1>VPN and Wi-Fi</h1>
+<p class="lede">This chapter specifies how bembel serves remote access and wireless access. In both cases a server outside bembel gives the client addresses: the eduVPN node or the DHCP server of the Wi-Fi. bembel owns the space, the pools, the names of the infrastructure, and the record of who had which address.</p>
+<ul class="keypoints">
+  <li>A VPN profile is one eduVPN profile or one WireGuard server. Its subnets have a range of the purpose <code>vpn-pool</code>. Allocation never takes an address from such a range.</li>
+  <li><code>GET /v1/vpn-profiles/{id}/config?format=eduvpn</code> gives the range keys of the profile (<code>wRangeFour</code>, <code>oRangeSix</code> and the rest). The config management of the VPN nodes writes them into <code>config.php</code>. bembel does not write files on the node.</li>
+  <li>The script connection hook of eduVPN sends each connect and disconnect to the bembel-agent on the node. The agent writes VPN sessions to bembel. The hook always exits 0: a bembel outage never blocks a VPN connection.</li>
+  <li>The agent compares the sessions with the admin API of eduVPN every 5 minutes. A lost event becomes a corrected session, not a hole in the record.</li>
+  <li>A VPN session answers "who had 10.40.0.17 at 14:02". It is personal data: it needs <code>vpn-session:read</code>, bembel keeps it 90 days, and each read is in the audit log.</li>
+  <li>A plain WireGuard server uses normal allocation. Each peer has an address and an interface with its public key. bembel never holds a private key.</li>
+  <li>Wi-Fi needs no new kind: one VLAN and one subnet for each SSID, a DHCP scope for the clients, and hosts of the kind <code>appliance</code> for the access points. A sync mirrors the access points and the active clients from ExtremeCloud IQ, read only.</li>
+</ul>
+
+<h2 id="scope">Scope</h2>
+<p>bembel holds the values that other tools must share. For remote and wireless access these are:</p>
+<table class="compact">
+<thead><tr><th>Value</th><th>Owner</th><th>Used by</th></tr></thead>
+<tbody>
+<tr><td>The container and the subnets of the VPN and the Wi-Fi</td><td>bembel</td><td>Routing, firewall feeds, DHCP, eduVPN</td></tr>
+<tr><td>The client pool of each eduVPN profile, node and protocol</td><td>bembel</td><td>eduVPN (<code>wRangeFour</code>, <code>wRangeSix</code>, <code>oRangeFour</code>, <code>oRangeSix</code>)</td></tr>
+<tr><td>The DNS servers, search domains and routes of a profile</td><td>bembel</td><td>eduVPN (<code>dnsServerList</code>, <code>dnsSearchDomainList</code>, <code>routeList</code>)</td></tr>
+<tr><td>The address of a VPN client at one time</td><td>eduVPN</td><td>bembel keeps a copy as a VPN session</td></tr>
+<tr><td>Users, permissions, keys and certificates of eduVPN</td><td>eduVPN and the IdP</td><td>Not in bembel</td></tr>
+<tr><td>The addresses and names of the access points</td><td>bembel</td><td>DHCP reservations, DNS, RADIUS clients</td></tr>
+<tr><td>SSIDs, radio settings, network policies</td><td>ExtremeCloud IQ</td><td>Not in bembel. The SSID is only a tag on the VLAN.</td></tr>
+</tbody>
+</table>
+
+<h2 id="eduvpn">eduVPN</h2>
+<p>eduVPN is the VPN server of many universities and research sites. One portal (<code>vpn-user-portal</code>) has profiles. Each profile runs on one or more nodes, with WireGuard, OpenVPN or both. eduVPN gives each client an address from the range of its profile, node and protocol, and takes it back at the disconnect. bembel does not allocate these addresses. It gives eduVPN the ranges and records what eduVPN did.</p>
+<figure class="diagram wide">
+<svg viewBox="0 -10 960 410" role="img" aria-labelledby="vpn-flow-t">
+<title id="vpn-flow-t">eduVPN and bembel: the ranges go to the node, the sessions come back</title>
+<rect class="box-accent" x="16" y="40" width="250" height="150" rx="8"/>
+<text class="t-title t-on" x="32" y="66">bembel</text>
+<text class="t-small t-on" x="32" y="88">VPN profiles staff, hpc</text>
+<text class="t-small t-on" x="32" y="106">subnets with vpn-pool ranges</text>
+<text class="t-small t-on" x="32" y="124">VPN sessions (90 days)</text>
+<text class="t-small t-mono t-on" x="32" y="152">/v1/vpn-profiles/{id}/config</text>
+<text class="t-small t-mono t-on" x="32" y="170">/v1/vpn-sessions:batch</text>
+<rect class="box" x="16" y="270" width="250" height="100" rx="8"/>
+<text class="t-title" x="32" y="296">config management</text>
+<text class="t-small t-muted" x="32" y="318">Ansible reads the profile</text>
+<text class="t-small t-muted" x="32" y="336">and writes the ranges, DNS</text>
+<text class="t-small t-muted" x="32" y="354">and routes into config.php</text>
+<rect class="zone" x="340" y="20" width="604" height="366" rx="10"/>
+<text class="t-title" x="356" y="44">vpn-01.example.org (Debian, eduVPN 3)</text>
+<rect class="box" x="360" y="64" width="250" height="120" rx="8"/>
+<text class="t-title" x="376" y="88">vpn-user-portal</text>
+<text class="t-small t-muted" x="376" y="108">profiles from config.php</text>
+<text class="t-small t-muted" x="376" y="126">gives client addresses</text>
+<text class="t-small t-mono" x="376" y="152">connectScriptPath</text>
+<text class="t-small t-mono" x="376" y="170">admin/api/v1/connection_list</text>
+<rect class="box-muted" x="360" y="250" width="250" height="110" rx="8"/>
+<text class="t-title" x="376" y="274">WireGuard, OpenVPN</text>
+<text class="t-small t-muted" x="376" y="294">wg0, tun0, tun1</text>
+<text class="t-small t-muted" x="376" y="312">clients in 10.40.0.0/22</text>
+<text class="t-small t-muted" x="376" y="330">and 10.40.8.0/23</text>
+<rect class="box-ok" x="690" y="64" width="234" height="200" rx="8"/>
+<text class="t-title" x="706" y="88">bembel-agent</text>
+<text class="t-small t-muted" x="706" y="110">takes hook events</text>
+<text class="t-small t-muted" x="706" y="128">queues them on disk</text>
+<text class="t-small t-muted" x="706" y="146">sends sessions in batches</text>
+<text class="t-small t-muted" x="706" y="164">reconciles every 5 min</text>
+<text class="t-small t-mono" x="706" y="196">vpn.sock (unix)</text>
+<text class="t-small t-mono" x="706" y="214">kc:svc-agent-vpn-01</text>
+<path class="edge" d="M141,190 L141,268" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="150" y="234">GET config</text>
+<path class="edge" d="M266,320 L300,320 L300,124 L358,124" marker-end="url(#arrow)"/>
+<path class="edge" d="M485,184 L485,248" marker-end="url(#arrow)"/>
+<path class="edge-accent" d="M610,110 L688,110" marker-end="url(#arrow-accent)"/>
+<text class="t-small t-muted" x="649" y="100" text-anchor="middle">hook</text>
+<path class="edge-muted" d="M688,170 L612,170" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="649" y="190" text-anchor="middle">reconcile</text>
+<path class="edge-accent" d="M807,64 C807,-4 141,-4 141,38" marker-end="url(#arrow-accent)"/>
+<text class="t-small t-muted" x="480" y="2" text-anchor="middle">HTTPS: sessions, observations</text>
+</svg>
+<figcaption>bembel gives the ranges through the config management, and eduVPN gives the client addresses. The hook and the reconcile bring the sessions back. Only the agent talks to bembel.</figcaption>
+</figure>
+
+<h3 id="profiles">VPN profiles</h3>
+<p>The story has one eduVPN portal on two nodes, <code>vpn-01.example.org</code> and <code>vpn-02.example.org</code>. The container <code>10.40.0.0/16</code> (twin <code>2001:db8:4200:400::/56</code>) in VRF <code>global</code> holds all VPN subnets. Each subnet is one range of eduVPN and has one range of the purpose <code>vpn-pool</code> that covers it.</p>
+<table class="compact">
+<thead><tr><th>Profile</th><th>Node</th><th>WireGuard</th><th>OpenVPN</th><th>Settings</th></tr></thead>
+<tbody>
+<tr><td rowspan="2"><code>staff</code></td><td>vpn-01</td><td>10.40.0.0/22, 2001:db8:4200:400::/64</td><td>10.40.8.0/23, 2001:db8:4200:408::/64</td><td rowspan="2"><code>defaultGateway: true</code>, DNS 10.20.2.53 and .54, search <code>example.org</code></td></tr>
+<tr><td>vpn-02</td><td>10.40.4.0/22, 2001:db8:4200:401::/64</td><td>10.40.10.0/23, 2001:db8:4200:409::/64</td></tr>
+<tr><td><code>hpc</code></td><td>vpn-01</td><td>10.40.16.0/24, 2001:db8:4200:410::/64</td><td>none</td><td><code>defaultGateway: false</code>, routes from the address group <code>vpn-hpc-routes</code>, ACL permission <code>hpc-users</code></td></tr>
+</tbody>
+</table>
+<ul>
+<li>A VPN profile has a <code>kind</code> (<code>eduvpn</code> or <code>wireguard</code>), a <code>profile_id</code> (the eduVPN <code>profileId</code>), a display name, the host name of the service, the DNS settings and an owner team. Its pools are a list of (node host, protocol, subnet).</li>
+<li>The eduVPN rule is that the ranges of all profiles and nodes are unique and do not overlap. bembel tests the same rule in the database: a pool is a subnet, and subnets do not overlap.</li>
+<li>The route list can name prefixes or an address group. bembel resolves the group at each export, so a new HPC subnet goes to the <code>hpc</code> profile without an edit of the profile.</li>
+<li>The DNS servers come from the resolvers of the site (10.20.2.53 and 10.20.2.54). A change of a resolver changes the profile export.</li>
+<li>The ACL permission is a value for eduVPN (<code>aclPermissionList</code>). eduVPN tests it against the attributes of the IdP. bembel does not evaluate it.</li>
+</ul>
+<pre><code class="language-json">GET /v1/vpn-profiles/staff/config?format=eduvpn&amp;node=vpn-01.example.org
+
+{
+  "profileId": "staff",
+  "displayName": "Staff",
+  "hostName": "vpn.example.org",
+  "defaultGateway": true,
+  "dnsServerList": ["10.20.2.53", "10.20.2.54"],
+  "dnsSearchDomainList": ["example.org"],
+  "wRangeFour": "10.40.0.0/22",
+  "wRangeSix": "2001:db8:4200:400::/64",
+  "oRangeFour": "10.40.8.0/23",
+  "oRangeSix": "2001:db8:4200:408::/64",
+  "preferredProto": "wireguard",
+  "bembel": { "revision": 9, "etag": "\"vpn-staff-9\"" }
+}</code></pre>
+<p>The keys are the keys of the eduVPN <code>ProfileList</code>. An Ansible template writes them into <code>/etc/vpn-user-portal/config.php</code> and runs <code>vpn-maint-apply-changes</code>, which applies the change to the VPN daemons. bembel does not write the file, because the file also holds keys and settings that bembel does not own.</p>
+<aside class="callout rule">
+<p class="callout-title">A pool change needs a drain</p>
+<p>eduVPN keeps the address of a connected client. A smaller or moved pool can leave a client outside the new range. bembel refuses a change of a pool with active sessions outside the new CIDR (<code>409 vpn.pool-in-use</code>), unless the call has <code>"drain": true</code>. A drain is a change request: the approver sees the count of sessions that end.</p>
+</aside>
+
+<h3 id="hook">The connection hook</h3>
+<p>eduVPN runs a script at each connect and disconnect when <code>connectScriptPath</code> is set. The script gets the event in environment variables: <code>VPN_EVENT</code> (<code>C</code> or <code>D</code>), <code>VPN_PROTO</code>, <code>VPN_IP_FOUR</code>, <code>VPN_IP_SIX</code>, <code>VPN_CONNECTION_ID</code>, the profile, and the user id. A non-zero exit code makes eduVPN refuse the connection. The bembel package installs the script <code>/usr/lib/bembel-agent/eduvpn-hook</code>.</p>
+<ol class="steps">
+<li>The script writes the variables as one JSON line to <code>/run/bembel-agent/vpn.sock</code>, with a timeout of 1 second.</li>
+<li>The script exits 0 in all cases, also when the socket does not answer. bembel records access. It never decides access.</li>
+<li>The agent writes the event to a queue on disk (<code>/var/lib/bembel-agent/vpn-queue</code>), so a restart loses nothing.</li>
+<li>The agent sends the queue in batches with <code>POST /v1/vpn-sessions:batch</code>, at most every 5 seconds. A connect starts a session. A disconnect ends the session with the same connection id.</li>
+<li>bembel also writes an observation with the method <code>vpn</code> for each connect. An address in a <code>vpn-pool</code> range gives no finding <code>address.unknown-seen</code>.</li>
+</ol>
+<pre><code class="language-bash"># /etc/vpn-user-portal/config.php (part)
+'connectScriptPath' => '/usr/lib/bembel-agent/eduvpn-hook',
+
+# /etc/bembel-agent/agent.yaml (part)
+eduvpn:
+  node: vpn-01.example.org
+  admin_api: https://vpn.example.org/vpn-user-portal/admin/api/v1/
+  admin_token_file: /etc/bembel-agent/eduvpn-admin.token
+  reconcile_interval: 5m</code></pre>
+
+<h3 id="reconcile">Reconcile</h3>
+<p>A hook event can get lost: the agent was down, or the node restarted during a disconnect. Every 5 minutes the agent reads <code>connection_list</code> of the eduVPN admin API with <code>show_all</code> (eduVPN 3.10 or later), and compares it with the open sessions of its node in bembel.</p>
+<table class="compact">
+<thead><tr><th>Case</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>A connection is in the list, but bembel has no open session</td><td>The agent starts a session with <code>started_at</code> from the list and the flag <code>late: true</code></td></tr>
+<tr><td>bembel has an open session, but the connection is not in the list</td><td>The agent ends the session with <code>ended_at</code> set to the time of the read and <code>end_reason: reconcile</code></td></tr>
+<tr><td>A connection has an address outside all pools of the profile and node</td><td>The finding <code>vpn.address-outside-pool</code>: the <code>config.php</code> of the node differs from bembel</td></tr>
+<tr><td>The admin API does not answer for 30 minutes</td><td>The alert <code>BembelVpnReconcileFailing</code></td></tr>
+</tbody>
+</table>
+<p>The admin token of eduVPN lets the agent read connections and also delete them. The agent never deletes a connection. The token file is readable only by the agent user.</p>
+
+<h3 id="sessions">VPN sessions</h3>
+<p>A VPN session is one row for each connection: profile, node, protocol, user id, connection id, IPv4 address, IPv6 address, start, end, end reason. With <code>originatingIp</code> on (OpenVPN only), it also has the public address of the client.</p>
+<pre class="term">$ bembel vpn session ls --address 10.40.0.17 --at 2026-11-04T14:02:00Z
+PROFILE  NODE    PROTO      USER                 IPV4         IPV6                    START             END
+staff    vpn-01  wireguard  m.huber@example.org  10.40.0.17   2001:db8:4200:400::11   2026-11-04 13:41  2026-11-04 15:07
+1 session (read recorded in the audit log)</pre>
+<ul>
+<li>The question has an exact answer, because eduVPN gives an address to one client at a time, and a session has a start and an end. An overlap of two sessions with the same address is a finding <code>vpn.session-overlap</code>.</li>
+<li><code>vpn-session:read</code> is not in <code>*:read</code> and not in <code>viewer</code>. The story gives it to the group <code>kc:netsec</code> with global scope. <code>network-admin</code> also holds it.</li>
+<li>Each read of a session is an audit event with the filter of the query. The audit log thus shows who looked up whom.</li>
+<li>The reaper deletes a session 90 days after its end (<code>vpn.session_retention</code>). This value must agree with the data protection rules of the site. bembel keeps no session longer, also not in the history tables.</li>
+<li>The address page of a client address shows only the count of sessions to a user without <code>vpn-session:read</code>.</li>
+</ul>
+
+<h2 id="wireguard">Plain WireGuard</h2>
+<p>Some links use WireGuard without eduVPN: an admin access server or a link to a remote site. Here no server gives addresses. Each peer has a fixed address, so bembel allocates it like any other address.</p>
+<ul>
+<li>A VPN profile of the kind <code>wireguard</code> names the server host (<code>wg-01.example.org</code>), its interface <code>wg0</code> and one subnet (<code>10.40.32.0/24</code>, twin <code>2001:db8:4200:420::/64</code>). The subnet has no <code>vpn-pool</code> range.</li>
+<li>A peer is a host with a WireGuard interface. The interface has no MAC. It has <code>wg_public_key</code> and the allocated addresses. bembel does not hold the private key or a preshared key.</li>
+<li><code>GET /v1/vpn-profiles/ops-wg/config?format=wg-quick</code> gives the <code>[Peer]</code> sections for the server: <code>PublicKey</code> and <code>AllowedIPs</code> of each peer. The config management adds the <code>[Interface]</code> section with the private key from its secret store.</li>
+<li>The derived records name each peer, for example <code>oob-gw-hall3.wg.example.org</code>. So a tunnel address in a log has a name.</li>
+</ul>
+<pre><code class="language-ini"># GET /v1/vpn-profiles/ops-wg/config?format=wg-quick  (revision 4)
+[Peer]
+# oob-gw-hall3.wg.example.org
+PublicKey = 0k3mXr7vQ2b9cY1sJfH5aWn8tLpR4dEuGzKiVoNqB2M=
+AllowedIPs = 10.40.32.11/32, 2001:db8:4200:420::11/128, 172.16.40.0/22</code></pre>
+<p>The route of a site behind a peer (here <code>172.16.40.0/22</code>) comes from a static route of the peer in bembel (<a href="routing.html#routes">routing</a>).</p>
+
+<h2 id="wifi">Wi-Fi</h2>
+<p>A Wi-Fi network needs these values: one VLAN and one subnet for each SSID, a DHCP scope with a large pool and a short lease time for the clients, the management addresses of the access points, and their names. All of them are objects of the model already.</p>
+<figure class="diagram wide">
+<svg viewBox="0 0 960 330" role="img" aria-labelledby="wifi-t">
+<title id="wifi-t">The data of a Wi-Fi network in bembel, and the mirror of ExtremeCloud IQ</title>
+<rect class="box" x="16" y="30" width="280" height="130" rx="8"/>
+<text class="t-title" x="32" y="54">SSID eduroam</text>
+<text class="t-small t-muted" x="32" y="76">VLAN 600 wlan-eduroam</text>
+<text class="t-small t-mono" x="32" y="96">10.60.0.0/19</text>
+<text class="t-small t-mono" x="32" y="114">2001:db8:4200:600::/64</text>
+<text class="t-small t-muted" x="32" y="136">DHCP scope, lease 4 h</text>
+<rect class="box" x="16" y="180" width="280" height="130" rx="8"/>
+<text class="t-title" x="32" y="204">SSID example-guest</text>
+<text class="t-small t-muted" x="32" y="226">VLAN 610 wlan-guest</text>
+<text class="t-small t-mono" x="32" y="246">10.60.32.0/21</text>
+<text class="t-small t-mono" x="32" y="264">2001:db8:4200:610::/64</text>
+<text class="t-small t-muted" x="32" y="286">DHCP scope, lease 1 h</text>
+<rect class="box-accent" x="350" y="90" width="260" height="160" rx="8"/>
+<text class="t-title t-on" x="366" y="114">access points</text>
+<text class="t-small t-on" x="366" y="136">hosts, kind appliance</text>
+<text class="t-small t-on" x="366" y="154">VLAN 620 wlan-mgmt</text>
+<text class="t-small t-mono t-on" x="366" y="174">10.60.48.0/24</text>
+<text class="t-small t-on" x="366" y="194">DHCP reservations, A, PTR</text>
+<text class="t-small t-on" x="366" y="212">asset link to the floor</text>
+<rect class="box-soft" x="680" y="30" width="264" height="130" rx="8"/>
+<text class="t-title" x="696" y="54">ExtremeCloud IQ</text>
+<text class="t-small t-muted" x="696" y="76">sync, read only</text>
+<text class="t-small t-muted" x="696" y="96">devices: serial, MAC, model</text>
+<text class="t-small t-muted" x="696" y="114">active clients</text>
+<text class="t-small t-mono" x="696" y="140">source xiq</text>
+<rect class="box-muted" x="680" y="190" width="264" height="120" rx="8"/>
+<text class="t-title" x="696" y="214">not in bembel</text>
+<text class="t-small t-muted" x="696" y="236">radio, channels, power</text>
+<text class="t-small t-muted" x="696" y="254">network policies, SSID keys</text>
+<text class="t-small t-muted" x="696" y="272">RADIUS users</text>
+<path class="edge" d="M296,95 L348,140" marker-end="url(#arrow)"/>
+<path class="edge" d="M296,245 L348,200" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" x="322" y="174" text-anchor="middle">served by</text>
+<path class="edge-muted" d="M678,110 L612,140" marker-end="url(#arrow-muted)"/>
+<text class="t-small t-muted" x="645" y="104" text-anchor="middle">mirror</text>
+</svg>
+<figcaption>Each SSID is a VLAN and a subnet pair with a DHCP scope. The access points are hosts in a management subnet. The mirror adds the device data and the active clients of ExtremeCloud IQ.</figcaption>
+</figure>
+<table class="compact">
+<thead><tr><th>Value</th><th>Object in bembel</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td>SSID</td><td>Tag <code>ssid=eduroam</code> on the VLAN</td><td>The SSID name only. Its settings stay in the Wi-Fi management.</td></tr>
+<tr><td>Client network</td><td>VLAN, subnet pair, DHCP scope</td><td>A pool of the purpose <code>dhcp-pool</code> covers most of the subnet. A Wi-Fi subnet is large and its use changes during the day. The utilisation alert uses the peak of the day.</td></tr>
+<tr><td>Access point</td><td>Host of the kind <code>appliance</code>, tag <code>role=wifi-ap</code></td><td>One interface with the MAC, one address in <code>wlan-mgmt</code> with a DHCP reservation, the name <code>ap-h2-01.example.org</code></td></tr>
+<tr><td>Place</td><td>Asset link to an FNT room or floor</td><td>An access point is often not a rack device. The link to the room is enough.</td></tr>
+<tr><td>RADIUS clients</td><td>Address group <code>wlan-ap</code> (tag <code>role=wifi-ap</code>)</td><td>The feed <code>/v1/feeds/wlan-ap?format=text</code> gives the client list of the RADIUS server.</td></tr>
+<tr><td>Guest isolation</td><td>Address group <code>wlan-guest</code></td><td>The firewall feed blocks the guest subnet from the internal prefixes.</td></tr>
+</tbody>
+</table>
+<p>The lease ingestion of the DHCP servers gives the active Wi-Fi clients, and the pool utilisation with its alert works as for any other scope (<a href="dhcp.html#leases">DHCP leases</a>).</p>
+
+<h3 id="xiq">ExtremeCloud IQ mirror</h3>
+<p>The access points of the site are managed in ExtremeCloud IQ (XIQ). XIQ is the cloud product that was earlier named HiveManager NG. The old local HiveManager Classic is no longer sold, and its developer API is closed. bembel uses only the public XIQ REST API at <code>api.extremecloudiq.com</code> with an API token.</p>
+<ul>
+<li>The sync worker <code>system:sync-xiq</code> reads the device list every 15 minutes. Each access point becomes or updates a host with <code>source=xiq</code>: host name, serial number, model, MAC and management address. The address must be in a subnet of bembel. If not, the result is the finding <code>xiq.address-outside</code>.</li>
+<li>The match key is the MAC. An access point that bembel already has with a reservation keeps its address. The sync only fills the fields of XIQ.</li>
+<li>The sync reads <code>GET /clients/active</code> and writes observations with the method <code>sync</code>: client MAC, address, SSID and access point. Thus the last-seen data of a Wi-Fi client has the access point, which the DHCP lease does not give.</li>
+<li>The location tree of XIQ (site, building, floor) maps by name to the FNT mirror. A name without a match is the finding <code>xiq.location-unmatched</code>. Users then set the asset link by hand.</li>
+<li>The mirror is read only. bembel never writes to XIQ. The API paths other than <code>/clients/active</code> need a test against the XIQ tenant of the site (<a href="questions.html#open">open questions</a>).</li>
+</ul>
+
+<h2 id="example">Example</h2>
+<ol class="steps">
+<li><code>d.klein</code> makes the container <code>10.40.0.0/16</code> and allocates the subnets of the profile <code>staff</code> from it: <code>bembel prefix allocate 10.40.0.0/16 --length 22 --name vpn-staff-wg-01</code>, and so on. Each subnet gets a range of the purpose <code>vpn-pool</code>.</li>
+<li><code>d.klein</code> makes the VPN profile <code>staff</code> with the four pools and the DNS settings. The profile export has revision 1.</li>
+<li>The Ansible run of the VPN nodes reads <code>/v1/vpn-profiles/staff/config?format=eduvpn</code> for each node and writes <code>config.php</code>.</li>
+<li><code>m.huber</code> connects with the eduVPN app over WireGuard. eduVPN gives <code>10.40.0.17</code> and runs the hook. The agent of <code>vpn-01</code> sends the connect. bembel starts the session.</li>
+<li>At 14:02 a firewall log shows an attack from <code>10.40.0.17</code>. A user of <code>kc:netsec</code> runs <code>bembel vpn session ls --address 10.40.0.17 --at 2026-11-04T14:02:00Z</code> and gets the user id. The audit log records the read.</li>
+<li><code>m.huber</code> disconnects at 15:07. The hook sends the disconnect, and bembel ends the session. After 90 days the reaper deletes it.</li>
+</ol>
+
+<h2 id="sources">Sources</h2>
+<ul>
+<li>eduVPN server documentation, version 3: profile configuration, script connection hook, admin API (<code>https://docs.eduvpn.org/server/v3/</code>).</li>
+<li>The example config of <code>eduvpn/vpn-user-portal</code>, branch v3: <code>config/config.php.example</code>.</li>
+<li>ExtremeCloud IQ API documentation (<code>https://api.extremecloudiq.com</code>).</li>
+</ul>
+</body>
+</html>

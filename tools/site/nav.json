@@ -92,12 +92,14 @@
             "fabrics",
             "hosts",
             "vms",
+            "vpn",
             "dns",
             "dhcp",
             "assets",
             "routing",
             "firewall",
             "access",
+            "extras",
             "history",
             "ownership",
             "schema"
@@ -189,6 +191,10 @@
             "constraints",
             "reaper",
             "bulk",
+            "plan",
+            "renumber",
+            "utilisation",
+            "observations",
             "explainer"
           ]
         },
@@ -211,7 +217,7 @@
             "checks",
             "delivery",
             "compat",
-            "later"
+            "delivery-kinds"
           ]
         },
         {
@@ -263,6 +269,7 @@
             "scope",
             "asn",
             "vrf-rt",
+            "vni",
             "routes",
             "prefix-lists",
             "address-groups",
@@ -288,6 +295,8 @@
             "evaluation",
             "tokens",
             "changes",
+            "notifications",
+            "break-glass",
             "audit",
             "api",
             "examples"
@@ -386,6 +395,8 @@
             "prefix",
             "allocate",
             "address",
+            "bulk",
+            "reports",
             "search"
           ]
         },
@@ -475,7 +486,7 @@
             "keystone",
             "designate",
             "ironic",
-            "phases",
+            "parts",
             "risks"
           ]
         },
@@ -493,8 +504,28 @@
             "cni",
             "identity",
             "terraform",
-            "phases",
+            "parts",
             "risks"
+          ]
+        },
+        {
+          "number": 23,
+          "path": "design/vpn-wifi.html",
+          "title": "VPN and Wi-Fi",
+          "short": "VPN and Wi-Fi",
+          "description": "eduVPN profiles and pools, VPN sessions from the connection hook, plain WireGuard peers, and Wi-Fi data with an ExtremeCloud IQ mirror.",
+          "anchors": [
+            "scope",
+            "eduvpn",
+            "profiles",
+            "hook",
+            "reconcile",
+            "sessions",
+            "wireguard",
+            "wifi",
+            "xiq",
+            "example",
+            "sources"
           ]
         }
       ]
@@ -504,7 +535,7 @@
       "title": "Operations",
       "pages": [
         {
-          "number": 23,
+          "number": 24,
           "path": "design/migration.html",
           "title": "Migration from OpenNetAdmin",
           "short": "Migration from OpenNetAdmin",
@@ -522,7 +553,7 @@
           ]
         },
         {
-          "number": 24,
+          "number": 25,
           "path": "design/operations.html",
           "title": "Deployment and operations",
           "short": "Deployment and operations",
@@ -538,15 +569,13 @@
           ]
         },
         {
-          "number": 25,
-          "path": "design/roadmap.html",
-          "title": "Roadmap",
-          "short": "Roadmap",
-          "description": "The releases, their scope and the open questions.",
+          "number": 26,
+          "path": "design/questions.html",
+          "title": "Open questions and sources",
+          "short": "Open questions",
+          "description": "What bembel does not do, the questions that are not decided, and the sources of the research.",
           "anchors": [
-            "v1",
-            "v1-1",
-            "v2",
+            "out-of-scope",
             "open",
             "sources"
           ]

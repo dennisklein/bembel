@@ -116,7 +116,7 @@ Content-Type: application/json
 <tr><td><code>hint</code></td><td>yes</td><td>yes</td><td>Take <code>hint</code> if it is free. If not, the answer depends on <code>on_conflict</code>: <code>fail</code> (<code>409</code>, default) or <code>next</code> (the nearest free address above it).</td></tr>
 </tbody>
 </table>
-<p>IPv6 has no <code>eui64</code> strategy. A host that forms an EUI-64 or SLAAC address does it without bembel. The agent or a sync reports the address, and bembel stores it as <em>observed</em>. See <a href="fabrics.html#dual-stack">dual stack</a> and the open question in <a href="roadmap.html#open">Roadmap</a>.</p>
+<p>IPv6 has no <code>eui64</code> strategy. A host that forms an EUI-64 or SLAAC address does it without bembel. The agent or a sync reports the address, and bembel stores it as <em>observed</em>. See <a href="fabrics.html#dual-stack">dual stack</a> and the open question in <a href="questions.html#open">Open questions</a>.</p>
 
 <h3 id="skipped">Skipped addresses</h3>
 <p>The allocator never returns these addresses:</p>
@@ -124,7 +124,7 @@ Content-Type: application/json
   <li>The network address (IPv4 with prefix length &lt; 31), and the subnet-router anycast address <code>::</code> of an IPv6 subnet shorter than /127.</li>
   <li>The broadcast address (IPv4 with prefix length &lt; 31). A /31 (RFC 3021), a /32, a /127 (RFC 6164) and a /128 have no network or broadcast address, so every address in them can be given out.</li>
   <li>The gateway of the subnet (<code>10.20.4.1</code> in kestrel-compute).</li>
-  <li>Every address in a <a href="dhcp.html#pools">range</a> with the purpose <code>dhcp-pool</code>, <code>reserved</code>, <code>infrastructure</code> or <code>lb-pool</code>. A range with the purpose <code>static</code> is not skipped.</li>
+  <li>Every address in a <a href="dhcp.html#pools">range</a> with the purpose <code>dhcp-pool</code>, <code>reserved</code>, <code>infrastructure</code>, <code>lb-pool</code> or <code>vpn-pool</code>. A range with the purpose <code>static</code> is not skipped.</li>
   <li>A request that names a range (<code>"range": "kestrel-static"</code>) allocates only inside that range. The range must have the purpose <code>static</code>, <code>infrastructure</code> or <code>reserved</code> (the last needs <code>range:update</code>). Any other purpose gives <code>422</code>.</li>
   <li>Every address that has a row, in any state, including <code>deprecated</code>.</li>
 </ul>
@@ -144,7 +144,7 @@ WITH p AS (
   SELECT r.first_addr, r.last_addr
   FROM range r, p
   WHERE r.prefix_id = p.id
-    AND r.purpose IN ('dhcp-pool', 'reserved', 'infrastructure', 'lb-pool')
+    AND r.purpose IN ('dhcp-pool', 'reserved', 'infrastructure', 'lb-pool', 'vpn-pool')
     AND r.id IS DISTINCT FROM $2
 ), cand AS (
   SELECT CASE WHEN p.p2p THEN host(network(p.cidr))::inet
@@ -393,7 +393,7 @@ COMMIT;</code></pre>
 <tr><td>Lock order</td><td>Always the parent first, then nothing else. No call locks two prefixes, so deadlocks between allocations cannot occur.</td></tr>
 </tbody>
 </table>
-<p>The lock limits the rate for one subnet. The critical section is one index lookup and two inserts, so the expected time is a few milliseconds. That gives hundreds of allocations per second for one subnet. The number is an estimate. The load test of the first release measures it (<a href="roadmap.html#v1">Roadmap</a>).</p>
+<p>The lock limits the rate for one subnet. The critical section is one index lookup and two inserts, so the expected time is a few milliseconds. That gives hundreds of allocations per second for one subnet. The number is an estimate. A load test measures it (<a href="operations.html#metrics">Operations</a>).</p>
 <div class="callout note">
 <p class="callout-title">The constraint is the second guard</p>
 <p>The lock prevents the conflict. The unique constraint and the exclusion constraint (next section) make sure that a bug in the code, a manual SQL change or an import cannot create one. If the constraint fires, bembel repeats the transaction up to 3 times (for <code>:allocate</code> and for prefix creates), and then maps <code>23505</code> and <code>23P01</code> to <code>409</code>.</p>
@@ -558,15 +558,82 @@ Idempotency-Key: 8a0c1e3b-...
 </ul>
 <p>The batch endpoint for other kinds (<code>POST /v1/hosts:batchCreate</code>) follows the same rule: one transaction, per-item errors in the problem body, a cap on the size.</p>
 
+<h2 id="plan">Plan and apply</h2>
+<p>A user often brings a list: 40 nodes of a new rack in a spreadsheet, or 120 records of a new service. bembel reads such a list as a <dfn>plan</dfn> first and writes it only after a confirm.</p>
+<ul>
+  <li>Every batch call accepts <code>"validate_only": true</code>. The server runs all checks and the permission test in a transaction that it rolls back. The answer is the plan: for each row the action (<code>create</code>, <code>update</code>, <code>delete</code>, <code>none</code>), the changed fields and the findings. The plan has a hash.</li>
+  <li><code>bembel apply -f rack-a04.csv</code> (or a YAML file) reads the rows, asks for the plan, prints it as a table and asks for a confirm. Then it sends the same calls with <code>plan_hash</code>. If the data changed after the plan, the hash differs and the answer is <code>409 plan.stale</code>.</li>
+  <li>A CSV file has one kind for each file, and a header row with the API field names (<code>fqdn,prefix,mac,interface,owner,tags</code>). A row finds its object by the natural key (FQDN for a host, VRF and address for an address, zone, name and type for a record), so a second apply of the same file changes nothing.</li>
+  <li>A plan with more than <code>access.change_request.bulk_threshold</code> objects (default 50) becomes a change request. The request holds the plan, and the approver sees the same table (<a href="access.html#changes">access.html#changes</a>).</li>
+  <li>The Import dialog of the web UI and the bulk edit of the lists use the same calls.</li>
+</ul>
+<pre class="term">$ bembel apply -f rack-a04.csv
+plan p-7c1e  40 rows  kind host  prefix 10.20.4.0/22
+  create  38  host, interface, address (next free), A, PTR, reservation
+  none     2  cn-640, cn-641 exist with the same values
+  finding  0
+40 objects &lt; 50: no change request
+apply? [y/N] y
+applied 38 hosts in 0.4 s  (audit origin cli, request 01JC…)</pre>
+
+<h2 id="renumber">Move, renumber and resize</h2>
+<p>Hosts and networks change place. bembel has one call for each kind of move. Each call keeps the names, so the derived records and the reservations follow.</p>
+<table class="compact">
+<thead><tr><th>Call</th><th>What it does</th><th>Permissions</th></tr></thead>
+<tbody>
+<tr><td><code>POST /v1/addresses/{id}:move</code></td><td>Moves one address to another subnet, or to another address in the same subnet. The checks of an allocation apply.</td><td><code>address:release</code> on the old subnet, <code>address:allocate</code> on the new one</td></tr>
+<tr><td><code>POST /v1/interfaces/{id}:move</code></td><td>Moves an interface with its addresses and its MAC to another host, for example after a mainboard swap. The history of both hosts shows the move.</td><td><code>interface:update</code> on both hosts</td></tr>
+<tr><td><code>POST /v1/prefixes/{id}:renumber</code></td><td>Maps each address of a source span to the same offset in a target subnet. Phase 1 makes the new addresses as claims with <code>publish: true</code>, so both names resolve. Phase 2 (<code>:confirm</code> on the renumber operation) makes them <code>allocated</code> and puts the old addresses in <code>deprecated</code> with the release grace.</td><td><code>address:allocate</code> and <code>address:release</code> on both subnets</td></tr>
+<tr><td><code>POST /v1/prefixes/{id}:resize</code></td><td>Changes the length of a subnet. A grow needs free space next to the subnet and no sibling inside the new CIDR. A shrink needs no address outside the new CIDR. The prefix trigger checks both rules again.</td><td><code>prefix:update</code> on the subnet and its parent</td></tr>
+<tr><td><code>POST /v1/prefixes/{id}:split</code></td><td>Cuts a subnet into equal parts. Each address goes to the part that holds it. The ranges must not cross a cut.</td><td><code>prefix:update</code>, <code>prefix:create</code></td></tr>
+</tbody>
+</table>
+<p>A renumber or a split with more than the bulk threshold of addresses becomes a change request. Each call accepts <code>validate_only</code> and returns a plan first.</p>
+
 <h2 id="utilisation">Utilisation</h2>
 <p><dfn>Utilisation</dfn> shows how full a subnet or a pool is. The UI, the alerts and the advisory buttons use it.</p>
 <ul>
-  <li><strong>Subnet, IPv4:</strong> <code>used / usable</code>. <code>usable</code> is the size minus the network and broadcast address. <code>used</code> is the number of address rows plus the addresses in ranges with the purpose <code>dhcp-pool</code>, <code>reserved</code>, <code>infrastructure</code> or <code>lb-pool</code>, each address counted once. Leases do not count: a pool counts fully, because the allocator never uses it.</li>
+  <li><strong>Subnet, IPv4:</strong> <code>used / usable</code>. <code>usable</code> is the size minus the network and broadcast address. <code>used</code> is the number of address rows plus the addresses in ranges with the purpose <code>dhcp-pool</code>, <code>reserved</code>, <code>infrastructure</code>, <code>lb-pool</code> or <code>vpn-pool</code>, each address counted once. Leases do not count: a pool counts fully, because the allocator never uses it.</li>
   <li><strong>Subnet, IPv6:</strong> the count <code>used</code> and the size as a power of two. A percentage in a /64 has no meaning. The API gives <code>percent: null</code> for subnets larger than a /112. Alerts use the count.</li>
   <li><strong>Pool:</strong> the sum of the sizes of the child prefixes divided by the size of the pool, counted in /24 equivalents (IPv4) or /64 equivalents (IPv6).</li>
 </ul>
 <p>Example, kestrel-compute <code>10.20.4.0/22</code>: 1 024 addresses, 1 022 usable. The DHCP pool takes 255. There are 686 address rows (635 allocated, 38 reserved, 7 claimed, 6 deprecated). So <code>used</code> is 941 (of which only 635 are in status <code>allocated</code>) and the utilisation is 92.1 %. This is the value in the UI mockup and in the alert tests.</p>
 <p>The table <code>prefix_usage (prefix_id, used, usable)</code> is updated in the allocate transaction, under the parent lock, so it is exact. A nightly job recomputes it from the rows and reports a difference as a finding. The metric <code>bembel_prefix_utilisation_ratio</code> reads this table (<a href="operations.html#observability">Observability</a>).</p>
+<p>The nightly usage recount writes one row for each prefix and day into <code>prefix_usage_daily (prefix_id, day, used, usable)</code>. It keeps the rows for 3 years. The prefix page draws the trend from it, and the report <code>utilisation</code> uses it (<a href="#reports">reports</a>).</p>
+
+<h3 id="reports">Reports</h3>
+<p>A <dfn>report</dfn> is a fixed query with a page, an API call <code>GET /v1/reports/{name}</code> and a CSV form. A report shows only rows that the caller can read. bembel runs no user code for reports. A new report is a change of bembel.</p>
+<table class="compact">
+<thead><tr><th>Report</th><th>Rows</th></tr></thead>
+<tbody>
+<tr><td><code>utilisation</code></td><td>Containers and subnets with used, usable, percent and the change in 30 and 365 days. Group by team, site or VRF.</td></tr>
+<tr><td><code>stale-addresses</code></td><td>Addresses with the finding <code>stale-address</code>: allocated, and no observation of any method for 90 days (<a href="dhcp.html#leases">dhcp.html#leases</a>).</td></tr>
+<tr><td><code>hosts-without-asset</code></td><td>Physical hosts and hypervisors with no asset link.</td></tr>
+<tr><td><code>records-outside-views</code></td><td>Manual records whose view list matches no view of their zone, and disabled records older than 180 days.</td></tr>
+<tr><td><code>expiring</code></td><td>Claims, bindings and tokens that expire in the next 14 days.</td></tr>
+</tbody>
+</table>
+
+<h2 id="observations">Observations</h2>
+<p>bembel knows what it allocated. An observation tells it what the network really uses. All sources write through one call:</p>
+<pre><code class="language-bash">POST /v1/observations:batch
+
+{
+  "source": "sweep:agent-ns1",
+  "items": [
+    {"vrf": "global", "address": "10.20.4.44", "mac": "3c:ec:ef:12:0a:44", "seen_at": "2026-11-04T16:02:11Z", "method": "arp"},
+    {"vrf": "global", "address": "10.20.4.230", "seen_at": "2026-11-04T16:02:12Z", "method": "icmp"}
+  ]
+}</code></pre>
+<ul>
+  <li>The methods are <code>lease</code>, <code>dhcp-ack</code>, <code>arp</code>, <code>nd</code>, <code>icmp</code>, <code>nmap</code>, <code>libvirt</code>, <code>vpn</code> and <code>sync</code>. The DHCP lease ingestion has its own call, because it also keeps the lease state, and it writes the same observations with <code>lease</code> and <code>dhcp-ack</code> (<a href="dhcp.html#leases">dhcp.html#leases</a>).</li>
+  <li>A known address gets <code>last_seen_at</code>, <code>last_seen_mac</code>, <code>last_seen_source</code> and, if the MAC differs from the interface, the finding <code>address.mac-mismatch</code>.</li>
+  <li>An unknown IPv6 address in a subnet becomes an observed address. An unknown IPv4 address gives the finding <code>address.unknown-seen</code>: someone uses an address that bembel did not give out.</li>
+  <li><code>bembel observe import --format nmap-xml scan.xml</code> reads an nmap XML file and sends it with the method <code>nmap</code>. Thus an existing scan job keeps its value.</li>
+  <li>The bembel-agent can do a <dfn>reachability sweep</dfn> of the subnets in its scope: ICMP echo, and ARP or ND on its own links. The sweep is off by default. It has a rate limit (<code>agent.sweep.rate</code>, default 50 packets/s) and a list of subnets that it never touches. Turn it on only with the approval of the network security team.</li>
+  <li>The permission is <code>observation:create</code>, tested on the subnet of the address. A read of the raw observations needs <code>observation:read</code>.</li>
+</ul>
+<p>The report <code>stale-addresses</code> uses all methods. Thus a static server that answers ICMP is not stale, although it never asks for a lease.</p>
 
 <h2 id="explainer">Two calls at the same time</h2>
 <p>The explainer shows the story in 5 steps. <code>a.berger</code> and <code>d.klein</code> (subject <code>kc:d.klein</code>, from the CLI) both call <code>addresses:allocate</code> for the subnet <code>10.20.4.0/22</code> with strategy <code>first</code> and no <code>claim_ttl</code>. At the story moment the first free addresses are <code>10.20.4.213</code> and <code>10.20.4.214</code>. The gateway is <code>10.20.4.1</code>.</p>

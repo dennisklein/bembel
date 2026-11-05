@@ -153,8 +153,8 @@
 <li>A bare key without <code>=</code> matches any value of that key in a filter or a scope term.</li>
 </ul>
 <p>Examples: the filter <code>?tag=role=login</code> (also sent as <code>?tag=role%3Dlogin</code>), the scope terms <code>tag=os_cloud=os-prod</code> and <code>tag=feed=fw-pan-01</code>.</p>
-<p>A <dfn>team</dfn> is an owner of objects. It maps to a group of the IdP, for example <code>hpc-ops</code> to the top-level Keycloak group <code>hpc-ops</code>. bembel sees that group as <code>kc:hpc-ops</code>. A team is not a tenant with an own data space: all teams see the same tree, and bindings control who can change what (<a href="access.html#scopes">access.html#scopes</a>).</p>
-<p>A <dfn>custom attribute</dfn> is a typed field that an admin declares for one kind: <code>string</code>, <code>integer</code>, <code>boolean</code>, <code>date</code>, <code>enum</code>, <code>url</code>, <code>json</code>. The declaration has a key, a label, a JSON Schema and an optional default. ONA custom attributes import to custom attributes with the same key (<a href="map-ona.html#attributes">map-ona.html#attributes</a>).</p>
+<p>A <dfn>team</dfn> is an owner of objects. It maps to a group of the IdP, for example <code>hpc-ops</code> to the top-level Keycloak group <code>hpc-ops</code>. bembel sees that group as <code>kc:hpc-ops</code>. A team is not a tenant with an own data space: all teams see the same tree, and bindings control who can change what (<a href="access.html#scopes">access.html#scopes</a>). A team has two contact fields, <code>contact_email</code> and <code>chat_webhook</code>. Notifications to the owner of an object use them (<a href="access.html#notifications">access.html#notifications</a>).</p>
+<p>A <dfn>custom attribute</dfn> is a typed field that an admin declares for one kind: <code>string</code>, <code>text</code>, <code>integer</code>, <code>decimal</code>, <code>boolean</code>, <code>date</code>, <code>datetime</code>, <code>enum</code>, <code>url</code>, <code>json</code>. The declaration has a key, a label, a JSON Schema and an optional default. No type links to another object: a link is always a typed field of the model. ONA custom attributes import to custom attributes with the same key (<a href="map-ona.html#attributes">map-ona.html#attributes</a>).</p>
 
 <h2 id="addressing">Addressing</h2>
 <p>Addressing has four core kinds: VRF, prefix, range and address. A claim is an address in status <code>claimed</code>. VLANs and fabrics give the L2 context of a subnet (<a href="#fabrics">fabrics</a>).</p>
@@ -240,7 +240,7 @@
 </ul>
 
 <h3 id="range">Range</h3>
-<p>A <dfn>range</dfn> is a contiguous span of addresses in one subnet. It does not need CIDR alignment. Its <code>purpose</code> tells bembel how to treat the addresses in it. The field is always <code>purpose</code>, with one of five values. An allocate request without a <code>range</code> skips every range except <code>static</code>. A request that names a range allocates only inside that range.</p>
+<p>A <dfn>range</dfn> is a contiguous span of addresses in one subnet. It does not need CIDR alignment. Its <code>purpose</code> tells bembel how to treat the addresses in it. The field is always <code>purpose</code>, with one of six values. An allocate request without a <code>range</code> skips every range except <code>static</code>. A request that names a range allocates only inside that range.</p>
 <table>
 <thead><tr><th>Purpose</th><th>Effect</th><th>ONA source</th></tr></thead>
 <tbody>
@@ -249,9 +249,10 @@
 <tr><td><code>static</code></td><td>Allocation may use it. A request that names it allocates only inside it.</td><td>none</td></tr>
 <tr><td><code>infrastructure</code></td><td>Gateways, VRRP and switch addresses. Allocation skips it. A request that names it allocates only inside it.</td><td>none</td></tr>
 <tr><td><code>lb-pool</code></td><td>A load balancer allocates in it (MetalLB, Cilium). The pool sync makes it with <code>POST /v1/prefixes/{id}/ranges:allocate</code>. Allocation skips it, also when a request names it (422).</td><td>none</td></tr>
+<tr><td><code>vpn-pool</code></td><td>A VPN server gives its clients addresses from it (eduVPN, WireGuard). The range is the whole subnet. Allocation skips it, also when a request names it (422).</td><td>none</td></tr>
 </tbody>
 </table>
-<p>Utilisation counts as used each address row and each address in a range with the purpose <code>dhcp-pool</code>, <code>reserved</code>, <code>infrastructure</code> or <code>lb-pool</code>, each address once (<a href="allocation.html#utilisation">allocation.html#utilisation</a>). A load balancer pool is a range in the subnet, not a child prefix, because a subnet has no child prefix.</p>
+<p>Utilisation counts as used each address row and each address in a range with the purpose <code>dhcp-pool</code>, <code>reserved</code>, <code>infrastructure</code>, <code>lb-pool</code> or <code>vpn-pool</code>, each address once (<a href="allocation.html#utilisation">allocation.html#utilisation</a>). A load balancer pool is a range in the subnet, not a child prefix, because a subnet has no child prefix.</p>
 
 <h3 id="address">Address</h3>
 <p>An <dfn>address</dfn> is one IP address in a subnet. It has a status, a DNS name (<code>fqdn</code>) and an optional interface. The export rules below apply to DNS records and to DHCP reservations in the same way.</p>
@@ -265,6 +266,13 @@
 </tbody>
 </table>
 <p>An address with <code>shared: true</code> is on several interfaces: a VIP, an anycast address or a VRRP address. A trigger allows more than one <code>address_interface</code> row only for a shared address. A <code>shared: false</code> address has at most one. ONA interface clusters import to shared addresses. An address in an IPv6 subnet can be <code>observed</code>: a SLAAC or EUI-64 address that a sync, an agent or a lease report found. bembel stores <code>observed</code>, <code>last_seen_at</code> and <code>last_seen_source</code>, and shows the address, but does not allocate it. A release of an observed address that its source still reports gives 409 <code>address.observed</code>.</p>
+<p>Three more fields complete an address:</p>
+<ul>
+<li><code>nat_outside_id</code> links an inside address to its outside address, also in another VRF. The address drawer shows the pair. A DNS view with <code>publish_nat_outside: true</code> publishes the outside address for the name of the inside address (<a href="dns.html#views">dns.html#views</a>). An address group can include the outside addresses of its members.</li>
+<li><code>dns_disabled: true</code> stops the derived A, AAAA and PTR records of the address, but keeps the address and its reservation.</li>
+<li><code>last_seen_at</code> and <code>last_seen_source</code> come from observations (below).</li>
+</ul>
+<p>An <dfn>observation</dfn> is a report that an address, and optionally a MAC, was seen at a time. Its sources are DHCP leases, the bembel-agent (libvirt, a reachability sweep, a VPN server), a sync, or an imported nmap scan. bembel keeps the raw observations for 30 days (<code>observation.retention</code>) and writes the newest time to the address. An observation of an IPv6 address that has no row makes an observed address. An observation never allocates an IPv4 address: an unknown IPv4 address is a finding <code>address.unknown-seen</code> (<a href="allocation.html#observations">allocation.html#observations</a>).</p>
 
 <h3 id="claim">Claim</h3>
 <p>A <dfn>claim</dfn> is a temporary hold on an address with an expiry. It is not a separate object: it is an address row with the status <code>claimed</code> and an <code>expires_at</code>. The caller makes it with <code>POST /v1/prefixes/{id}/addresses:allocate</code> and a <code>claim_ttl</code>, for example <code>PT10M</code>. The caller confirms it with <code>POST /v1/addresses/{id}:confirm</code> when the resource exists, and the address becomes <code>allocated</code>. Otherwise the reaper deletes the row after the expiry. Only addresses are claimed. A prefix is never claimed.</p>
@@ -272,6 +280,7 @@
 
 <h3 id="vlan">VLAN and VLAN domain</h3>
 <p>A <dfn>VLAN</dfn> has a VID from 1 to 4094 and a name. A <dfn>VLAN domain</dfn> is the scope in which a VID is unique: a campus, a hall or one fabric. ONA VLAN campuses import to VLAN domains. A subnet refers to one VLAN. Two subnets of a dual stack network refer to the same VLAN.</p>
+<p>A VLAN can carry a <dfn>VNI</dfn>, a VXLAN network identifier from 1 to 16 777 215 for an EVPN overlay. A VRF can carry an L3 VNI. A VNI is unique in the whole instance and comes from a VNI range, in the same way as an ASN comes from an ASN range (<a href="routing.html#vni">routing.html#vni</a>).</p>
 
 <h2 id="fabrics">Fabrics</h2>
 <p>A <dfn>fabric</dfn> is the L2 technology domain of a subnet. It answers the question "what carries this network": Ethernet, Ethernet with RoCEv2, or InfiniBand. The chapter <a href="fabrics.html">Fabrics</a> gives all details.</p>
@@ -306,7 +315,7 @@
 <p>An <dfn>IB partition</dfn> has a P_Key from <code>0x0001</code> to <code>0x7ffe</code> (<code>0x7fff</code> is the Default partition), a name, an IPoIB flag, an MTU and a membership (full or limited) per member. bembel stores the 15-bit base key, unique in the fabric. The membership is per member, not part of the key. An input with the top bit (the full member bit) set is changed to the base key, so both forms name the same partition. The 16-bit form appears only as a value per member, and in Linux child interface names such as <code>ib0.8001</code>. In the story, kestrel-ipoib is <code>0x0001</code>. A <dfn>QoS profile</dfn> holds the lossless settings of a RoCEv2 fabric. Host and switch configuration tools read it from the API.</p>
 
 <h2 id="hosts">Hosts and interfaces</h2>
-<p>A <dfn>host</dfn> is a named logical system with interfaces. Its kind (<code>host_kind</code>) is <code>physical</code>, <code>vm</code>, <code>hypervisor</code>, <code>appliance</code> or <code>container-node</code>. A host has a primary FQDN, an owner team, tags and an optional asset link to a device of the asset mirror. An <dfn>interface</dfn> is a network port of a host. It has a name, a fabric and an identifier: a MAC for Ethernet, a port GUID (<code>port_guid</code>, 16 lowercase hex digits, for example <code>0c42a1030071a2b4</code>) and the 20-byte IPoIB hardware address for InfiniBand. An interface holds zero or more addresses.</p>
+<p>A <dfn>host</dfn> is a named logical system with interfaces. Its kind (<code>host_kind</code>) is <code>physical</code>, <code>vm</code>, <code>hypervisor</code>, <code>appliance</code> or <code>container-node</code>. A host has a primary FQDN, an owner team, tags and an optional asset link to a device of the asset mirror. An <dfn>interface</dfn> is a network port of a host. It has a name, a fabric and an identifier: a MAC for Ethernet, a port GUID (<code>port_guid</code>, 16 lowercase hex digits, for example <code>0c42a1030071a2b4</code>) and the 20-byte IPoIB hardware address for InfiniBand. An interface holds zero or more addresses. A WireGuard interface has no L2 identifier. It has the public key (<code>wg_public_key</code>, 44 characters base64) instead. bembel never stores a private key.</p>
 <figure class="diagram wide">
 <svg viewBox="0 0 1040 326" role="img" aria-labelledby="host-t">
 <title id="host-t">Host cn-004 with three interfaces in three VRFs and its asset link</title>
@@ -345,6 +354,10 @@
 <h2 id="vms">Virtual machines</h2>
 <p>A VM is a host with <code>host_kind</code> <code>vm</code>. It has a <code>runs_on</code> link to a host with <code>host_kind</code> <code>hypervisor</code> and a <code>platform</code>: <code>libvirt</code>, <code>openstack</code> or <code>other</code>. All VMs use this one model. Only the source differs: the bembel-agent on a Debian libvirt hypervisor reports libvirt VMs, and the OpenStack sync reports OpenStack VMs. A live migration changes only <code>runs_on</code>. The chapter <a href="vms.html">Virtual machines</a> gives the agent, the libvirt hook and the cloud-init data.</p>
 
+<h2 id="vpn">VPN and Wi-Fi access</h2>
+<p>A <dfn>VPN profile</dfn> is one eduVPN profile or one WireGuard server. An eduVPN profile names its VPN nodes and, for each node, protocol and family, one subnet with a range of the purpose <code>vpn-pool</code>. The VPN server gives the client addresses from that range. bembel does not allocate them. A WireGuard profile has one subnet without such a range: bembel allocates one address for each peer, on a WireGuard interface. A <dfn>VPN session</dfn> records which user had which client address from when to when. The bembel-agent on the VPN node reports it. bembel keeps sessions for 90 days (<code>vpn.session_retention</code>), because they answer the question "who had 10.40.0.17 at 14:02".</p>
+<p>Wi-Fi uses the model as it is: a subnet and a VLAN for each SSID, a DHCP scope with a large pool for the clients, and hosts of the kind <code>appliance</code> for the access points. The chapter <a href="vpn-wifi.html">VPN and Wi-Fi</a> gives the details.</p>
+
 <h2 id="dns">DNS</h2>
 <p>A <dfn>zone</dfn> is a forward or reverse DNS zone. It is in one or more DNS views, it has SOA and NS settings, an owner and DNS servers as delivery targets. A <dfn>DNS view</dfn> is a split-horizon view, for example <code>internal</code> and <code>external</code>. A record is a resource record with name, type, TTL and data in a view.</p>
 <p>bembel has two classes of records:</p>
@@ -352,6 +365,7 @@
 <li>A <dfn>derived record</dfn> comes from an address with a DNS name: the A or AAAA record in the forward zone and the PTR record in the reverse zone. A user changes it only through the address. When an address moves to another IP, both records move.</li>
 <li>A <dfn>manual record</dfn> is edited directly: CNAME, MX, SRV, TXT, NS, CAA, and A or AAAA records for names outside bembel. A CNAME can point to any name, also outside bembel.</li>
 </ul>
+<p>A manual record can be <code>disabled</code>, and it can have an <code>active_from</code> time. The export skips a disabled record and a record whose <code>active_from</code> is in the future. For a derived record, the address field <code>dns_disabled</code> does the same (<a href="dns.html#records">dns.html#records</a>).</p>
 <p>Reverse zones are computed from the subnets: <code>20.10.in-addr.arpa</code> for <code>10.20.0.0/16</code>, nibble zones for IPv6, and RFC 2317 zones with the parent CNAMEs for small IPv4 subnets. The BIND export writes all zones per DNS server and per view (<a href="dns.html#export">dns.html#export</a>).</p>
 
 <h2 id="dhcp">DHCP</h2>
@@ -379,6 +393,14 @@
 
 <h2 id="access">Access</h2>
 <p>A subject is a user, a group or a service. A role is a set of permissions. A binding gives a subject a role in a scope. The scope is global, a VRF, a prefix subtree, a zone subtree, a site subtree, a team or a tag. A binding can AND several scope terms. A token is a personal access token that narrows the permissions of its owner. A change request holds a dangerous change until a second subject approves it. An audit event records each change and each denied request. The chapter <a href="access.html">Access control</a> gives the details.</p>
+
+<h2 id="extras">Notes, link templates and saved filters</h2>
+<p>Three small kinds help users to work with the data. None of them changes an export.</p>
+<ul>
+<li>A <dfn>note</dfn> is a short text on one object: a host, an interface, an address, a prefix, a zone, a VLAN or a DHCP scope. It has a level (<code>info</code> or <code>warn</code>), a <code>pinned</code> flag, an optional <code>expires_at</code>, an author and a time. A pinned <code>warn</code> note shows above the head of the object page. A note without an object is a <dfn>banner</dfn>: it shows under the top bar for all users, for example "DNS freeze from 2026-11-09 06:00 UTC". The note table has one nullable foreign key for each kind and a CHECK that at most one is set, so the rule of typed links holds.</li>
+<li>A <dfn>link template</dfn> is a URL with fields, declared by an admin for one kind, for example <code>https://grafana.example.org/d/node?var-host={fqdn}</code>. The object page shows it as a button next to Open in FNT. bembel URL-encodes each field. Only <code>https</code> links are allowed, and a template holds no code.</li>
+<li>A <dfn>saved filter</dfn> is a named list state: the page, the filters, the sort and the columns. A user saves it for self or for a team, and can pin it to the Overview page.</li>
+</ul>
 
 <h2 id="history">History and events</h2>
 <p>Each table has a history table with the old row and a validity range (<code>tstzrange</code>). Thus bembel can show each object at any time, and "who could do what at time T" for bindings. Each change writes, in the same transaction:</p>
@@ -423,6 +445,8 @@
 <tr><td>The Neutron IPAM driver allocates a subnet or claims an address.</td><td><code>openstack:os-prod</code></td><td><code>openstack-driver</code></td><td>The driver, and the sync that confirms its claims.</td></tr>
 <tr><td>The Cluster API provider allocates an address.</td><td><code>k8s:prod-1</code></td><td><code>k8s:prod-1</code></td><td>The provider. A user can release it only with a change request.</td></tr>
 <tr><td>The bembel-agent reports a libvirt VM.</td><td><code>libvirt:hv-03</code></td><td><code>libvirt:hv-03</code></td><td>The agent of the current hypervisor.</td></tr>
+<tr><td>The bembel-agent on a VPN node reports a VPN session.</td><td><code>eduvpn:vpn-01</code></td><td><code>eduvpn:vpn-01</code></td><td>Only the agent of that node.</td></tr>
+<tr><td>The ExtremeCloud IQ sync mirrors an access point.</td><td><code>xiq</code></td><td><code>xiq</code></td><td>Only the sync. Users add only asset links.</td></tr>
 </tbody>
 </table>
 <p>The server sets <code>source</code>, and <code>managed_by</code> for an integration subject, from the source of the calling subject. A source names at most one external service subject plus its own built-in worker. A write by any other subject to an object of that source gives 409 <code>resource.managed</code>. Inside one source, <code>managed_by</code> separates the writers.</p>
@@ -488,6 +512,8 @@ CREATE TABLE address (
   publish          boolean NOT NULL DEFAULT false,    -- export while claimed
   deprecated_until timestamptz,                       -- deprecated only
   observed         boolean NOT NULL DEFAULT false,
+  dns_disabled     boolean NOT NULL DEFAULT false,    -- no derived records
+  nat_outside_id   uuid REFERENCES address,           -- outside address of a NAT pair
   last_seen_at     timestamptz,
   last_seen_source text,                              -- agent, sync or lease source
   owner            uuid REFERENCES team,
@@ -510,6 +536,24 @@ CREATE TABLE address_interface (                 -- one row, or several for a sh
   address_id   uuid REFERENCES address ON DELETE CASCADE,
   interface_id uuid REFERENCES interface ON DELETE CASCADE,
   PRIMARY KEY (address_id, interface_id)
+);
+
+CREATE TABLE note (                              -- typed links: at most one object column is set
+  id            uuid PRIMARY KEY DEFAULT uuidv7(),
+  host_id       uuid REFERENCES host ON DELETE CASCADE,
+  interface_id  uuid REFERENCES interface ON DELETE CASCADE,
+  address_id    uuid REFERENCES address ON DELETE CASCADE,
+  prefix_id     uuid REFERENCES prefix ON DELETE CASCADE,
+  zone_id       uuid REFERENCES zone ON DELETE CASCADE,
+  vlan_id       uuid REFERENCES vlan ON DELETE CASCADE,
+  dhcp_scope_id uuid REFERENCES dhcp_scope ON DELETE CASCADE,
+  level         note_level NOT NULL DEFAULT 'info',  -- info | warn
+  pinned        boolean NOT NULL DEFAULT false,
+  body          text NOT NULL CHECK (length(body) <= 4000),
+  expires_at    timestamptz,
+  created_by    text NOT NULL,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT note_one_object CHECK (num_nonnulls(host_id, interface_id, address_id, prefix_id, zone_id, vlan_id, dhcp_scope_id) <= 1)
 );
 
 CREATE TABLE object_ref (                        -- more source refs of a merged object

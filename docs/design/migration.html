@@ -223,7 +223,7 @@ bembel import findings list|show|accept
 <tr><td><code>--map-file FILE</code></td><td>The YAML map file with the rules that ONA cannot hold. The import stores a hash of the file in the run.</td></tr>
 <tr><td><code>--context NAME</code></td><td>The ONA context (a separate database). The map file can set a VRF or team for it.</td></tr>
 <tr><td><code>--fail-on error|warn|never</code></td><td>Exit code 3 if findings of that severity are open. Default <code>never</code>. The cutover uses <code>error</code>.</td></tr>
-<tr><td><code>--with-configs</code>, <code>--with-logs</code></td><td>Also import the config archive and <code>ona_logs</code> as attachments.</td></tr>
+<tr><td><code>--with-configs</code>, <code>--with-logs</code></td><td>Also write the device configs and <code>ona_logs</code> as files in the output directory of the run. bembel stores neither.</td></tr>
 <tr><td><code>--report FILE</code></td><td>Write the run report as JSON.</td></tr>
 <tr><td><code>--release</code></td><td>Cutover only. Remove <code>managed_by = ona-import</code> from all imported objects. Users can then edit them.</td></tr>
 </tbody>
@@ -564,7 +564,7 @@ differences:
   <li>Announce the freeze to all users with the time of window A.</li>
   <li>Check that the agent on each server has a release <code>ona-final</code> prepared. It is the copy of the files that run now, so the agent can return to them.</li>
   <li>Check that the bembel API has three ready replicas and the metrics show no alert.</li>
-  <li>Check that the M4 entry criteria passed: the HA and restore drills and the alert tests (<a href="roadmap.html#m4-entry">roadmap.html#m4-entry</a>).</li>
+  <li>Check the readiness of bembel. The placement has one bembel pod and one PostgreSQL instance per zone, and the kill tests of one pod, one zone and the PostgreSQL primary pass (<a href="operations.html#ha">HA</a>). One point-in-time restore drill into a new cluster passes (<a href="operations.html#restore">restore</a>). The alerts <code>BembelReplicasLow</code>, <code>BembelExportStale</code>, <code>BembelExportNotPulled</code> and <code>BembelOutboxLag</code> have passing promtool tests (<a href="operations.html#alerts">alerts</a>).</li>
 </ol>
 <h3 id="window-a">Window A: data and DNS</h3>
 <table>

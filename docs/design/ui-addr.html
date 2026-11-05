@@ -61,9 +61,12 @@
 <tr><td>Allowed actions</td><td>A button that the user may not use stays visible, set to <code>aria-disabled</code>, with a <code>title</code> such as "Needs the permission record:create. Roles with it: dns-editor, network-admin, admin."</td><td>A hidden button leaves the user to guess. A reason tells the user whom to ask.</td></tr>
 <tr><td>Dangerous actions</td><td>Delete… of a prefix with children or addresses keeps its label and says "Needs a change request". The form adds a reason field, and its confirm button is "Request approval". A second user with <code>approver</code> in scope approves.</td><td>Four-eyes for shared state (<a href="access.html#changes">change requests</a>).</td></tr>
 <tr><td>Values</td><td>IP, prefix, MAC, FQDN and VLAN id use one mono style with no line break. The prefix length is muted.</td><td>The eye finds the part that changes.</td></tr>
-<tr><td>Source badge</td><td>A badge shows <code>local</code>, <code>ona-import</code>, <code>fnt</code>, <code>openstack:&lt;cloud&gt;</code>, <code>k8s:&lt;cluster&gt;</code> or <code>libvirt:&lt;hv&gt;</code>. A managed source has a lock mark. A user cannot edit a managed object.</td><td>The user knows who owns the data before an edit.</td></tr>
+<tr><td>Source badge</td><td>A badge shows <code>local</code>, <code>ona-import</code>, <code>fnt</code>, <code>openstack:&lt;cloud&gt;</code>, <code>k8s:&lt;cluster&gt;</code>, <code>libvirt:&lt;hv&gt;</code>, <code>eduvpn:&lt;node&gt;</code> or <code>xiq</code>. A managed source has a lock mark. A user cannot edit a managed object.</td><td>The user knows who owns the data before an edit.</td></tr>
 <tr><td>Assistant</td><td>An advisory button has a ✦ mark and a fixed prompt, for example "Find stale addresses". It reads data with the tools of the user. It changes nothing. It can give a draft.</td><td>The assistant is never a stronger subject than the user (<a href="assistant.html">assistant</a>).</td></tr>
 <tr><td>Offline</td><td>A banner at the top of main says "Offline" and the page shows old data. It tries again every 5 s.</td><td>Old data must not look live.</td></tr>
+<tr><td>Notes</td><td>Each object page has a Notes tab with a count. A pinned <code>warn</code> note shows as a yellow line above the page head ("PSU 2 failed, ticket 8812", m.huber). A banner shows under the top bar on all pages. A user can close it until its text changes.</td><td>Facts that are not fields still need a place, near the object (<a href="model.html#extras">notes</a>).</td></tr>
+<tr><td>Links to other tools</td><td>The link templates of the kind show as outline buttons in the page head, next to Open in FNT ("Grafana", "Ticket search").</td><td>A user goes from the object to the other tool in one click, with the right values in the URL.</td></tr>
+<tr><td>Saved filters</td><td>A list page has "Save filter…" in its filter bar. The sidebar lists the saved filters of the user and of the teams under "Saved". A pinned filter is a card on Overview with its count.</td><td>A user repeats the same list every day. A name is faster than six chips.</td></tr>
 </tbody></table>
 <p>The pages are responsive with a container query on <code>main</code>. When the drawer is open, <code>main</code> is narrower, and the tables drop their least important columns first (source, then team and fabric, then kind and VLAN). Below 760 px the sidebar becomes a menu and a drawer fills the screen.</p>
 <dl class="facts">
@@ -129,7 +132,7 @@
 <tr><td>⋯ Delete…</td><td>menu</td><td><code>prefix:delete</code></td><td>The line under it says "Needs a change request: 941 addresses, 1 DHCP scope". A delete of a prefix with children or addresses is always held.</td></tr>
 </tbody></table>
 <h3 id="util">Utilisation card</h3>
-<p>The card has one large number (92 %), the counts, one stacked bar and a legend. The bar has six parts in a fixed order: allocated 635, deprecated 6, reserved 38, claimed 7, dhcp-pool 255 and free 81. The sum is 1 022, the usable addresses of a /22 (the network and broadcast address are not counted). A small line chart shows used addresses over 30 days and a sentence gives the forecast: "At this rate the subnet is full in 19 days". The forecast is a linear fit of the daily counts. A second line shows the number of addresses with no DHCP lease, no DHCP ACK and no other sign for 90 days.</p>
+<p>The card has one large number (92 %), the counts, one stacked bar and a legend. The bar has six parts in a fixed order: allocated 635, deprecated 6, reserved 38, claimed 7, dhcp-pool 255 and free 81. The sum is 1 022, the usable addresses of a /22 (the network and broadcast address are not counted). A small line chart shows used addresses over 30 days and a sentence gives the forecast: "At this rate the subnet is full in 19 days". The forecast is a linear fit of the daily counts from <code>prefix_usage_daily</code>. A switch shows 1 year instead of 30 days. A second line shows the number of addresses with no DHCP lease, no DHCP ACK and no other sign for 90 days.</p>
 <h3 id="map">The address map</h3>
 <p>The map draws every address of the subnet as one square cell. A /22 has 1 024 addresses and so 1 024 cells. The cells are in <strong>4 blocks</strong>, one per /24. A block has 16 rows of 16 cells. The cell of an address with offset <var>n</var> in its /24 is in row <var>n</var> ÷ 16 and column <var>n</var> mod 16. The address <code>10.20.4.44</code> has offset 44: row 2, column 12 of block 1.</p>
 <figure class="diagram wide">
@@ -238,6 +241,7 @@
   <li><strong>DHCP reservation.</strong> The fixed address, the hardware address, the host name and the delivery target (<code>dhcp-a</code>, bundle <code>b-7c41e0</code>).</li>
   <li><strong>Asset.</strong> A small rack picture with the device in U10–11 of Rack A01, then rack, position, device (links to the rack and device pages), the serial <code>SN7K4-0042</code> and the match rule. The badge <code>fnt</code> and the sync time show the source.</li>
   <li><strong>History.</strong> The audit events of this address as a timeline. The oldest: "import imp-20261023-0131 created it from ONA (ona:hosts:8812)" on 2026-10-23 01:31, with the binding to <code>eno1</code> and the reservation from the same run. Then "sync fnt updated the device link" on 2026-11-03 03:00 (full reconcile).</li>
+  <li><strong>VPN sessions.</strong> For an address in a <code>vpn-pool</code> range, the drawer shows the sessions of the last 24 hours: user, profile, start and end. A user without <code>vpn-session:read</code> sees only the count (<a href="vpn-wifi.html#sessions">VPN sessions</a>).</li>
   <li><strong>Actions.</strong> Edit, Move…, Release… (red outline), Add record… and a ⋯ menu. Move… changes the subnet and runs the same checks as an allocation. Release… asks for a confirmation and says what it removes: 3 records and 1 reservation.</li>
 </ul>
 <aside class="callout rule"><p class="callout-title">Allowed actions</p><p>The user in the story, d.klein, has <code>network-admin</code> in global, which holds <code>record:create</code>, so "Add record…" is enabled. Its <code>title</code> says: "Add record… needs record:create. You have it through network-admin in global." For a.berger (allocator) "Add record…" is visible and disabled. Its <code>title</code> says: "Needs the permission record:create. Roles with it: dns-editor, network-admin, admin. You have allocator in prefix 10.20.0.0/16 AND team hpc-ops." A line under the buttons repeats the text in plain text, so a touch user can read it too. The API call <code>POST /v1/me/permissions:check</code> gives the answer for each button. The page asks once for all buttons.</p></aside>
@@ -270,6 +274,29 @@
   <dt>API</dt><dd><code>GET /v1/hosts</code>, <code>GET /v1/hosts/{id}</code>, <code>GET /v1/hosts/{id}/interfaces</code>, <code>POST /v1/hosts</code>, <code>PATCH /v1/hosts/{id}</code></dd>
   <dt>CLI</dt><dd><code>bembel host ls --kind hypervisor</code>, <code>bembel host show cn-004.kestrel.example.org</code>, <code>bembel vm prepare --name vm-build-07 --subnet kestrel-services --mac auto</code></dd>
   <dt>Keys</dt><dd><kbd>g</kbd> <kbd>h</kbd> go to Hosts, <kbd>n</kbd> new host</dd>
+</dl>
+
+<h2 id="bulk">Bulk edit and import</h2>
+<p>The lists of hosts, addresses and records have a checkbox in each row. A selection opens a bar over the table: "38 hosts selected", with Set team…, Set tags…, Add note…, Move… and Delete…. The Import… button in the page head opens the import dialog.</p>
+<ol class="steps">
+<li>The user drops a CSV or YAML file, or pastes rows. The dialog shows the kind and the columns that it found (<code>fqdn, prefix, mac, interface, owner, tags</code>).</li>
+<li>The dialog sends the rows with <code>validate_only</code> and shows the plan: one row for each line, with the action (create, update, none), the changed fields and the findings. A row with an error is red and has the reason.</li>
+<li>The footer says "38 create, 2 none, 0 findings". The confirm button is "Apply 38 changes". Over the bulk threshold it is "Request approval", and the plan goes into the change request.</li>
+<li>The dialog shows the CLI command: <code>bembel apply -f rack-a04.csv</code>.</li>
+</ol>
+<p>A bulk edit from the selection bar uses the same plan step. The rule of <a href="allocation.html#plan">plan and apply</a> applies to both.</p>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/hosts?import=1</code></dd>
+  <dt>API</dt><dd><code>POST /v1/hosts:batchCreate</code>, <code>POST /v1/hosts:batchUpdate</code> (with <code>validate_only</code>, then <code>plan_hash</code>)</dd>
+  <dt>CLI</dt><dd><code>bembel apply -f rack-a04.csv --plan-only</code></dd>
+</dl>
+
+<h2 id="reports">Reports</h2>
+<p>The page Reports lists the fixed reports: utilisation, stale addresses, hosts without asset, records outside views, expiring. Each report is a table with the filters of the report and a CSV button. The utilisation report draws one line for each container over the selected time (<a href="allocation.html#reports">reports</a>).</p>
+<dl class="facts">
+  <dt>URL</dt><dd><code>/reports/utilisation?group=team&amp;since=365d</code></dd>
+  <dt>API</dt><dd><code>GET /v1/reports/utilisation?group=team&amp;since=365d</code></dd>
+  <dt>CLI</dt><dd><code>bembel report utilisation --group team -o csv</code></dd>
 </dl>
 
 <h2 id="search">Search and the jump box</h2>

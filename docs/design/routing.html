@@ -107,7 +107,7 @@ ASN         NAME             OWNER    USED BY
 <dl class="facts">
   <dt>VRF</dt><dd><code>default_asn</code>: the local AS of the VRF, if all routers of the VRF use one.</dd>
   <dt>Host</dt><dd><code>bgp_asn</code>: the local AS of a router or a switch. The default is the ASN of the VRF.</dd>
-  <dt>Prefix</dt><dd><code>origin_asn</code>: the AS that announces it. The default is the ASN of the VRF. Needed for RPKI or IRR exports later.</dd>
+  <dt>Prefix</dt><dd><code>origin_asn</code>: the AS that announces it. The default is the ASN of the VRF. RPKI or IRR exports use it.</dd>
   <dt>Fabric</dt><dd><code>asn</code>: the ASN of a fabric, for example <code>osprey-roce</code>.</dd>
 </dl>
 <p>The checks are simple. A number must lie in a range, or the user must say <code>--no-range</code>. A number is unique. A private number cannot be used for a prefix with the status <code>announce</code> in the VRF <code>global</code> without an ASN of the kind <code>public</code> in the path (a warning, not an error, because the border router may remove the private AS).</p>
@@ -133,6 +133,33 @@ ASN         NAME             OWNER    USED BY
 <p class="callout-title">Leaks and overlaps</p>
 <p>The database allows the same CIDR in two VRFs. A route target that leaks routes between the two VRFs makes the overlap a real conflict. bembel checks this: if VRF A imports an RT that VRF B exports, and both have an equal or overlapping prefix, the check gives the finding <code>vrf.leak-overlap</code> with both prefixes. The check runs on every change of an RT list or a prefix.</p>
 </aside>
+
+<h2 id="vni">VXLAN network identifiers</h2>
+<p>An EVPN overlay carries a layer 2 segment or a VRF over VXLAN. Each segment needs a <dfn>VNI</dfn>, a number from 1 to 16 777 215. A VNI must be unique in the overlay, and a duplicate joins two networks that must stay apart. bembel allocates VNIs from a <dfn>VNI range</dfn>, in the same way as ASNs from an ASN range.</p>
+<table>
+<thead><tr><th>Range</th><th>Span</th><th>Use</th><th>Owner</th></tr></thead>
+<tbody>
+<tr><td><code>l2-campus</code></td><td>10000 to 19999</td><td>L2 VNI of a VLAN. Convention: 10000 + VLAN ID.</td><td>network</td></tr>
+<tr><td><code>l3-vrf</code></td><td>50000 to 50999</td><td>L3 VNI of a VRF (symmetric IRB)</td><td>network</td></tr>
+</tbody>
+</table>
+<pre class="term">$ bembel vni allocate --range l2-campus --vlan kestrel-compute --prefer 10204
+allocated VNI 10204  vlan kestrel-compute (204)  range l2-campus
+$ bembel vni allocate --range l3-vrf --vrf os-provider
+allocated VNI 50000  vrf os-provider  range l3-vrf</pre>
+<ul>
+<li>A VLAN has the field <code>vni</code>, a VRF has the field <code>l3_vni</code>. Both are nullable. A unique index on the two values together makes a VNI unique in the instance.</li>
+<li><code>--prefer</code> asks for one number. If it is taken or outside the range, the answer is <code>409 vni.unavailable</code>. Without <code>--prefer</code>, bembel takes the lowest free number. The allocation uses the same lock as an ASN allocation (<a href="allocation.html#concurrency">concurrency</a>).</li>
+<li>A VNI outside all ranges needs <code>--no-range</code>, like an ASN.</li>
+<li>The routing intent of a VRF lists its <code>l3_vni</code> and the <code>vni</code> of each VLAN with a subnet in the VRF. The fabric intent lists the VNIs of its VLANs (<a href="fabrics.html#ethernet">fabrics.html#ethernet</a>).</li>
+<li>bembel does not hold EVPN device config: no VTEP addresses as config, no flood lists, no ESI. A VTEP loopback is a normal address with the role <code>loopback</code>.</li>
+</ul>
+<pre><code class="language-json">{
+  "vrf": "os-provider",
+  "rd": "65010:300",
+  "l3_vni": 50000,
+  "l2_vni": [ { "vlan": 300, "name": "os-provider", "vni": 10300 } ]
+}</code></pre>
 
 <h2 id="routes">Static routes and announced prefixes</h2>
 <h3 id="routes-static">Static routes</h3>

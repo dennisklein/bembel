@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Open questions and sources</title>
+<meta name="description" content="What bembel does not do, the questions that are not decided, and the sources of the research.">
+</head>
+<body>
+<h1>Open questions and sources</h1>
+<p class="lede">This chapter lists what bembel does not do, the points of the design that are not decided, and the sources of the research.</p>
+<ul class="keypoints">
+  <li>bembel holds values and exports them. It does not configure devices and does not serve DNS or DHCP itself.</li>
+  <li>Each open question names the part of the design that its answer changes.</li>
+  <li>The sources list the pages that the research read. A fact from a search snippet is marked.</li>
+</ul>
+
+<h2 id="out-of-scope">Out of scope</h2>
+<table>
+<thead><tr><th>Not in bembel</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>A CNI IPAM plugin</td><td>The latency and availability needs at pod start do not fit a central service (<a href="kubernetes.html#cni">Kubernetes</a>).</td></tr>
+<tr><td>Write back to FNT Command</td><td>FNT is the source of truth for the assets. bembel mirrors it read only (<a href="assets.html">Assets</a>).</td></tr>
+<tr><td>A DHCP server or a DNS server inside bembel</td><td>bembel builds files and bundles. BIND, dhcpd and Kea serve them (<a href="dns.html">DNS</a>, <a href="dhcp.html">DHCP</a>).</td></tr>
+<tr><td>A firewall or router config manager</td><td>bembel gives values and feeds. The network automation writes the config (<a href="routing.html#scope">Routing</a>).</td></tr>
+</tbody>
+</table>
+
+<h2 id="open">Open questions</h2>
+<p>These points are not decided. The answer changes the design only where the table says so.</p>
+<table>
+<thead><tr><th>Question</th><th>State and effect</th><th>Affects</th></tr></thead>
+<tbody>
+<tr><td><strong>Name.</strong> Is <code>bembel</code> final?</td><td>Chosen after a search of crates.io, npm, PyPI and GitHub on 2026-11-04. The fallback is <code>glebe</code>. Trademark databases and the Go module path are not checked. A rename costs a day now and a lot after the first release.</td><td>Go module path, packages</td></tr>
+<tr><td><strong>VPN session retention.</strong></td><td>The design keeps VPN sessions for 90 days. The data protection officer of the site must agree to the value and to the group that may read sessions. A shorter value is a config change.</td><td><a href="vpn-wifi.html#sessions">VPN sessions</a></td></tr>
+<tr><td><strong>ExtremeCloud IQ API.</strong></td><td>Only <code>GET /clients/active</code> is confirmed. The device and location paths, the paging and the rate limit need a test against the site tenant with an API token.</td><td><a href="vpn-wifi.html#xiq">XIQ mirror</a></td></tr>
+<tr><td><strong>FNT attribute names.</strong></td><td>The entity names for rack, device, port and cable, the login call, the paging parameters and the delta timestamp are not public. An FNT admin must give a Swagger or OpenAPI export of the tenant. Until then <a href="assets.html#entities">the mapping table</a> is a plan.</td><td>FNT sync</td></tr>
+<tr><td><strong>ISC dhcpd end of life.</strong></td><td>ISC has ended the development of ISC DHCP (since 2022). bembel exports dhcpd because ONA does and because the parallel run needs the same format. It also exports Kea. When does the organisation move its servers to Kea? The answer sets the end of the dhcpd export.</td><td><a href="dhcp.html#kea">DHCP export</a></td></tr>
+<tr><td><strong>LLM model choice.</strong></td><td>The examples use <code>gpt-oss-20b</code> or <code>qwen3-coder-30b</code> for chat and <code>bge-m3</code> or <code>nomic-embed-text</code> for embeddings, on <code>llm.example.org</code>. The choice depends on the GPU of the host, the quality of tool calls and the language of the users. An evaluation set of 50 questions about the story data decides. Embedding model changes need a full re-embed.</td><td><a href="assistant.html#llm">Assistant</a></td></tr>
+<tr><td><strong>NetBox exchange need.</strong></td><td>No team uses NetBox today. If a partner site or a tool (a NetBox-based automation) needs the model, bembel builds the exchange. If not, it stays out.</td><td><a href="map-netbox.html#exchange">NetBox exchange</a></td></tr>
+<tr><td><strong>IPv6 SLAAC policy.</strong></td><td>bembel only observes SLAAC and EUI-64 addresses. Open: how long does an observed address stay after the last report, does it count in utilisation, and does a privacy address (RFC 8981) create a host entry? The default proposal: keep for 30 days, count by the number, ignore privacy addresses.</td><td>Observed addresses, utilisation</td></tr>
+<tr><td><strong>Level trigger.</strong></td><td>The exclusion constraint on prefixes uses a computed level (<a href="allocation.html#level">Allocation</a>). The trigger and its cost on 10<sup>5</sup> prefixes need a prototype.</td><td>Prefix constraints</td></tr>
+<tr><td><strong>pgvector in CloudNativePG.</strong></td><td>How the extension gets into the image (own image, or an extension image volume) depends on the operator version. Verify on the target cluster. The first production cluster already needs it.</td><td>Database image</td></tr>
+<tr><td><strong>Rack numbering.</strong></td><td>Does FNT number U from the bottom or the top for each rack, and does it differ by rack? The model has a field per rack. Verify with the tenant export.</td><td>Rack view</td></tr>
+</tbody>
+</table>
+
+<h2 id="sources">Sources</h2>
+<p>The design rests on research notes made on 2026-11-04. Some sources could not be reached from the research environment (for example the FNT customer portal and parts of postgresql.org). The notes mark such facts, and this record keeps the marks. Where a statement says "to verify", the source is a search result or prior knowledge, not a fetched page.</p>
+
+<h3 id="src-products">Product and migration sources</h3>
+<ul>
+  <li>OpenNetAdmin: <a href="https://github.com/opennetadmin/ona">github.com/opennetadmin/ona</a>, <a href="https://github.com/opennetadmin/ona/issues">issues</a>, <a href="https://github.com/opennetadmin/ona/wiki/plugins">plugins</a>, <a href="https://github.com/opennetadmin/ona-core">ona-core</a>, <a href="https://github.com/opennetadmin/dcm">dcm</a></li>
+  <li>ONA exporters: <a href="https://github.com/opennetadmin/build_bind">build_bind</a>, <a href="https://github.com/opennetadmin/build_isc_dhcp">build_isc_dhcp</a></li>
+  <li>NetBox: <a href="https://github.com/netbox-community/netbox">netbox</a>, <a href="https://netboxlabs.com/docs/netbox/">documentation</a>, <a href="https://github.com/netbox-community/devicetype-library">devicetype-library</a>, <a href="https://github.com/netboxlabs/diode">diode</a>, <a href="https://github.com/netboxlabs/netbox-branching">netbox-branching</a>, <a href="https://netboxlabs.com/docs/extensions/branching/">branching docs</a>, <a href="https://github.com/peteeckel/netbox-plugin-dns">netbox-plugin-dns</a></li>
+  <li>NetBox discussions and issues: <a href="https://github.com/netbox-community/netbox/discussions/16262">#16262</a>, <a href="https://github.com/netbox-community/netbox/discussions/7516">#7516</a>, <a href="https://github.com/netbox-community/netbox/issues/1737">#1737</a>, <a href="https://github.com/netbox-community/netbox/issues/9763">#9763</a></li>
+</ul>
+
+<h3 id="src-fnt">FNT Command</h3>
+<ul>
+  <li><a href="https://www.fntsoftware.com/en/products/fnt-command/c-gate/api">FNT Command API (C gate)</a> (search snippet only)</li>
+  <li><a href="https://github.com/witcom-gmbh/witcom-api-gateway">witcom-gmbh/witcom-api-gateway</a>: entity routes, login and session handling</li>
+  <li><a href="https://github.com/witcom-gmbh/command-feign-client">witcom-gmbh/command-feign-client</a>: generated OpenAPI 3 for a subset of entities</li>
+  <li><a href="https://github.com/dennisklein/fntcommand-restclient">dennisklein/fntcommand-restclient</a>: Python client of the author</li>
+  <li><a href="https://datacenterknowledge.com/business/fnt">Data Center Knowledge: FNT</a> (search snippet only)</li>
+</ul>
+
+<h3 id="src-dnsdhcp">DNS and DHCP</h3>
+<ul>
+  <li>Kea: <a href="https://www.isc.org/blogs/kea-3-0/">Kea 3.0</a>, <a href="https://kb.isc.org/docs/things-to-be-aware-of-when-upgrading-to-kea-300">upgrading to Kea 3.0</a>, <a href="https://kb.isc.org/docs/isc-kea-packages">Kea packages</a>, <a href="https://kb.isc.org/docs/migrating-from-isc-dhcp-to-kea">migrating from ISC DHCP</a>, <a href="https://kea.readthedocs.io/en/latest/arm/hooks.html">hooks</a>, <a href="https://gitlab.isc.org/isc-projects/kea/-/wikis/">wiki</a></li>
+  <li>RFCs: <a href="https://datatracker.ietf.org/doc/rfc9432/">RFC 9432 (catalog zones)</a>, <a href="https://www.rfc-editor.org/rfc/rfc2317">RFC 2317 (classless reverse delegation)</a></li>
+  <li>DNS libraries and tools: <a href="https://github.com/miekg/dns">miekg/dns</a>, <a href="https://codeberg.org/miekg/dns">miekg/dns v2</a>, <a href="https://github.com/kubernetes-sigs/external-dns">external-dns</a>, <a href="https://www.mail-archive.com/pdns-users@mailman.powerdns.com/msg13167.html">PowerDNS users list thread</a></li>
+</ul>
+
+<h3 id="src-k8s">Kubernetes and OpenStack</h3>
+<ul>
+  <li>Cluster API: <a href="https://cluster-api.sigs.k8s.io/developer/providers/contracts/ipam">IPAM provider contract</a>, <a href="https://github.com/metal3-io/ip-address-manager">metal3 ip-address-manager</a>, <a href="https://github.com/telekom/cluster-api-ipam-provider-infoblox">Infoblox provider</a>, <a href="https://github.com/erwin-kok/cluster-api-ipam-provider-netbox">NetBox provider</a>, <a href="https://github.com/kubernetes-sigs/cluster-api-provider-vsphere/pull/1666">CAPV pull request 1666</a>, <a href="https://jkremser.github.io/post/ipam-for-capv">IPAM for CAPV</a></li>
+  <li>Service account tokens: <a href="https://kubernetes.io/docs/concepts/storage/projected-volumes/">projected volumes</a>, <a href="https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/">service accounts admin</a>, <a href="https://www.keycloak.org/securing-apps/token-exchange">Keycloak token exchange</a>, <a href="https://docs.giantswarm.io/tutorials/security/structured-authentication/">Giant Swarm: structured authentication</a>, <a href="https://techblog.cisco.com:443/blog/kubernetes-oidc">Cisco: Kubernetes OIDC</a>, <a href="https://docs.coreweave.com/products/cks/auth-access/workload-identity/introduction">CoreWeave: workload identity</a></li>
+  <li>OpenStack: the research read the source trees of Neutron, Designate, Ironic, Keystone and networking-infoblox (shallow clones). It has no URL list. The Neutron files are <code>neutron/doc/source/admin/config-ipam.rst</code> and <code>config-address-scopes.rst</code>.</li>
+</ul>
+
+<h3 id="src-authz">Access control</h3>
+<ul>
+  <li>Cedar: <a href="https://www.cedarpolicy.com/">cedarpolicy.com</a>, <a href="https://github.com/cedar-policy">github.com/cedar-policy</a>, <a href="https://pkg.go.dev/github.com/cedar-policy/cedar-go">cedar-go</a>, <a href="https://docs.rs/cedar-policy/latest/cedar_policy/struct.PartialResponse.html">PartialResponse</a>, <a href="https://docs.rs/crate/cedar-policy-core/4.10.0/source/src/tpe.rs">type-aware partial evaluation</a>, <a href="https://www.strongdm.com/blog/cedar-go-implementation">StrongDM: cedar-go</a></li>
+  <li>OPA and others: <a href="https://www.openpolicyagent.org/">OPA</a>, <a href="https://www.openpolicyagent.org/docs/filtering/tutorial-sql-filtering">OPA SQL filtering</a>, <a href="https://docs.styra.com/enterprise-opa/reference/api-reference/partial-evaluation-api">Styra partial evaluation</a>, <a href="https://casbin.org/">Casbin</a>, <a href="https://openfga.dev/docs/best-practices/running-in-production">OpenFGA production</a>, <a href="https://www.pkgpulse.com/guides/openfga-vs-permify-vs-spicedb-zanzibar-authorization-2026">OpenFGA, Permify and SpiceDB compared</a></li>
+  <li>Browser login: <a href="https://datatracker.ietf.org/doc/draft-ietf-oauth-browser-based-apps/15/">OAuth 2.0 for browser-based apps (draft 15)</a></li>
+</ul>
+
+<h3 id="src-stack">Stack, API and database</h3>
+<ul>
+  <li>Go API tools: <a href="https://github.com/danielgtaylor/huma">huma</a> (<a href="https://huma.rocks">site</a>), <a href="https://ogen.dev">ogen</a>, <a href="https://github.com/oapi-codegen/oapi-codegen">oapi-codegen</a> (<a href="https://github.com/oapi-codegen/oapi-codegen/discussions/1027">discussion 1027</a>), <a href="https://appliedgo.net/spotlight/4-tools-for-generating-rest-apis/">Applied Go: four tools</a>, <a href="https://github.com/oasdiff/oasdiff">oasdiff</a></li>
+  <li>TypeScript clients: <a href="https://openapi-ts.dev">openapi-typescript</a>, <a href="https://heyapi.dev">Hey API</a>, <a href="https://orval.dev">orval</a>; frontend roadmap: <a href="https://svelte.dev/roadmap">svelte.dev/roadmap</a></li>
+  <li>Toolchain versions: <a href="https://go.dev/dl/">go.dev/dl</a>, <a href="https://proxy.golang.org/golang.org/toolchain/@v/list">Go toolchain list</a>, <a href="https://static.rust-lang.org/dist/channel-rust-stable.toml">Rust stable channel</a>, <a href="https://nodejs.org/dist/index.json">Node.js releases</a>, <a href="https://mise.jdx.dev/VERSION">mise version</a>, <a href="https://mise.jdx.dev/dev-tools/mise-lock.html">mise lock</a>, <a href="https://mise.jdx.dev/dev-tools/backends/">mise backends</a>, <a href="https://raw.githubusercontent.com/jdx/mise/main/CHANGELOG.md">mise changelog</a></li>
+  <li>PostgreSQL: <a href="https://www.postgresql.org/docs/current/datatype-net-types.html">network address types</a>, <a href="https://www.postgresql.org/docs/18/release-18.html">release 18</a>, <a href="https://www.postgresql.org/about/news/postgresql-19-rc-1-released-3409/">19 RC1</a>, <a href="https://www.postgresql.org/message-id/attachment/197187/19beta1.md">19 beta 1 notes</a>, <a href="https://github.com/RhodiumToad/ip4r">ip4r</a></li>
+  <li>API standards: <a href="https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/">Idempotency-Key header draft</a>, <a href="https://www.rfc-editor.org/rfc/rfc9457">RFC 9457 (problem details)</a>, <a href="https://google.aip.dev/">Google AIP</a>, <a href="https://jsonapi.org">JSON:API</a>, <a href="https://www.standardwebhooks.com">Standard Webhooks</a>, <a href="https://cloudevents.io">CloudEvents</a> (<a href="https://github.com/cloudevents/spec">spec</a>)</li>
+</ul>
+<p>The design record of the author's tools <code>repoctl</code>, <code>brig</code> and <code>rackplanner</code> gave the form of this record, the help system and the rack drawing. They are local repositories and have no public links in this list.</p>
+</body>
+</html>

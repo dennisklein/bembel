@@ -108,16 +108,17 @@
 <tr><td><code>/prefixes/{id}/prefixes:allocate</code></td><td>custom</td><td>Next free child prefix of a length from a pool</td><td><code>prefix</code></td></tr>
 <tr><td><code>/prefixes/{id}/ranges:allocate</code></td><td>custom</td><td>Lowest free aligned block of addresses in a subnet, as a range (for example an lb-pool)</td><td><code>prefix</code></td></tr>
 <tr><td><code>/prefixes/{id}/free</code></td><td>get</td><td>Preview of free ranges. Not a reservation.</td><td><code>prefix</code></td></tr>
-<tr><td><code>/addresses</code></td><td>list get patch; <code>:confirm</code> <code>:renew</code> <code>:release</code></td><td>Across prefixes; filters <code>address mac fqdn status within observed external_ref prefix_id</code>. A claim is an address in status <code>claimed</code> (<code>?status=claimed</code>).</td><td><code>address</code>, <code>claim</code></td></tr>
-<tr><td><code>/ranges</code></td><td>list get create patch delete</td><td>Purpose: dhcp-pool, reserved, static, infrastructure, lb-pool</td><td><code>range</code></td></tr>
+<tr><td><code>/prefixes/{id}:renumber</code>, <code>:resize</code>, <code>:split</code></td><td>custom</td><td>Move a subnet to new addresses, change its length, cut it (<a href="allocation.html#renumber">renumber</a>). A renumber is an operation with <code>:confirm</code>.</td><td><code>prefix</code>, <code>address</code></td></tr>
+<tr><td><code>/addresses</code></td><td>list get patch; <code>:confirm</code> <code>:renew</code> <code>:release</code> <code>:move</code></td><td>Across prefixes; filters <code>address mac fqdn status within observed external_ref prefix_id</code>. A claim is an address in status <code>claimed</code> (<code>?status=claimed</code>).</td><td><code>address</code>, <code>claim</code></td></tr>
+<tr><td><code>/ranges</code></td><td>list get create patch delete</td><td>Purpose: dhcp-pool, reserved, static, infrastructure, lb-pool, vpn-pool</td><td><code>range</code></td></tr>
 <tr><td><code>/vlans</code>, <code>/vlan-domains</code></td><td>full</td><td>VID 1–4094, unique per domain</td><td><code>vlan</code></td></tr>
 <tr><td><code>/fabrics</code></td><td>full</td><td>ethernet, ethernet-roce, infiniband; QoS profile</td><td><code>fabric</code></td></tr>
 <tr><td><code>/ib-partitions</code></td><td>full</td><td>P_Key, membership, MTU</td><td><code>ib-partition</code></td></tr>
 <tr><td><code>/hosts</code></td><td>full</td><td><code>host_kind</code>: physical, vm, hypervisor, appliance, container-node. <code>runs_on</code>, <code>platform</code></td><td><code>host</code></td></tr>
-<tr><td><code>/interfaces</code></td><td>full</td><td>MAC, <code>port_guid</code>, <code>node_guid</code>, addresses. Also nested: <code>/hosts/{id}/interfaces</code></td><td><code>interface</code></td></tr>
+<tr><td><code>/interfaces</code></td><td>full</td><td>MAC, <code>port_guid</code>, <code>node_guid</code>, <code>wg_public_key</code>, addresses. Also nested: <code>/hosts/{id}/interfaces</code>. <code>:move</code> to another host.</td><td><code>interface</code></td></tr>
 <tr><td><code>/views</code></td><td>full</td><td>internal, external</td><td><code>view</code></td></tr>
 <tr><td><code>/zones</code></td><td>full</td><td>Delete always held</td><td><code>zone</code></td></tr>
-<tr><td><code>/zones/{id}/records</code></td><td>full</td><td>Manual records. Derived records are read only.</td><td><code>record</code></td></tr>
+<tr><td><code>/zones/{id}/records</code></td><td>full</td><td>Manual records. Derived records are read only. <code>disabled</code> and <code>active_from</code> on manual records.</td><td><code>record</code></td></tr>
 <tr><td><code>/dhcp-scopes</code>, <code>/dhcp-servers</code>, <code>/dhcp-failover-pairs</code></td><td>full</td><td>Options, pools, failover pair. A scope names its subnet by <code>prefix_id</code>.</td><td><code>dhcp-scope</code>, <code>dhcp-server</code></td></tr>
 <tr><td><code>/dns-servers/{name}/bundle</code>, <code>/dhcp-servers/{name}/bundle</code></td><td>get</td><td>The signed bundle of one server. The agent pulls it with <code>If-None-Match</code> (200 with ETag, or 304).</td><td><code>export</code></td></tr>
 <tr><td><code>/dns-servers/{name}/deployments</code>, <code>/dhcp-servers/{name}/deployments</code></td><td>create</td><td>The agent reports the result of an install: bundle id, time, result per zone, served serial</td><td><code>export</code></td></tr>
@@ -126,11 +127,22 @@
 <tr><td><code>/dhcp-failover-pairs/{name}/restart-tickets</code></td><td>create delete</td><td>One peer may restart while the other is normal. <code>override: true</code> is held for approval.</td><td><code>dhcp-server</code></td></tr>
 <tr><td><code>/exports</code></td><td>list get; <code>:build</code>; <code>/exports/{id}/artifact</code></td><td>bind, dhcpd, opensm, prefix-list, address-group. The artifact is for download and preview by humans, and for prefix-list exports (<code>?format=frr|bird|junos|eos&amp;family=4|6</code>). It has an ETag. Servers get their per-server bundle instead.</td><td><code>export</code></td></tr>
 <tr><td><code>/asns</code>, <code>/static-routes</code></td><td>full</td><td>Routing data (<a href="routing.html">routing</a>)</td><td><code>asn</code></td></tr>
+<tr><td><code>/vni-ranges</code></td><td>full; <code>/{id}/vnis:allocate</code></td><td>VXLAN network identifiers for VLANs and VRFs (<a href="routing.html#vni">VNI</a>)</td><td><code>vni-range</code></td></tr>
+<tr><td><code>/vpn-profiles</code></td><td>full; <code>/{id}/config?format=eduvpn|wg-quick</code></td><td>VPN profiles and their pools (<a href="vpn-wifi.html#profiles">VPN profiles</a>)</td><td><code>vpn-profile</code></td></tr>
+<tr><td><code>/vpn-sessions</code></td><td>list get; <code>:batch</code></td><td>Who had an address when. Filters <code>address at user profile</code>. The agent writes with <code>:batch</code>.</td><td><code>vpn-session</code></td></tr>
 <tr><td><code>/address-groups</code></td><td>full; <code>/{id}/members</code></td><td>Dynamic sets of addresses and prefixes</td><td><code>address-group</code></td></tr>
 <tr><td><code>/feeds/{name}</code></td><td>get</td><td>The feed of an address group: <code>?format=nft|firewalld|text|json&amp;family=4|6</code>; ETag, 304</td><td><code>address-group</code></td></tr>
 <tr><td><code>/assets/sites</code>, <code>buildings</code>, <code>floors</code>, <code>rooms</code>, <code>rows</code>, <code>racks</code>, <code>devices</code>, <code>ports</code>, <code>links</code></td><td>list get; links also create delete</td><td>Mirror of FNT Command, read only. Links join hosts and devices.</td><td><code>asset</code></td></tr>
 <tr><td><code>/teams</code>, <code>/tags</code>, <code>/attributes</code></td><td>full</td><td>Owners, labels, custom fields per kind</td><td><code>team</code></td></tr>
-<tr><td><code>/sources</code></td><td>list get patch; <code>:sync</code></td><td>local, ona-import, fnt, openstack, k8s, libvirt</td><td><code>source</code></td></tr>
+<tr><td><code>/sources</code></td><td>list get patch; <code>:sync</code></td><td>local, ona-import, fnt, openstack, k8s, libvirt, eduvpn, xiq</td><td><code>source</code></td></tr>
+<tr><td><code>/observations</code></td><td>list; <code>:batch</code></td><td>Seen addresses from agents, sweeps, nmap and VPN (<a href="allocation.html#observations">observations</a>)</td><td><code>observation</code></td></tr>
+<tr><td><code>/notes</code></td><td>full</td><td>Notes on an object, and banners. Filters <code>object level pinned banner</code></td><td><code>note</code></td></tr>
+<tr><td><code>/me/watches/{kind}/{id}</code></td><td>list put delete</td><td>Watches of the caller (<a href="access.html#notifications">notifications</a>)</td><td>self</td></tr>
+<tr><td><code>/link-templates</code></td><td>full</td><td>Links to other tools on object pages</td><td><code>link-template</code></td></tr>
+<tr><td><code>/saved-filters</code></td><td>full</td><td>Named list filters of a user or a team</td><td><code>saved-filter</code></td></tr>
+<tr><td><code>/reports/{name}</code></td><td>get; <code>?format=csv</code></td><td>Fixed reports (<a href="allocation.html#reports">reports</a>)</td><td>by row</td></tr>
+<tr><td><code>/inventory/ansible</code></td><td>get</td><td>Dynamic inventory for Ansible: hosts, groups from site, team, tags and fabric, host vars from attributes</td><td><code>host</code></td></tr>
+<tr><td><code>/sd/prometheus</code></td><td>get</td><td>HTTP service discovery for Prometheus: hosts with the tag <code>monitor</code>, labels from site, team and tags</td><td><code>host</code></td></tr>
 <tr><td><code>/events</code>, <code>/events/stream</code></td><td>list; SSE</td><td>CloudEvents</td><td><code>event</code></td></tr>
 <tr><td><code>/webhooks</code></td><td>full; <code>/{id}/deliveries</code>, <code>:redeliver</code></td><td>Signed event receivers</td><td><code>webhook</code></td></tr>
 <tr><td><code>/drafts</code></td><td>list get create delete; <code>:apply</code></td><td>Change sets of the assistant</td><td><code>draft</code></td></tr>
@@ -139,6 +151,8 @@
 <tr><td><code>/me</code>, <code>/me/permissions</code>, <code>/me/permissions:check</code>, <code>/me/tokens</code>, <code>/roles</code>, <code>/bindings</code>, <code>/change-requests</code>, <code>/audit-events</code></td><td>see <a href="access.html#api">access API</a></td><td>Identity, rights, tokens, approvals, audit</td><td><code>role</code> ...</td></tr>
 <tr><td><code>/auth/config</code>, <code>/livez</code>, <code>/readyz</code>, <code>/openapi.yaml</code></td><td>get</td><td>No authentication</td><td>none</td></tr>
 </tbody></table>
+
+<p>Every batch call and every move, renumber, resize and split call accepts <code>"validate_only": true</code>. The answer is then a plan with a <code>plan_hash</code>, and nothing changes (<a href="allocation.html#plan">plan and apply</a>).</p>
 
 <h3 id="object">The shape of an object</h3>
 <p>Each object has the common fields of the <a href="model.html#common">model</a>. Here is a subnet.</p>
@@ -348,7 +362,7 @@ curl -sS "https://bembel.example.org/v1/search?q=3c:ec:ef:12:0a:44" \
 <tr><td><code>within</code></td><td><code>?within=10.20.0.0/16</code></td><td>objects inside a CIDR at any depth (<code>&lt;&lt;=</code>)</td></tr>
 <tr><td><code>q</code></td><td><code>?q=kestrel</code></td><td>text search in names and descriptions</td></tr>
 <tr><td><code>order_by</code></td><td><code>?order_by=cidr</code>, <code>-updated_at</code></td><td>sort; a minus sign is descending; the id is the tie breaker</td></tr>
-<tr><td><code>filter</code></td><td>reserved</td><td>A later AIP-160 expression; not in v1</td></tr>
+<tr><td><code>filter</code></td><td>reserved</td><td>Reserved for an AIP-160 expression. Not accepted.</td></tr>
 </tbody></table>
 <p>An unknown parameter gives <code>400 request.invalid</code>. A client then notices a misspelt filter instead of getting all rows.</p>
 
@@ -475,7 +489,7 @@ curl -sS "https://bembel.example.org/v1/prefixes?within=10.0.0.0/8&amp;page_size
 <text class="t-small" x="538" y="154">HMAC signed POST</text>
 <text class="t-small" x="538" y="171">retry with backoff</text>
 <rect class="box-soft" x="526" y="204" width="200" height="76" rx="8"/>
-<text class="t-title" x="538" y="226">later</text>
+<text class="t-title" x="538" y="226">other sinks</text>
 <text class="t-small" x="538" y="246">NATS, Kafka</text>
 <text class="t-small" x="538" y="263">same outbox</text>
 <rect class="box-ok" x="790" y="20" width="134" height="76" rx="8"/>
@@ -526,8 +540,12 @@ curl -sS "https://bembel.example.org/v1/prefixes?within=10.0.0.0/8&amp;page_size
 <tr><td><code>record.changed</code>, <code>zone.changed</code></td><td>DNS data; the export builder also listens</td></tr>
 <tr><td><code>dhcp-scope.changed</code></td><td>DHCP data</td></tr>
 <tr><td><code>export.built</code>, <code>export.failed</code></td><td>Export builds</td></tr>
-<tr><td><code>change-request.created</code>, <code>.approved</code>, <code>.executed</code></td><td>Four-eyes flow</td></tr>
-<tr><td><code>sync.finished</code>, <code>finding.created</code></td><td>Integrations and import</td></tr>
+<tr><td><code>change-request.created</code>, <code>.approved</code>, <code>.executed</code>, <code>.failed</code>, <code>.rejected</code>, <code>.expired</code></td><td>Four-eyes flow</td></tr>
+<tr><td><code>sync.finished</code>, <code>finding.created</code>, <code>finding.assigned</code></td><td>Integrations, import and observations</td></tr>
+<tr><td><code>prefix.renumbered</code></td><td>Phase 2 of a renumber is done</td></tr>
+<tr><td><code>note.created</code>, <code>.updated</code>, <code>.deleted</code></td><td>Notes and banners</td></tr>
+<tr><td><code>vpn-session.started</code>, <code>.ended</code></td><td>A VPN client gets or gives back an address. Only for receivers with <code>vpn-session:read</code>.</td></tr>
+<tr><td><code>claim.expiring</code>, <code>token.expiring</code></td><td>Reminders before an expiry (<a href="access.html#notifications">notifications</a>)</td></tr>
 </tbody></table>
 <h3 id="sse">SSE stream</h3>
 <p><code>GET /v1/events/stream?types=org.example.bembel.address.*</code> keeps the connection open. Each frame has the order number as <code>id</code>. A client that reconnects sends <code>Last-Event-ID</code> and gets the events it missed. When a pod shuts down, it sends <code>retry: 2000</code> and closes each stream at once, so the client reconnects to another pod with <code>Last-Event-ID</code>. The server sends a comment line every 15 seconds. The stream applies the same read predicate as a list: a client sees only events of objects it may read.</p>
@@ -570,7 +588,16 @@ webhook-signature: v1,K5oZfzN95Z9UkAYgAt1V0QnCyH3uZ1b2KE8tJc0lYV4=</code></pre>
 <tr><td><code>bembel host ls|show|create|edit|rm</code></td><td>Hosts and interfaces. <code>--kind vm --runs-on hv-03</code> (<code>--kind</code> sets <code>host_kind</code>)</td></tr>
 <tr><td><code>bembel zone ls|show|create|rm</code></td><td>Zones. <code>rm</code> opens a change request</td></tr>
 <tr><td><code>bembel record ls|add|edit|rm ZONE</code></td><td>Manual records. <code>add ZONE ssh CNAME login --ttl 300</code></td></tr>
-<tr><td><code>bembel export bind|dhcpd|opensm|prefix-list|address-group</code></td><td>Build or fetch an export. See below.</td></tr>
+<tr><td><code>bembel export bind|dhcpd|opensm|prefix-list|address-group|eduvpn</code></td><td>Build or fetch an export. See below.</td></tr>
+<tr><td><code>bembel apply -f FILE</code></td><td>Read a CSV or YAML file, show the plan, apply after a confirm (<a href="allocation.html#plan">plan and apply</a>). <code>--yes</code> skips the question, <code>--plan-only</code> stops after the plan.</td></tr>
+<tr><td><code>bembel address move</code>, <code>bembel interface move</code>, <code>bembel prefix renumber|resize|split</code></td><td>Moves (<a href="allocation.html#renumber">renumber</a>). <code>renumber</code> waits for <code>--confirm OPERATION</code> before phase 2.</td></tr>
+<tr><td><code>bembel record enable|disable ZONE NAME TYPE</code></td><td>Turn a manual record on or off without a delete</td></tr>
+<tr><td><code>bembel note add|ls|rm</code></td><td>Notes. <code>add host/cn-004 --level warn --pin "PSU 2 failed, ticket 8812"</code></td></tr>
+<tr><td><code>bembel observe import --format nmap-xml FILE</code></td><td>Send an nmap scan as observations</td></tr>
+<tr><td><code>bembel vni allocate|ls</code></td><td>VNIs from a VNI range</td></tr>
+<tr><td><code>bembel vpn profile ls|show</code>, <code>bembel vpn session ls --address IP --at TIME</code></td><td>VPN profiles and the session lookup (<a href="vpn-wifi.html#sessions">sessions</a>)</td></tr>
+<tr><td><code>bembel report NAME</code></td><td>Print a report as a table or CSV</td></tr>
+<tr><td><code>bembel admin break-glass --user NAME --reason TEXT</code></td><td>Emergency session when the IdP is down. Runs only on a server host (<a href="access.html#break-glass">break-glass</a>).</td></tr>
 <tr><td><code>bembel import ona|netbox</code></td><td>Import from a MariaDB dump, an ONA API or a NetBox API. <code>--dry-run</code> makes findings only.</td></tr>
 <tr><td><code>bembel sync fnt</code></td><td>Start and watch an FNT sync</td></tr>
 <tr><td><code>bembel vm prepare</code></td><td>Claim the addresses with <code>publish: true</code> (DNS, DHCP) and print cloud-init network config</td></tr>
