@@ -128,6 +128,7 @@
 <tr><td><code>match_clients</code></td><td>A list of prefixes, address groups or TSIG key names. bembel writes it as an <code>acl</code>. An address group makes the ACL follow the data.</td></tr>
 <tr><td><code>match_destinations</code></td><td>Optional. For servers with one address per view.</td></tr>
 <tr><td><code>recursion</code></td><td><code>yes</code> or <code>no</code>. Default <code>no</code>. The story's <code>internal</code> view sets <code>yes</code> for its address ACL, so DHCP and VM clients can use ns1 and ns2 as resolvers (10.20.2.53, 10.20.2.54). The <code>external</code> view keeps <code>no</code>.</td></tr>
+<tr><td><code>publish_nat_outside</code></td><td><code>true</code> or <code>false</code>. Default <code>false</code>. When <code>true</code>, an address with a NAT link gets its derived A or AAAA record in this view with the outside address, not the inside address. The story's <code>external</code> view sets it, so <code>www.example.org</code> answers 192.0.2.80 outside and 10.20.2.80 inside.</td></tr>
 <tr><td><code>transfer_key</code></td><td>The name of the TSIG key that selects this view for zone transfers and NOTIFY. Default <code>xfer-</code> and the view name, for example <code>xfer-internal</code>. The bundle names the key. The secret is in a file on each server.</td></tr>
 </tbody>
 </table>
@@ -174,6 +175,17 @@
   <li><strong>TTL.</strong> Allowed values are 60 to 604800 seconds. The TTL of a record comes from, in this order: the record, the address or host field <code>dns_ttl</code>, the <code>default_ttl</code> of the zone.</li>
   <li><strong>Duplicates.</strong> The same name, type and data twice in one view is an error. A record set (same name and type) shares one TTL. A write that sets a different TTL for one member changes the whole set.</li>
 </ul>
+
+<p>A record can stay in bembel and still be out of the zone file. Two fields control this.</p>
+<table class="compact">
+<thead><tr><th>Field</th><th>On</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>disabled</code></td><td>manual record</td><td>The export skips the record. The zone page shows it in grey with the word "disabled". The validation rules still apply, so a disabled CNAME still blocks other data at its name.</td></tr>
+<tr><td><code>active_from</code></td><td>manual record</td><td>The export skips the record until this time. The export worker starts a new build at that time, so the record appears within one build interval.</td></tr>
+<tr><td><code>dns_disabled</code></td><td>address</td><td>The address has no derived A, AAAA or PTR record. The DHCP reservation stays.</td></tr>
+</tbody>
+</table>
+<p>A disabled record keeps its history. Enable it with <code>PATCH /v1/zones/{id}/records/{rid}</code> and <code>{"disabled": false}</code>, or with <code>bembel record enable</code>.</p>
 
 <h2 id="derived">Derived records</h2>
 <p>An address that has an FQDN makes records. The user does not write them. A host can have many addresses and each can have a name, so the rules say which record is the PTR.</p>
