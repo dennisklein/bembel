@@ -471,6 +471,12 @@
       "forms": [
         "OpenTelemetry"
       ]
+    },
+    {
+      "repo": "eduvpn/vpn-user-portal",
+      "forms": [
+        "vpn-user-portal"
+      ]
     }
   ]
 }

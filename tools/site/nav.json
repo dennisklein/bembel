@@ -497,6 +497,26 @@
             "phases",
             "risks"
           ]
+        },
+        {
+          "number": 23,
+          "path": "design/vpn-wifi.html",
+          "title": "VPN and Wi-Fi",
+          "short": "VPN and Wi-Fi",
+          "description": "eduVPN profiles and pools, VPN sessions from the connection hook, plain WireGuard peers, and Wi-Fi data with an ExtremeCloud IQ mirror.",
+          "anchors": [
+            "scope",
+            "eduvpn",
+            "profiles",
+            "hook",
+            "reconcile",
+            "sessions",
+            "wireguard",
+            "wifi",
+            "xiq",
+            "example",
+            "sources"
+          ]
         }
       ]
     },
@@ -505,7 +525,7 @@
       "title": "Operations",
       "pages": [
         {
-          "number": 23,
+          "number": 24,
           "path": "design/migration.html",
           "title": "Migration from OpenNetAdmin",
           "short": "Migration from OpenNetAdmin",
@@ -523,7 +543,7 @@
           ]
         },
         {
-          "number": 24,
+          "number": 25,
           "path": "design/operations.html",
           "title": "Deployment and operations",
           "short": "Deployment and operations",
@@ -539,7 +559,7 @@
           ]
         },
         {
-          "number": 25,
+          "number": 26,
           "path": "design/roadmap.html",
           "title": "Roadmap",
           "short": "Roadmap",
