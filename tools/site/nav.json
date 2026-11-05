@@ -395,6 +395,8 @@
             "prefix",
             "allocate",
             "address",
+            "bulk",
+            "reports",
             "search"
           ]
         },

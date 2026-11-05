@@ -118,9 +118,10 @@
 <tr><td>TTL</td><td>Seconds. An empty TTL in the data shows the zone default.</td></tr>
 <tr><td>Data</td><td>By type. SRV shows priority, weight and port in bold and the target as an FQDN. TXT shows the quoted text.</td></tr>
 <tr><td>Origin</td><td>A derived row: <code>address 10.20.4.44</code> as a link. A manual row: <code>manual</code> and the user. The NS set: <code>zone</code>.</td></tr>
-<tr><td>Last</td><td>A ⋯ menu. A derived row offers "Copy as zone file line" and "History". A manual row adds "Edit…" and "Delete…".</td></tr>
+<tr><td>Last</td><td>A ⋯ menu. A derived row offers "Copy as zone file line" and "History". A manual row adds "Edit…", "Disable" or "Enable", and "Delete…".</td></tr>
 </tbody>
 </table>
+<p>A disabled record shows in grey with the tag <span class="tag">disabled</span>. A record with <code>active_from</code> in the future has the tag <span class="tag">from Nov 9, 06:00</span>. Both rows are not in the BIND preview. A filter chip "Disabled" lists them (<a href="dns.html#records">records</a>).</p>
 <aside class="callout why"><p class="callout-title">Why the lock</p><p>ONA let a user edit an A record in the DNS table and then did not match the address. In bembel the address is the one source. The lock is a visible refusal, with the way out in the tooltip and in the link of the origin column.</p></aside>
 <h3 id="zone-edit">Inline edit and validation</h3>
 <p>The ⋯ menu of a manual row, or a double click, turns the row into inputs: name, type, TTL, data. The row gets a grey background and a red left edge when it has an error. The error stands under the data field. It has a code, a plain sentence and a link to the cause.</p>
@@ -155,7 +156,7 @@
 </figure>
 <p>The example in the mockup: a user renames the CNAME <code>slurm</code> to <code>ctl01</code>. The name has a derived A record from 10.20.4.5. The API answers <code>409</code> with the problem code <code>cname.conflict</code>. The row shows: "ctl01 already holds an A record, derived from 10.20.4.5. A name with a CNAME cannot hold other records." Save stays disabled until the user changes the name.</p>
 <h3 id="zone-bulk">Bulk actions</h3>
-<p>A selection of manual rows opens a bar over the table: "2 manual records selected", with Set TTL…, Copy to view… and Delete…. The bar does not list derived rows. A bulk change of more than the configured limit becomes a change request (<a href="access.html">access.html</a>). The dialog says so before the user confirms.</p>
+<p>A selection of manual rows opens a bar over the table: "2 manual records selected", with Set TTL…, Copy to view…, Disable, Enable and Delete…. The bar does not list derived rows. A bulk change of more than the configured limit becomes a change request (<a href="access.html">access.html</a>). The dialog says so before the user confirms.</p>
 <h3 id="zone-checks">Checks and the assistant</h3>
 <ul>
   <li><b>Checks card.</b> Five lines with a dot: named-checkzone ok, no CNAME beside other data, PTR coverage, targets outside the zone, and the unsaved row. A warning has a second line with the detail.</li>
