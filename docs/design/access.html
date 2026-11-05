@@ -7,7 +7,7 @@
 <p class="lede">bembel is API first, so every client passes the same gate: an OpenID Connect identity, a set of scoped bindings and one SQL predicate. This chapter shows how a user or a service logs in, what a binding grants, how the database decides, and how dangerous changes get a second pair of eyes.</p>
 <ul class="keypoints">
 <li>Authentication is outside: Keycloak for users, trusted issuers for services (Kubernetes, GitLab, GitHub). bembel stores no password.</li>
-<li>Authorization is inside the database: roles are sets of <code>kind:verb</code> permissions, bindings give a role to a subject in a scope. Allow only in v1.</li>
+<li>Authorization is inside the database: roles are sets of <code>kind:verb</code> permissions, bindings give a role to a subject in a scope. Allow only.</li>
 <li>One predicate filters lists and checks single objects. It uses GiST containment on <code>inet</code> and <code>ltree</code>, so counts and pages are right.</li>
 <li>A hidden object gives 404. A visible object without the permission gives 403 with the missing permission.</li>
 <li>Four-eyes: a change request holds deleting a prefix tree, deleting a zone, bulk changes over 50 objects, a DHCP restart override, and creating, deleting or changing a privileged binding or role.</li>
@@ -20,7 +20,7 @@
 <li><strong>One gate.</strong> The web UI, the CLI, the Neutron driver, the Kubernetes controllers and the assistant call the public REST API. There is no second path to the data.</li>
 <li><strong>Identity from the IdP.</strong> bembel trusts a fixed list of issuers. It checks signature, issuer, audience and expiry. It keeps no password and no user directory.</li>
 <li><strong>Permission is data.</strong> Roles, bindings and scopes are rows in PostgreSQL. A history table keeps every version. "Who could do what on this day" has an answer.</li>
-<li><strong>Allow only.</strong> A request is allowed when at least one binding allows it. There is no deny rule in v1. A narrower binding is the way to limit access.</li>
+<li><strong>Allow only.</strong> A request is allowed when at least one binding allows it. There is no deny rule. A narrower binding is the way to limit access.</li>
 <li><strong>The scope is a closed list.</strong> Seven scope types, each one a typed column with an index. There are no free expressions.</li>
 <li><strong>Least surprise for lists.</strong> A list shows only what the user may read. Totals and pages are correct. Nothing leaks through counts, search or vectors.</li>
 <li><strong>Grant only what you hold.</strong> A user can give a role only if the user holds it, and only inside the own scope.</li>
@@ -63,14 +63,14 @@
 </svg><figcaption>A binding joins a subject to a role inside a scope. A request is allowed when one binding gives the permission and the scope matches the resource.</figcaption></figure>
 
 <div class="callout why"><p class="callout-title">Why not OpenFGA, SpiceDB, Cedar or OPA</p>
-<p>The hard part of an IPAM is list filtering over a CIDR tree. Relationship services return lists of ids (OpenFGA caps them at 1 000 by default) and cannot test CIDR containment. Cedar has no partial evaluation in Go, and OPA compiles only a part of Rego to a filter. In the database the filter is a join. The code stays behind an <code>Authorizer</code> interface, so Cedar can add conditional rules later (v2).</p></div>
+<p>The hard part of an IPAM is list filtering over a CIDR tree. Relationship services return lists of ids (OpenFGA caps them at 1 000 by default) and cannot test CIDR containment. Cedar has no partial evaluation in Go, and OPA compiles only a part of Rego to a filter. In the database the filter is a join. The code stays behind an <code>Authorizer</code> interface, so Cedar can add conditional rules if a need appears.</p></div>
 
 <table>
 <thead><tr><th>Option</th><th>Hierarchy</th><th>List filter</th><th>Operations</th><th>Decision</th></tr></thead>
 <tbody>
-<tr><td>Scoped RBAC in PostgreSQL</td><td>GiST on <code>inet</code>, <code>ltree</code></td><td>one SQL predicate</td><td>none extra</td><td>v1</td></tr>
+<tr><td>Scoped RBAC in PostgreSQL</td><td>GiST on <code>inet</code>, <code>ltree</code></td><td>one SQL predicate</td><td>none extra</td><td>yes</td></tr>
 <tr><td>OpenFGA / SpiceDB</td><td>tuples that must follow every prefix move</td><td>id lists, caps</td><td>second service and database</td><td>no</td></tr>
-<tr><td>Cedar</td><td>entity <code>in</code></td><td>experimental, Rust only</td><td>embedded</td><td>maybe v2</td></tr>
+<tr><td>Cedar</td><td>entity <code>in</code></td><td>experimental, Rust only</td><td>embedded</td><td>no; possible behind the <code>Authorizer</code> interface</td></tr>
 <tr><td>OPA / Rego</td><td>free</td><td>partial subset</td><td>bundles</td><td>no</td></tr>
 </tbody></table>
 
@@ -293,7 +293,7 @@
 </tbody></table>
 <div class="callout why"><p class="callout-title">Why the audience is mandatory</p>
 <p>A Kubernetes token for the default audience is valid for the API server of the cluster. Any pod could pass it to bembel if bembel accepted it. A dedicated audience <code>bembel</code> limits the token to this one use.</p></div>
-<p>The libraries are <code>coreos/go-oidc</code> and <code>lestrrat-go/jwx</code>. The validator interface can accept <code>cnf</code> claims (DPoP, mTLS) later. v1 does not need them, because tokens are short and the BFF hides them from the browser.</p>
+<p>The libraries are <code>coreos/go-oidc</code> and <code>lestrrat-go/jwx</code>. The validator interface can accept <code>cnf</code> claims (DPoP, mTLS). bembel does not need them, because tokens are short and the BFF hides them from the browser.</p>
 
 <h3 id="keycloak">Keycloak setup</h3>
 <p>Keycloak does not put the audience <code>bembel</code> in a token by default, and its group mapper writes the full group path by default. The realm <code>main</code> therefore needs this setup.</p>

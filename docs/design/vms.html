@@ -513,7 +513,7 @@ exit 0</code></pre>
 <tr><td><code>platform</code></td><td><code>libvirt</code></td><td><code>openstack</code></td><td><code>other</code></td></tr>
 <tr><td>Source of the facts</td><td>Agent on each hypervisor, <code>libvirt:hv-03</code></td><td>Sync worker, <code>openstack:os-prod</code></td><td>User, Terraform</td></tr>
 <tr><td>Identity of the VM</td><td>libvirt UUID</td><td>Nova server UUID (port <code>device_id</code>)</td><td>Name</td></tr>
-<tr><td>Who gives the address</td><td>bembel (<code>vm prepare</code>)</td><td>Neutron, with the bembel driver in phase 2</td><td>User or Terraform</td></tr>
+<tr><td>Who gives the address</td><td>bembel (<code>vm prepare</code>)</td><td>Neutron, or the bembel IPAM driver</td><td>User or Terraform</td></tr>
 <tr><td>How the guest gets it</td><td>cloud-init network config or DHCP reservation</td><td>Neutron DHCP and metadata</td><td>Any</td></tr>
 <tr><td>Link to the claim</td><td>MAC</td><td>Idempotency key, then the port id</td><td>Not applicable</td></tr>
 <tr><td>Claim confirmed by</td><td>Hook or agent report</td><td>Next sync poll</td><td>Not applicable</td></tr>

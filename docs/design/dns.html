@@ -18,8 +18,8 @@
 </ul>
 
 <aside class="callout note">
-<p class="callout-title">What is in v1</p>
-<p>v1 delivers BIND zone files and <code>named.conf</code> fragments by pull. Catalog zones, RFC 2136 updates, a PowerDNS driver and DNSSEC signing support come later (<a href="#later">later</a>). The requester requires the BIND export in v1. The Kea chapter is <a href="dhcp.html#kea">DHCP and ISC dhcpd export</a>.</p>
+<p class="callout-title">Delivery kinds</p>
+<p>The default delivery is BIND zone files and <code>named.conf</code> fragments by pull. Catalog zones, RFC 2136 updates, a PowerDNS driver and DNSSEC signing support are further delivery kinds (<a href="#delivery-kinds">delivery kinds</a>). The requester requires the BIND export. The Kea chapter is <a href="dhcp.html#kea">DHCP and ISC dhcpd export</a>.</p>
 </aside>
 
 <h2 id="zones">Zones</h2>
@@ -772,13 +772,13 @@ $ORIGIN 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.
 <p>At cutover, the administrator sets the mode of each server to <code>native</code> one server at a time. The file paths change, and the agent handles the move. The first native bundle contains a one-time include for the new paths. ONA stays able to build for the rollback window. A rollback to ONA re-stamps the ONA serials (<a href="#rollback">rollback</a>).</p>
 </aside>
 
-<h2 id="later">Later</h2>
-<p>The BIND file export is the base. The next steps use the same data model and the same agent.</p>
+<h2 id="delivery-kinds">Other delivery kinds</h2>
+<p>The BIND file export is the base. The other delivery kinds use the same data model and the same agent.</p>
 <table class="compact">
-<thead><tr><th>Step</th><th>What it adds</th><th>Note</th></tr></thead>
+<thead><tr><th>Kind</th><th>What it adds</th><th>Note</th></tr></thead>
 <tbody>
 <tr><td>Catalog zones (RFC 9432)</td><td>bembel makes one catalog zone per view. A secondary adds and removes zones itself when the catalog changes.</td><td>BIND 9.18 or newer has catalog zone support. The catalog only lists zones. The data still moves by IXFR. Not verified in this sandbox.</td></tr>
-<tr><td>RFC 2136 update with TSIG</td><td>Fast incremental updates instead of a reload. bembel reconciles: it reads the zone by AXFR, computes the difference and sends an UPDATE.</td><td>A dynamic zone cannot be edited by hand without <code>rndc freeze</code>. The update has no atomic multi-zone change. This is why the file export comes first.</td></tr>
+<tr><td>RFC 2136 update with TSIG</td><td>Fast incremental updates instead of a reload. bembel reconciles: it reads the zone by AXFR, computes the difference and sends an UPDATE.</td><td>A dynamic zone cannot be edited by hand without <code>rndc freeze</code>. The update has no atomic multi-zone change. This is why the file export is the default.</td></tr>
 <tr><td>PowerDNS API driver</td><td>A DNS server of kind <code>powerdns</code>. bembel patches RRsets through the API.</td><td>The model does not change. Views need PowerDNS Authoritative 5.0 or newer. Not verified.</td></tr>
 <tr><td>DNSSEC</td><td>bembel does not sign zones. The generated zone stanza names a <code>dnssec-policy</code> and sets <code>inline-signing yes</code>. BIND keeps and rolls the keys.</td><td>The serial of the unsigned file must still go up. BIND keeps its own serial for the signed zone. The files <code>.signed</code> and <code>.signed.jnl</code> stay over bundles, because the <code>file</code> path is stable (<a href="#paths">paths</a>). bembel may record DS records as data for the parent zone, but does not publish them.</td></tr>
 </tbody>
@@ -792,6 +792,6 @@ $ORIGIN 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.
     inline-signing yes;
 };</code></pre>
 
-<p>Every later step is a new <em>delivery kind</em> of the DNS server object. The data, the views, the derived records and the checks stay the same. The roadmap lists the order (<a href="roadmap.html#v1-1">roadmap.html#v1-1</a>).</p>
+<p>Each of these is a <em>delivery kind</em> of the DNS server object. The data, the views, the derived records and the checks stay the same.</p>
 </body>
 </html>

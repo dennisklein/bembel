@@ -24,7 +24,7 @@ The source is in [`docs/`](docs/index.html):
 | III How it works | [Allocation](docs/design/allocation.html) · [DNS](docs/design/dns.html) · [DHCP](docs/design/dhcp.html) · [Fabrics](docs/design/fabrics.html) · [Routing and firewall](docs/design/routing.html) · [Access control](docs/design/access.html) · [Assets](docs/design/assets.html) |
 | IV Interfaces | [REST API](docs/design/api.html) · [Web UI](docs/design/ui.html) · [Assistant and help](docs/design/assistant.html) · [Addressing pages](docs/design/ui-addr.html) · [DNS and DHCP pages](docs/design/ui-dns.html) · [Asset pages](docs/design/ui-assets.html) · [Access and integration pages](docs/design/ui-access.html) · [Mockup gallery](docs/design/mockups/index.html) |
 | V Integrations | [Virtual machines](docs/design/vms.html) · [OpenStack](docs/design/openstack.html) · [Kubernetes](docs/design/kubernetes.html) |
-| VI Operations | [Migration from ONA](docs/design/migration.html) · [Operations](docs/design/operations.html) · [Roadmap](docs/design/roadmap.html) |
+| VI Operations | [Migration from ONA](docs/design/migration.html) · [Operations](docs/design/operations.html) · [Open questions](docs/design/questions.html) |
 
 The OpenAPI sketch is in [`docs/design/api/openapi.yaml`](docs/design/api/openapi.yaml).
 

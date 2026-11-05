@@ -107,7 +107,7 @@ ASN         NAME             OWNER    USED BY
 <dl class="facts">
   <dt>VRF</dt><dd><code>default_asn</code>: the local AS of the VRF, if all routers of the VRF use one.</dd>
   <dt>Host</dt><dd><code>bgp_asn</code>: the local AS of a router or a switch. The default is the ASN of the VRF.</dd>
-  <dt>Prefix</dt><dd><code>origin_asn</code>: the AS that announces it. The default is the ASN of the VRF. Needed for RPKI or IRR exports later.</dd>
+  <dt>Prefix</dt><dd><code>origin_asn</code>: the AS that announces it. The default is the ASN of the VRF. RPKI or IRR exports use it.</dd>
   <dt>Fabric</dt><dd><code>asn</code>: the ASN of a fabric, for example <code>osprey-roce</code>.</dd>
 </dl>
 <p>The checks are simple. A number must lie in a range, or the user must say <code>--no-range</code>. A number is unique. A private number cannot be used for a prefix with the status <code>announce</code> in the VRF <code>global</code> without an ASN of the kind <code>public</code> in the path (a warning, not an error, because the border router may remove the private AS).</p>

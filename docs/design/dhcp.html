@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>DHCP and ISC dhcpd export</title>
-<meta name="description" content="The DHCP model of bembel: scopes, pools, reservations, options, failover pairs, IPoIB client identifiers, the dhcpd.conf export, checks, delivery with one-peer-at-a-time restarts, lease ingestion and the later Kea export.">
+<meta name="description" content="The DHCP model of bembel: scopes, pools, reservations, options, failover pairs, IPoIB client identifiers, the dhcpd.conf export, checks, delivery with one-peer-at-a-time restarts, lease ingestion and the Kea export.">
 </head>
 <body>
 <h1>DHCP and ISC dhcpd export</h1>
@@ -15,12 +15,12 @@
   <li>DHCPv6 uses a separate file, <code>dhcpd6.conf</code>, for <code>dhcpd -6</code>. ISC dhcpd has no failover for DHCPv6.</li>
   <li>ISC dhcpd has no reload. bembel-agent restarts one peer at a time, and bembel grants the restart ticket.</li>
   <li>The agent reads <code>dhcpd.leases</code> for the pool addresses and the dhcpd log for the reservations, and sends last-seen data to bembel. bembel uses it to find stale addresses and wrong client identifiers.</li>
-  <li>ISC DHCP has reached end of life. The model is neutral, so a Kea 3.0 LTS JSON export is a second renderer later.</li>
+  <li>ISC DHCP has reached end of life. The model is neutral, so a Kea 3.0 LTS JSON export is a second renderer (<a href="#kea">Kea</a>).</li>
 </ul>
 
 <aside class="callout note">
 <p class="callout-title">Scope of the export</p>
-<p>The ISC dhcpd export is a v1 requirement of the requester. It also feeds the ONA parallel run. The export does not configure DDNS. Local settings such as <code>authoritative</code>, <code>ddns-update-style</code> and <code>log-facility</code> stay in a header file on the server, as in ONA.</p>
+<p>The ISC dhcpd export is a requirement of the requester. It also feeds the ONA parallel run. The export does not configure DDNS. Local settings such as <code>authoritative</code>, <code>ddns-update-style</code> and <code>log-facility</code> stay in a header file on the server, as in ONA.</p>
 </aside>
 
 <h2 id="scopes">Scopes</h2>
@@ -203,7 +203,7 @@
 <p>The merge rules are simple.</p>
 <ul>
   <li>The key of an option is its code (name for the standard options). The same key at a lower level replaces the whole value of the higher level. There is no partial merge of a list.</li>
-  <li>ISC dhcpd has no way to remove an inherited option. v1 has no "unset". The page of the scope shows the options that the scope inherits, and where they come from. To drop a global option for one scope, a user moves it from global to the other scopes.</li>
+  <li>ISC dhcpd has no way to remove an inherited option. bembel has no "unset". The page of the scope shows the options that the scope inherits, and where they come from. To drop a global option for one scope, a user moves it from global to the other scopes.</li>
   <li>bembel does the merge in the export for the check. It writes each option at its own level. This keeps the file short and lets <code>dhcpd</code> do the inheritance.</li>
   <li>A value has a type from the option definition. bembel checks the value against the type when a user saves it.</li>
 </ul>
@@ -294,7 +294,7 @@ option cluster-id code 225 = unsigned integer 16;</code></pre>
   <li>The scope of an IPv6 subnet becomes a <code>subnet6</code> block with <code>range6</code> for each pool.</li>
   <li>A reservation uses the DUID of the client (<code>host-identifier option dhcp6.client-id</code>). An interface needs a stored DUID. Without a DUID, bembel writes no stanza and shows a finding.</li>
   <li>ISC dhcpd has no failover for DHCPv6. For a dual-stack subnet, a user has two ways: split the v6 range by hand over two independent servers, or use SLAAC for addresses and DHCPv6 only for options (stateless). bembel warns when a v6 scope names a failover pair.</li>
-  <li>Prefix delegation (<code>prefix6</code>) is later work.</li>
+  <li>Prefix delegation (<code>prefix6</code>) is not in the model.</li>
   <li>SLAAC and EUI-64 addresses are not allocated. bembel only observes them (<a href="fabrics.html#dual-stack">fabrics.html#dual-stack</a>).</li>
 </ul>
 <pre><code class="language-plaintext">subnet6 2001:db8:4200:204::/64 {
@@ -479,7 +479,7 @@ host cn-004-ib0 {
 <p>The bundle has <code>bundle.tar</code>, <code>manifest.json</code> with <code>"kind": "dhcpd"</code> and <code>"server": "dhcp1.example.org"</code>, and <code>manifest.json.sig</code> (Ed25519 over <code>manifest.json</code>). The agent trusts only the signed manifest. It runs the same checks as the DNS agent (<a href="dns.html#manifest">dns.html#manifest</a>), in this order: the signature with the key named by <code>key_id</code>; <code>kind</code> and <code>server</code> equal to its own identity; a <code>snapshot</code> not lower than that of the current release; the sha256 of the tar and of each file. A rejected bundle leaves the current release in place and is reported as <code>deploy.bundle-rejected</code>. The signature protects the transport and the ingress path. It does not protect against a compromised bembel pod that holds the key.</p>
 <p>Two things differ from DNS.</p>
 <ol>
-  <li><strong>ISC dhcpd has no reload.</strong> A new config needs a restart (<code>systemctl restart isc-dhcp-server</code> on Debian). OMAPI can add a host at run time, but the file and the run time then differ. v1 does not use OMAPI for config. The agent uses OMAPI only to read the failover state.</li>
+  <li><strong>ISC dhcpd has no reload.</strong> A new config needs a restart (<code>systemctl restart isc-dhcp-server</code> on Debian). OMAPI can add a host at run time, but the file and the run time then differ. bembel does not use OMAPI for config. The agent uses OMAPI only to read the failover state.</li>
   <li><strong>A restart of both peers at once stops DHCP.</strong> The failover pair protects the service only if one server runs.</li>
 </ol>
 <p>The restart ticket solves this. The agent that has a new valid config asks bembel for a ticket: <code>POST /v1/dhcp-failover-pairs/dhcp-a/restart-tickets</code> with the body <code>{"server": "dhcp2.example.org"}</code>. The answer is <code>201</code> with <code>{id, server, expires_at}</code>. <code>DELETE /v1/dhcp-failover-pairs/dhcp-a/restart-tickets/{id}</code> returns the ticket.</p>
@@ -568,7 +568,7 @@ host cn-004-ib0 {
 </table>
 <p>The diff normalises the date line and sorts the host stanzas by IP. It keeps the counts in the section comments as assertions. The semantic diff (level 3) compares the sets of (subnet, pool, option, failover, host) tuples. The known deviations are a file with a reason for each entry. The migration chapter has the exit criteria (<a href="migration.html#parallel">migration.html#parallel</a>).</p>
 
-<h2 id="kea">Kea later</h2>
+<h2 id="kea">Kea export</h2>
 <p>ISC DHCP has reached end of life. Kea is the successor. Kea 3.0 is the first long-term support release (July 2025). The DHCP model of bembel is neutral on purpose: scope, pool, option, reservation and failover pair do not depend on ISC syntax. A Kea renderer is a second output and an extra DHCP server kind. The facts below come from public sources and from the research notes. Several are not verified in this sandbox.</p>
 <table class="compact">
 <thead><tr><th>Item</th><th>Design</th></tr></thead>
@@ -600,6 +600,6 @@ host cn-004-ib0 {
     }]
   }
 }</code></pre>
-<p>This is a sketch of the target, not a promise of the final format. The Kea hooks list (which are open source in 3.0) must be checked against the Kea documentation before the work starts. The roadmap places the Kea renderer in v1.1 (<a href="roadmap.html#v1-1">roadmap.html#v1-1</a>).</p>
+<p>This is a sketch of the target, not a promise of the final format. The Kea hooks list (which are open source in 3.0) must be checked against the Kea documentation before the work starts.</p>
 </body>
 </html>

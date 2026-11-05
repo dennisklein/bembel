@@ -248,7 +248,7 @@ AllowedIPs = 10.40.32.11/32, 2001:db8:4200:420::11/128, 172.16.40.0/22</code></p
 <li>The match key is the MAC. An access point that bembel already has with a reservation keeps its address. The sync only fills the fields of XIQ.</li>
 <li>The sync reads <code>GET /clients/active</code> and writes observations with the method <code>sync</code>: client MAC, address, SSID and access point. Thus the last-seen data of a Wi-Fi client has the access point, which the DHCP lease does not give.</li>
 <li>The location tree of XIQ (site, building, floor) maps by name to the FNT mirror. A name without a match is the finding <code>xiq.location-unmatched</code>. Users then set the asset link by hand.</li>
-<li>The mirror is read only. bembel never writes to XIQ. The API paths other than <code>/clients/active</code> need a test against the XIQ tenant of the site (<a href="roadmap.html#open">open questions</a>).</li>
+<li>The mirror is read only. bembel never writes to XIQ. The API paths other than <code>/clients/active</code> need a test against the XIQ tenant of the site (<a href="questions.html#open">open questions</a>).</li>
 </ul>
 
 <h2 id="example">Example</h2>

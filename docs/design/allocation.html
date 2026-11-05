@@ -116,7 +116,7 @@ Content-Type: application/json
 <tr><td><code>hint</code></td><td>yes</td><td>yes</td><td>Take <code>hint</code> if it is free. If not, the answer depends on <code>on_conflict</code>: <code>fail</code> (<code>409</code>, default) or <code>next</code> (the nearest free address above it).</td></tr>
 </tbody>
 </table>
-<p>IPv6 has no <code>eui64</code> strategy. A host that forms an EUI-64 or SLAAC address does it without bembel. The agent or a sync reports the address, and bembel stores it as <em>observed</em>. See <a href="fabrics.html#dual-stack">dual stack</a> and the open question in <a href="roadmap.html#open">Roadmap</a>.</p>
+<p>IPv6 has no <code>eui64</code> strategy. A host that forms an EUI-64 or SLAAC address does it without bembel. The agent or a sync reports the address, and bembel stores it as <em>observed</em>. See <a href="fabrics.html#dual-stack">dual stack</a> and the open question in <a href="questions.html#open">Open questions</a>.</p>
 
 <h3 id="skipped">Skipped addresses</h3>
 <p>The allocator never returns these addresses:</p>
@@ -393,7 +393,7 @@ COMMIT;</code></pre>
 <tr><td>Lock order</td><td>Always the parent first, then nothing else. No call locks two prefixes, so deadlocks between allocations cannot occur.</td></tr>
 </tbody>
 </table>
-<p>The lock limits the rate for one subnet. The critical section is one index lookup and two inserts, so the expected time is a few milliseconds. That gives hundreds of allocations per second for one subnet. The number is an estimate. The load test of the first release measures it (<a href="roadmap.html#v1">Roadmap</a>).</p>
+<p>The lock limits the rate for one subnet. The critical section is one index lookup and two inserts, so the expected time is a few milliseconds. That gives hundreds of allocations per second for one subnet. The number is an estimate. A load test measures it (<a href="operations.html#metrics">Operations</a>).</p>
 <div class="callout note">
 <p class="callout-title">The constraint is the second guard</p>
 <p>The lock prevents the conflict. The unique constraint and the exclusion constraint (next section) make sure that a bug in the code, a manual SQL change or an import cannot create one. If the constraint fires, bembel repeats the transaction up to 3 times (for <code>:allocate</code> and for prefix creates), and then maps <code>23505</code> and <code>23P01</code> to <code>409</code>.</p>

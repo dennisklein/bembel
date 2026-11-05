@@ -122,7 +122,7 @@
 <tr><td>rack (cabinet)</td><td><code>rack</code></td><td><code>name</code>, ELID, parent row or room, <code>height_u</code>, <code>numbering</code> (<code>top-down</code> or <code>bottom-up</code>), position on the floor (x, y, rotation)</td><td>not verified</td></tr>
 <tr><td>device (item)</td><td><code>device</code></td><td><code>name</code>, ELID, manufacturer, <code>model</code>, <code>serial</code>, <code>asset_tag</code>, <code>status</code>, <code>rack_id</code>, <code>position_u</code> (lowest U), <code>height_u</code>, <code>face</code> (<code>front</code>, <code>rear</code>, <code>both</code>), half-width, depth, custom attributes</td><td>not verified</td></tr>
 <tr><td>card, port</td><td><code>port</code></td><td><code>name</code>, ELID, <code>mac</code> (if present), <code>speed</code>, parent device, label</td><td>not verified. Only ports with a name or a MAC are mirrored.</td></tr>
-<tr><td><code>vlan</code>, <code>sVlan</code>, <code>logicalPort</code></td><td>read for a comparison report; not mirrored in v1</td><td>VID and name</td><td>entity verified</td></tr>
+<tr><td><code>vlan</code>, <code>sVlan</code>, <code>logicalPort</code></td><td>read for a comparison report; not mirrored</td><td>VID and name</td><td>entity verified</td></tr>
 <tr><td>cable, connection</td><td>optional <code>cable</code> (peer port to peer port)</td><td>two port ELIDs, medium, length</td><td>not verified; off by default</td></tr>
 </tbody>
 </table>
@@ -442,7 +442,7 @@ links: 3 new, 2 in review      duration 4m 12s      result ok</pre>
 <h2 id="limits">Limits</h2>
 <ul>
   <li><strong>No write back.</strong> A rack move or a new device is done in FNT Command. The mirror shows it after the next delta (up to 15 minutes).</li>
-  <li><strong>Unverified API details.</strong> Entity names for rack, device, port and cable, the login call, the delta timestamp and the paging parameters need a tenant export. The first sync milestone starts with this export (<a href="roadmap.html#open">Open questions</a>).</li>
+  <li><strong>Unverified API details.</strong> Entity names for rack, device, port and cable, the login call, the delta timestamp and the paging parameters need a tenant export. The FNT sync starts with this export (<a href="questions.html#open">Open questions</a>).</li>
   <li><strong>No deletes in deltas.</strong> A delta cannot see a deleted object. Removals appear after the next full run, and the soft delete needs two runs. A removal can therefore take up to two days to leave the views.</li>
   <li><strong>One tenant per source.</strong> A second FNT tenant is a second source with its own configuration.</li>
   <li><strong>IP data in FNT.</strong> FNT may hold IP or VLAN data. bembel reads VLAN and management-IP attributes only for the comparison report. It does not import them as truth.</li>

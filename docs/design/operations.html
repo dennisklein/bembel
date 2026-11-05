@@ -183,7 +183,7 @@ metrics:
 <tr><td>OTLP collector</td><td><code>tempo.monitoring:4317</code></td><td>with <code>tracing.otlp_endpoint</code></td></tr>
 <tr><td>Webhook receivers</td><td>443, CIDRs from <code>networkPolicy.extraEgress</code></td><td>with webhooks</td></tr>
 <tr><td>Audit stream</td><td>the Loki or SIEM endpoint of <code>exports.audit_stream</code></td><td>with the audit stream</td></tr>
-<tr><td>OpenStack</td><td>Keystone, Neutron and Ironic endpoints</td><td>with an OpenStack source (v1.1)</td></tr>
+<tr><td>OpenStack</td><td>Keystone, Neutron and Ironic endpoints</td><td>with an OpenStack source</td></tr>
 <tr><td>JWKS hosts</td><td>443 to the issuers with <code>jwks: discovery</code></td><td>for each such issuer</td></tr>
 <tr><td>SMTP relay</td><td>587 to <code>notify.smtp.host</code></td><td>with mail notifications</td></tr>
 <tr><td>Team chat</td><td>443 to the hosts of the team chat webhooks</td><td>with chat notifications</td></tr>

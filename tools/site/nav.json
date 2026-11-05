@@ -217,7 +217,7 @@
             "checks",
             "delivery",
             "compat",
-            "later"
+            "delivery-kinds"
           ]
         },
         {
@@ -486,7 +486,7 @@
             "keystone",
             "designate",
             "ironic",
-            "phases",
+            "parts",
             "risks"
           ]
         },
@@ -504,7 +504,7 @@
             "cni",
             "identity",
             "terraform",
-            "phases",
+            "parts",
             "risks"
           ]
         },
@@ -570,14 +570,12 @@
         },
         {
           "number": 26,
-          "path": "design/roadmap.html",
-          "title": "Roadmap",
-          "short": "Roadmap",
-          "description": "The releases, their scope and the open questions.",
+          "path": "design/questions.html",
+          "title": "Open questions and sources",
+          "short": "Open questions",
+          "description": "What bembel does not do, the questions that are not decided, and the sources of the research.",
           "anchors": [
-            "v1",
-            "v1-1",
-            "v2",
+            "out-of-scope",
             "open",
             "sources"
           ]

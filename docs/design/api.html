@@ -362,7 +362,7 @@ curl -sS "https://bembel.example.org/v1/search?q=3c:ec:ef:12:0a:44" \
 <tr><td><code>within</code></td><td><code>?within=10.20.0.0/16</code></td><td>objects inside a CIDR at any depth (<code>&lt;&lt;=</code>)</td></tr>
 <tr><td><code>q</code></td><td><code>?q=kestrel</code></td><td>text search in names and descriptions</td></tr>
 <tr><td><code>order_by</code></td><td><code>?order_by=cidr</code>, <code>-updated_at</code></td><td>sort; a minus sign is descending; the id is the tie breaker</td></tr>
-<tr><td><code>filter</code></td><td>reserved</td><td>A later AIP-160 expression; not in v1</td></tr>
+<tr><td><code>filter</code></td><td>reserved</td><td>Reserved for an AIP-160 expression. Not accepted.</td></tr>
 </tbody></table>
 <p>An unknown parameter gives <code>400 request.invalid</code>. A client then notices a misspelt filter instead of getting all rows.</p>
 
@@ -489,7 +489,7 @@ curl -sS "https://bembel.example.org/v1/prefixes?within=10.0.0.0/8&amp;page_size
 <text class="t-small" x="538" y="154">HMAC signed POST</text>
 <text class="t-small" x="538" y="171">retry with backoff</text>
 <rect class="box-soft" x="526" y="204" width="200" height="76" rx="8"/>
-<text class="t-title" x="538" y="226">later</text>
+<text class="t-title" x="538" y="226">other sinks</text>
 <text class="t-small" x="538" y="246">NATS, Kafka</text>
 <text class="t-small" x="538" y="263">same outbox</text>
 <rect class="box-ok" x="790" y="20" width="134" height="76" rx="8"/>
