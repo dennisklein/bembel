@@ -223,7 +223,7 @@ bembel import findings list|show|accept
 <tr><td><code>--map-file FILE</code></td><td>The YAML map file with the rules that ONA cannot hold. The import stores a hash of the file in the run.</td></tr>
 <tr><td><code>--context NAME</code></td><td>The ONA context (a separate database). The map file can set a VRF or team for it.</td></tr>
 <tr><td><code>--fail-on error|warn|never</code></td><td>Exit code 3 if findings of that severity are open. Default <code>never</code>. The cutover uses <code>error</code>.</td></tr>
-<tr><td><code>--with-configs</code>, <code>--with-logs</code></td><td>Also import the config archive and <code>ona_logs</code> as attachments.</td></tr>
+<tr><td><code>--with-configs</code>, <code>--with-logs</code></td><td>Also write the device configs and <code>ona_logs</code> as files in the output directory of the run. bembel stores neither.</td></tr>
 <tr><td><code>--report FILE</code></td><td>Write the run report as JSON.</td></tr>
 <tr><td><code>--release</code></td><td>Cutover only. Remove <code>managed_by = ona-import</code> from all imported objects. Users can then edit them.</td></tr>
 </tbody>

@@ -143,7 +143,7 @@
 <tr><td>6</td><td><code>dns</code></td><td>address FQDN, manual record</td><td><a href="#dns">dns</a></td></tr>
 <tr><td>4b</td><td><code>hosts.primary_dns_id</code></td><td>host FQDN</td><td><a href="#hosts">hosts</a></td></tr>
 <tr><td>7</td><td><code>dhcp_server_subnets</code>, <code>dhcp_pools</code>, <code>dhcp_failover_groups</code>, <code>dhcp_option_entries</code></td><td>DHCP scope, range, failover pair, option values</td><td><a href="#dhcp">dhcp</a></td></tr>
-<tr><td>8</td><td><code>custom_attributes</code>, <code>tags</code>, <code>messages</code>, <code>configurations</code></td><td>attributes, tags, notes, optional config archive</td><td><a href="#attributes">attributes</a></td></tr>
+<tr><td>8</td><td><code>custom_attributes</code>, <code>tags</code>, <code>messages</code>, <code>configurations</code></td><td>attributes, tags, notes, optional config files</td><td><a href="#attributes">attributes</a></td></tr>
 <tr><td>9</td><td><code>users</code>, <code>auth_groups</code>, <code>group_assignments</code>, <code>permissions</code>, <code>permission_assignments</code></td><td>subject, group, binding, role</td><td><a href="#auth">auth</a></td></tr>
 <tr><td>10</td><td><code>sys_config</code> (DNS defaults)</td><td>zone SOA defaults</td><td><a href="#domains">domains</a></td></tr>
 <tr><td>none</td><td><code>sequences</code>, <code>sessions</code>, <code>contexts</code>, <code>defaults</code>, <code>ona_logs</code>, <code>dcm_module_list</code>, <code>racks</code>, <code>rack_assignments</code></td><td>not mapped</td><td><a href="#not-mapped">not-mapped</a></td></tr>
@@ -268,8 +268,8 @@
 <tr><td><code>mac_addr</code></td><td>varchar(12)</td><td><code>interface.mac</code></td><td>12 hex digits to <code>3c:ec:ef:12:0a:44</code>. Lowercase. Empty to null.</td><td>The same MAC on two hosts: <code>ona.dup-mac</code>.</td></tr>
 <tr><td><code>name</code></td><td>varchar(191)</td><td><code>interface.name</code></td><td>Trim. Empty name gets <code>if-ID</code> (ID of the first row).</td><td>The VLAN suffix of <code>eth0.100</code> stays in the name.</td></tr>
 <tr><td><code>description</code></td><td>varchar(191) NULL</td><td><code>interface.description</code></td><td>Decode.</td><td></td></tr>
-<tr><td><code>nat_interface_id</code></td><td>int</td><td><code>address.attributes.nat_address</code></td><td>Link to the other address (the external NAT IP).</td><td>bembel has no NAT object. The attribute is typed.</td></tr>
-<tr><td><code>last_response</code></td><td>timestamp NULL</td><td><code>address.last_seen_at</code> (<code>last_seen_source</code> <code>ona-nmap</code>)</td><td>Zero date to null (<code>ona.zero-date</code>).</td><td>Set by the nmap plugin only.</td></tr>
+<tr><td><code>nat_interface_id</code></td><td>int</td><td><code>address.nat_outside_id</code></td><td>Interface to its first address. The link points from the inside address to the outside address.</td><td>A target interface with no address gives <code>ona.nat-dangling</code>.</td></tr>
+<tr><td><code>last_response</code></td><td>timestamp NULL</td><td>observation with the method <code>nmap</code></td><td>Zero date to null (<code>ona.zero-date</code>).</td><td>Set by the nmap plugin only. The observation sets <code>last_seen_at</code> (<a href="allocation.html#observations">observations</a>).</td></tr>
 <tr><td>(no column)</td><td></td><td><code>address.status</code></td><td><code>allocated</code>.</td><td>ONA knows only assigned IPs.</td></tr>
 <tr><td>(no column)</td><td></td><td><code>address.fqdn</code></td><td>From the A row of the interface, see <a href="#dns">dns</a>.</td><td></td></tr>
 </tbody>
@@ -659,8 +659,8 @@ zones_in_views:
 <tr><td><code>custom_attributes.table_name_ref</code>, <code>table_id_ref</code></td><td>varchar(40), int</td><td>object that gets the attribute</td><td>Only <code>hosts</code>, <code>subnets</code> and <code>vlans</code>. The id follows the ONA id to the external ref.</td><td>An id with no object: dropped. The report counts it.</td></tr>
 <tr><td><code>custom_attributes.value</code></td><td>text</td><td><code>attributes[key]</code></td><td>Typed by the declaration: Y/N becomes boolean.</td><td></td></tr>
 <tr><td><code>tags.name</code>, <code>type</code>, <code>reference</code></td><td>varchar, varchar(25), int</td><td><code>tags</code> of the host or prefix</td><td>Type <code>host</code> or <code>subnet</code>. Tag = <code>key=value</code>; a plain name <code>x</code> gives <code>tag=x</code>.</td><td>Other types give an info finding.</td></tr>
-<tr><td><code>messages</code></td><td></td><td><code>description</code> or note of the object</td><td>Joined to the notes with user and date.</td><td>Sticky notes of host and subnet pages. Expired notes are dropped.</td></tr>
-<tr><td><code>configuration_types</code>, <code>configurations</code></td><td></td><td>config archive (optional)</td><td>Only with <code>--with-configs</code>. The body is not part of the model.</td><td>Can be large. bembel stores the text as an attachment. A device config is not managed by bembel.</td></tr>
+<tr><td><code>messages</code></td><td></td><td><code>note</code> of the object</td><td>One note for each message, with the author and the time. The expiry goes to <code>expires_at</code>. The level is <code>info</code>.</td><td>Sticky notes of host and subnet pages. Expired messages are dropped.</td></tr>
+<tr><td><code>configuration_types</code>, <code>configurations</code></td><td></td><td>files in the output directory of the run (optional)</td><td>Only with <code>--with-configs</code>: one file <code>configs/FQDN/TYPE-DATE.txt</code> for each row. The body is not part of the model.</td><td>Can be large. bembel stores no config text. Copy the files to the config backup of the site. A device config is not managed by bembel.</td></tr>
 </tbody>
 </table>
 <p>The map file may rename a key. For example <code>attributes.rename: {nmap_scan: scan_enabled}</code>.</p>
@@ -713,7 +713,7 @@ zones_in_views:
 <tr><td><code>sequences</code></td><td>bembel uses uuidv7. The ONA ids only live in the external refs. The counters can lag behind <code>MAX(id)</code>, so the import never reads them (<code>ona.sequence-drift</code>, info).</td></tr>
 <tr><td><code>sessions</code>, <code>dcm_module_list</code></td><td>Runtime state of the PHP application.</td></tr>
 <tr><td><code>contexts</code>, <code>defaults</code></td><td>Left over. A context in ONA is a separate database. Run the import once per database with <code>--context NAME</code> and a VRF or team in the map file.</td></tr>
-<tr><td><code>ona_logs</code></td><td>Free text without before and after values. It cannot become audit events. The import can copy it as a text archive (<code>--with-logs</code>).</td></tr>
+<tr><td><code>ona_logs</code></td><td>Free text without before and after values. It cannot become audit events. The import can write it as a text file <code>ona_logs.txt</code> in the output directory of the run (<code>--with-logs</code>).</td></tr>
 <tr><td><code>users.password</code>, guest, <code>dcm.pl</code> login</td><td>Unsalted MD5 and a passwordless login are security faults.</td></tr>
 <tr><td><code>group_assignments</code>, LDAP group membership</td><td>The IdP owns membership.</td></tr>
 <tr><td><code>hosts.parent_id</code></td><td>Never set by ONA.</td></tr>
@@ -721,7 +721,7 @@ zones_in_views:
 <tr><td><code>dns_server_domains.rebuild_flag</code></td><td>bembel builds when data changes.</td></tr>
 <tr><td>Zone footer files of build_bind</td><td>They are files, not rows. The map file <code>zones.NAME.extra_records_file</code> loads a footer as the optional <code>extra_records</code> block of the zone.</td></tr>
 <tr><td>ONA plugins other than nmap</td><td>Their tables are unknown. The import lists tables it does not know and ignores them.</td></tr>
-<tr><td>Device config text (<code>configurations</code>)</td><td>Only with <code>--with-configs</code>, and only as an attachment.</td></tr>
+<tr><td>Device config text (<code>configurations</code>)</td><td>Only with <code>--with-configs</code>, and only as files in the output directory, not in bembel.</td></tr>
 </tbody>
 </table>
 <p>ONA data that has no source in ONA also exists. The map file supplies it: VRF, fabric, team, site of a container, QoS profile and host kind.</p>
@@ -736,6 +736,7 @@ zones_in_views:
 <tr><td><code>ona.overlap</code></td><td>error</td><td>A subnet starts, ends inside or encloses another subnet of the same VRF.</td><td>The smaller subnet is not imported. Fix: delete or resize in ONA, or move one subnet to another VRF in the map file.</td></tr>
 <tr><td><code>ona.ipv6-ambiguous</code></td><td>warn</td><td>A value up to <code>0xFFFFFFFF</code> fits an IPv4 subnet and an IPv6 subnet in <code>::/96</code>.</td><td>Imported as IPv4. Fix: <code>family: {ona:interfaces:ID: v6}</code> in the map file.</td></tr>
 <tr><td><code>ona.stale-subnet-id</code></td><td>info</td><td><code>interfaces.subnet_id</code> differs from the subnet that contains the IP.</td><td>The derived subnet wins. No fix needed. No containing subnet: <code>ona.orphan-interface</code>.</td></tr>
+<tr><td><code>ona.nat-dangling</code></td><td>warn</td><td><code>interfaces.nat_interface_id</code> names an interface that does not exist or has no address.</td><td>The address is imported without <code>nat_outside_id</code>. Fix: correct the NAT link in ONA, or set it in bembel after the import.</td></tr>
 <tr><td><code>ona.zero-date</code></td><td>info</td><td>A date <code>0000-00-00 00:00:00</code> in <code>dns.ebegin</code>, <code>domains.ctime</code>, <code>users.atime</code>, <code>configurations.ctime</code> or <code>interfaces.last_response</code>, and in the legacy columns <code>domains.mtime</code> and <code>configurations.etime</code> where present.</td><td>The import reads dates as text. Zero becomes null. A record with a zero <code>ebegin</code> is imported as disabled (the <a href="#dns">ebegin table</a>).</td></tr>
 <tr><td><code>ona.encoding</code></td><td>warn</td><td>A text is not valid UTF-8, or it shows the signs of a double encoding (<code>Ã¼</code>).</td><td>The import reads bytes. It tries UTF-8, then windows-1252. The finding shows both texts. Fix: <code>encoding: {table.column: latin1}</code> in the map file.</td></tr>
 <tr><td><code>ona.dup-ip</code></td><td>error</td><td>The same IP in two interface rows (SQL insert, or two contexts).</td><td>The lower id is imported. Fix: delete the duplicate in ONA.</td></tr>
