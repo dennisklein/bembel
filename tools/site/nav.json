@@ -263,6 +263,7 @@
             "scope",
             "asn",
             "vrf-rt",
+            "vni",
             "routes",
             "prefix-lists",
             "address-groups",
