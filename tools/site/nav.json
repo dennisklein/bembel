@@ -189,6 +189,10 @@
             "constraints",
             "reaper",
             "bulk",
+            "plan",
+            "renumber",
+            "utilisation",
+            "observations",
             "explainer"
           ]
         },

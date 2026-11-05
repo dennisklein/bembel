@@ -530,6 +530,7 @@ host cn-004-ib0 {
   <li>bembel finds the address through the scopes of the reporting server: (server, ip) → scope → prefix → VRF → address, never by the IP alone. The same IP can exist in two VRFs. One server serves no overlapping subnets from different VRFs, so this result is unique.</li>
   <li>bembel stores <code>last_seen_at</code>, <code>last_seen_mac</code>, <code>last_seen_client_id</code> and <code>last_seen_source</code> on the address. The data is an observation, not a claim. A lease does not create an address in the allocated state.</li>
   <li>bembel limits the writes: one update per address in 15 minutes. A renewal does not make a change event.</li>
+  <li>Each lease and each DHCPACK is also an observation with the method <code>lease</code> or <code>dhcp-ack</code>. Other sources (ARP, ICMP sweep, nmap, VPN sessions) add to the same data (<a href="allocation.html#observations">observations</a>).</li>
   <li>With a failover pair, bembel merges the reports of both servers. The later <code>ends</code> wins.</li>
 </ul>
 <p>The data has these uses.</p>
