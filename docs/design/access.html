@@ -359,6 +359,13 @@
 <tr><td><code>export</code></td><td>read build</td><td>global only (the export target; a pin needs <code>build</code>)</td></tr>
 <tr><td><code>asn</code>, <code>static-route</code>, <code>address-group</code></td><td>read create update delete</td><td>VRF, owner, tags</td></tr>
 <tr><td><code>asset</code> (site, rack, device, port, link)</td><td>read link</td><td>site subtree</td></tr>
+<tr><td><code>vni-range</code></td><td>read create update delete <strong>allocate</strong></td><td>owner, tags of the range</td></tr>
+<tr><td><code>vpn-profile</code></td><td>read create update delete</td><td>the subnets of the profile</td></tr>
+<tr><td><code>vpn-session</code></td><td>read</td><td>the subnet of the session address. Not in <code>*:read</code>: a session is personal data.</td></tr>
+<tr><td><code>observation</code></td><td>read create</td><td>the subnet of the address</td></tr>
+<tr><td><code>note</code></td><td>read create update delete</td><td>the object of the note; a banner (no object) is global only</td></tr>
+<tr><td><code>link-template</code></td><td>read create update delete</td><td>global only</td></tr>
+<tr><td><code>saved-filter</code></td><td>read create update delete</td><td>the team of a team filter (own filters are self rights)</td></tr>
 <tr><td><code>team</code>, <code>tag</code>, <code>attribute</code></td><td>read create update delete</td><td>global only</td></tr>
 <tr><td><code>source</code></td><td>read update sync</td><td>global only (accepting an import finding needs <code>sync</code>)</td></tr>
 <tr><td><code>event</code>, <code>webhook</code></td><td>read; webhook also create update delete</td><td>event: visibility of the object</td></tr>
@@ -372,7 +379,7 @@
 </tbody></table>
 <p>The verb list is <code>read create update delete allocate release traverse confirm build sync link apply approve revoke admin use</code>. Nothing else exists: there is no <code>write</code>, <code>reject</code>, <code>operate</code>, <code>claim</code>, <code>expire</code> or <code>run</code> verb (<code>claim</code> is a kind), and there is no <code>reservation</code> kind (a DHCP reservation is a flag of an address).</p>
 <ul>
-<li><code>*:read</code> covers every kind except role, binding, token, audit, change-request and draft.</li>
+<li><code>*:read</code> covers every kind except role, binding, token, audit, change-request, draft and vpn-session.</li>
 <li><strong>Claim actions.</strong> An allocate with <code>claim_ttl</code> and <code>:renew</code> need <code>claim:create</code>. <code>:confirm</code> needs <code>claim:confirm</code>. <code>:release</code> of a claimed address, and the expiry by the reaper, need <code>claim:release</code>. A direct allocate needs <code>address:allocate</code>. <code>:release</code> of an allocated or reserved address needs <code>address:release</code>.</li>
 <li><strong>traverse</strong> is an implied permission. Any binding that reaches a descendant gives <code>traverse</code> on its ancestors. The user then sees the parent as a stub (id, cidr, name) so the tree has a path. A stub shows no tags, no owner and no counts.</li>
 <li><strong>global only</strong> means that a narrower scope never matches. A binding with a vrf term gives nothing for <code>view:read</code>. The rule is safe by default: a term that does not apply to a kind makes the binding silent for that kind.</li>
@@ -385,14 +392,14 @@
 <thead><tr><th>Role</th><th>Permissions</th><th>Use</th></tr></thead>
 <tbody>
 <tr><td><code>viewer</code></td><td><code>*:read</code>, <code>prefix:traverse</code>, <code>assistant:use</code>. Not audit, binding, role, token or change-request of others</td><td>Read the part of the space in scope</td></tr>
-<tr><td><code>allocator</code></td><td>viewer + <code>prefix:allocate</code>, <code>address:create update allocate release</code>, <code>claim:create confirm release</code>, <code>host:create update</code>, <code>interface:create update</code></td><td>Take and give back addresses and make hosts</td></tr>
+<tr><td><code>allocator</code></td><td>viewer + <code>prefix:allocate</code>, <code>address:create update allocate release</code>, <code>claim:create confirm release</code>, <code>host:create update</code>, <code>interface:create update</code>, <code>note:create update delete</code></td><td>Take and give back addresses, make hosts and add notes</td></tr>
 <tr><td><code>dns-editor</code></td><td>viewer + <code>zone:update</code>, <code>record:create update delete</code>, <code>export:read</code></td><td>Manual records in zones</td></tr>
 <tr><td><code>dhcp-editor</code></td><td>viewer + <code>dhcp-scope:create update delete</code>, <code>range:create update delete</code>, <code>export:read</code></td><td>Scopes, pools and options</td></tr>
-<tr><td><code>network-admin</code></td><td>viewer + <code>create update delete</code> on vrf, prefix, range, address, vlan, vlan-domain, fabric, ib-partition, host, interface, zone, record, view, dhcp-scope, dhcp-server, asn, static-route, address-group, team, tag and attribute; <code>prefix:allocate</code>; <code>address:allocate release</code>; <code>claim:create confirm release</code>; <code>asset:link</code>; <code>export:build</code>; <code>source:sync</code>; <code>binding:read create delete</code>; <code>change-request:read</code>; <code>audit:read</code></td><td>Run the network data and grant non-privileged roles</td></tr>
+<tr><td><code>network-admin</code></td><td>viewer + <code>create update delete</code> on vrf, prefix, range, address, vlan, vlan-domain, fabric, ib-partition, host, interface, zone, record, view, dhcp-scope, dhcp-server, asn, vni-range, static-route, address-group, vpn-profile, note, link-template, saved-filter, team, tag and attribute; <code>prefix:allocate</code>; <code>vni-range:allocate</code>; <code>observation:create</code>; <code>vpn-session:read</code>; <code>address:allocate release</code>; <code>claim:create confirm release</code>; <code>asset:link</code>; <code>export:build</code>; <code>source:sync</code>; <code>binding:read create delete</code>; <code>change-request:read</code>; <code>audit:read</code></td><td>Run the network data and grant non-privileged roles</td></tr>
 <tr><td><code>approver</code></td><td>viewer + <code>change-request:read approve</code></td><td>Second pair of eyes</td></tr>
 <tr><td><code>admin</code></td><td>Every permission of every kind, including <code>role:*</code>, <code>binding:*</code>, <code>token:admin</code>, <code>source:*</code>, <code>audit:read</code>, <code>webhook:*</code> and <code>change-request:*</code></td><td>Run bembel itself</td></tr>
 </tbody></table>
-<p>Some rights come from the subject itself, not from a role. Every <code>user</code> subject holds <code>draft:read create apply delete</code> on its own drafts, <code>token:read create revoke</code> on its own tokens, and <code>change-request:read</code> plus <code>:withdraw</code> on its own requests. The audit log records these with <code>via = self</code>. Service subjects have no self rights.</p>
+<p>Some rights come from the subject itself, not from a role. Every <code>user</code> subject holds <code>draft:read create apply delete</code> on its own drafts, <code>saved-filter:read create update delete</code> on its own saved filters, its own watches, <code>token:read create revoke</code> on its own tokens, and <code>change-request:read</code> plus <code>:withdraw</code> on its own requests. The audit log records these with <code>via = self</code>. Service subjects have no self rights.</p>
 <div class="callout note"><p class="callout-title">Admin is not a bypass</p>
 <p><code>admin</code> still has a scope, and it does not skip change requests. Delete of a zone needs a second subject also for an admin. The first bootstrap admin comes from the config key <code>auth.bootstrap_admins</code> and is audited.</p></div>
 <p>A custom role is a row set. The libvirt agent of a hypervisor uses one, <code>vm-provisioner</code>. It may take addresses and make VM hosts, and nothing else.</p>
@@ -795,6 +802,43 @@ token fw-pan-01 (expires 2027-11-04)
 </ol>
 <p>The states are <code>pending</code>, <code>approved</code>, <code>executed</code>, <code>failed</code>, <code>rejected</code>, <code>withdrawn</code> and <code>expired</code>. A client that cannot handle 202 sends <code>Bembel-Change-Request: never</code>. It then gets <code>409 change-request.required</code>. A request waits 7 days (<code>expired</code>). The proposer can withdraw it with <code>:withdraw</code>. When a subject is disabled, all its pending requests become <code>failed</code> with <code>change-request.proposer-forbidden</code>. The assistant never approves, and a PAT never approves.</p>
 
+<h2 id="notifications">Notifications</h2>
+<p>An event that needs a person goes to that person. bembel sends it by mail and to a team chat. The UI shows the same items as a badge on the bell icon.</p>
+<table class="compact">
+<thead><tr><th>Event</th><th>Goes to</th></tr></thead>
+<tbody>
+<tr><td><code>change-request.created</code></td><td>The subjects that hold <code>change-request:approve</code> on the target, and the team of the target</td></tr>
+<tr><td><code>change-request.executed</code>, <code>.failed</code>, <code>.rejected</code>, <code>.expired</code></td><td>The proposer</td></tr>
+<tr><td><code>export.failed</code></td><td>The team that owns the zone or the scope, and the admins</td></tr>
+<tr><td><code>claim.expiring</code></td><td>The subject that made the claim, 1 hour before the expiry</td></tr>
+<tr><td><code>finding.assigned</code></td><td>The subject or the team that gets the finding (import, sync, observation)</td></tr>
+<tr><td><code>token.expiring</code></td><td>The owner of the PAT, 14 days and 1 day before the expiry</td></tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Mail.</strong> bembel sends through the SMTP relay of the site (<code>notify.smtp.host</code>, port 587 with STARTTLS). A user gets the mail address from the <code>email</code> claim of the IdP. A team gets <code>contact_email</code> (<a href="model.html#common">team</a>).</li>
+<li><strong>Chat.</strong> A team with <code>chat_webhook</code> gets a short text with a link to the object. The format is the incoming webhook of Mattermost, which Slack and Rocket.Chat also accept.</li>
+<li><strong>Settings.</strong> A user can turn off mail for each event on the profile page. A change request to approve cannot be turned off for an approver who is the only approver of its target.</li>
+<li><strong>Delivery.</strong> A worker reads the outbox of the events (<a href="api.html#events">events</a>), so a notification goes out only after the commit. A failed send retries for 24 hours. The metric <code>bembel_notify_failed_total</code> counts the failures.</li>
+<li>A notification holds no secret and only the fields of the object that the receiver can read.</li>
+</ul>
+<p>A user can also <dfn>watch</dfn> an object: a host, a prefix, a zone or a DHCP scope. The bell on the object page adds the watch (<code>PUT /v1/me/watches/{kind}/{id}</code>). Each change of the object, and of the objects under a watched prefix or zone, then gives a notification, at most one mail for each object in 15 minutes. A watch shows only changes that the user can read. A user who loses the read right of the object loses the watch.</p>
+
+<h2 id="break-glass">Break-glass access</h2>
+<p>All logins go through the IdP. When the IdP is down, no one can log in, and a PAT of a user also fails closed (<code>503 auth.directory-unavailable</code>). A <dfn>break-glass</dfn> session is the way in for that case.</p>
+<pre><code class="language-text">$ sudo -u bembel bembel admin break-glass --user d.klein --reason "Keycloak down, INC-4471"
+break-glass session for local:breakglass:d.klein
+  role admin, scope global, expires 2026-11-05T15:42:00Z (1 h)
+  open https://ipam.example.org/break-glass#bgs_Qm9…  (shown once)</code></pre>
+<ul>
+<li>The command runs on a bembel server host as the service user. It needs the database credentials of the config file, so it needs shell access to the host. No API call can make a break-glass session.</li>
+<li>The session belongs to the subject <code>local:breakglass:&lt;name&gt;</code> of kind <code>user</code> and issuer <code>local</code>. It has the built-in role <code>admin</code> with global scope, a life of 1 hour (maximum 4 hours with <code>--ttl</code>) and no refresh.</li>
+<li>The reason is required. The audit log shows <code>via = break-glass</code> and the reason on every call of the session.</li>
+<li>The alert <code>BembelBreakGlassUsed</code> fires at the start of the session and goes to all admins by mail (<a href="operations.html#observability">alerts</a>).</li>
+<li>The session does not skip change requests. A second person with a break-glass session can approve, because the approver is a different human user.</li>
+<li><code>bembel admin break-glass --revoke-all</code> ends all break-glass sessions. Do this when the IdP is back.</li>
+</ul>
+
 <h2 id="audit">Audit log</h2>
 <p>An audit event is an append-only record. bembel writes it in the transaction of the change, so a change without an event cannot exist. It also records each deny.</p>
 <pre><code class="language-sql">CREATE TABLE audit_event (
@@ -814,7 +858,7 @@ token fw-pan-01 (expires 2027-11-04)
   resource_kind        text,
   resource_id          uuid,
   decision             text NOT NULL,          -- allow | deny | pending
-  via                  text NOT NULL,          -- binding | self | system
+  via                  text NOT NULL,          -- binding | self | system | break-glass
   via_binding_id       uuid,                   -- set only when via = binding
   change_request_id    uuid,
   before               jsonb,
