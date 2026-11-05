@@ -185,7 +185,9 @@ metrics:
 <tr><td>Audit stream</td><td>the Loki or SIEM endpoint of <code>exports.audit_stream</code></td><td>with the audit stream</td></tr>
 <tr><td>OpenStack</td><td>Keystone, Neutron and Ironic endpoints</td><td>with an OpenStack source (v1.1)</td></tr>
 <tr><td>JWKS hosts</td><td>443 to the issuers with <code>jwks: discovery</code></td><td>for each such issuer</td></tr>
-<tr><td>SMTP relay</td><td>25 or 587</td><td>with mail notifications</td></tr>
+<tr><td>SMTP relay</td><td>587 to <code>notify.smtp.host</code></td><td>with mail notifications</td></tr>
+<tr><td>Team chat</td><td>443 to the hosts of the team chat webhooks</td><td>with chat notifications</td></tr>
+<tr><td>ExtremeCloud IQ</td><td>443 to <code>api.extremecloudiq.com</code></td><td>with <code>sources.xiq</code></td></tr>
 </tbody>
 </table>
 <p>The chart adds a rule for each enabled feature, and <code>networkPolicy.extraEgress</code> adds site rules. A feature whose destination the policy blocks fails loudly: it logs an error, and its metric or alert shows it (for example <code>bembel_sync_runs_total{result="error"}</code> or <code>bembel_outbox_delivered_total{result="error"}</code>).</p>
@@ -283,6 +285,17 @@ agents:
 
 sources:
   fnt: { enabled: true, config_file: /etc/bembel/fnt.yaml }
+  xiq: { enabled: false, token_file: /run/secrets/xiq-token }      # ExtremeCloud IQ mirror
+
+notify:                                 # see Access control, Notifications
+  smtp: {host: smtp.example.org, port: 587, starttls: true, from: bembel@example.org, password_file: /run/secrets/smtp}
+  retry_for: 24h
+
+observation:
+  retention: 720h                       # 30 days of raw observations
+
+vpn:
+  session_retention: 2160h              # 90 days; agree it with the data protection officer
 
 limits:
   rate_per_subject: 50                  # requests per second
@@ -347,7 +360,8 @@ metrics:
 <tr><td>export build (BIND, dhcpd, OpenSM) and feed build</td><td>one target, one address group</td><td><code>pg_try_advisory_xact_lock</code> in one read-only <code>REPEATABLE READ</code> transaction (below)</td><td>every 30 s; a new bundle only when content changed</td></tr>
 <tr><td>sync (FNT, OpenStack os-prod)</td><td>one source</td><td><code>job_lease</code> row <code>sync:&lt;source&gt;</code> (TTL 2 min) (<a href="assets.html#sync-rules">Assets</a>)</td><td>FNT: delta every 15 min, full at 03:00; os-prod: every 2 min</td></tr>
 <tr><td>embedding indexer</td><td>50 objects</td><td><code>SKIP LOCKED</code> on the queue table</td><td>at once, poll 10 s</td></tr>
-<tr><td>usage recount, history compaction</td><td>one table</td><td><code>job_lease</code> row <code>recount</code>, <code>compact</code></td><td>nightly</td></tr>
+<tr><td>usage recount (with the rows of <code>prefix_usage_daily</code>), history compaction, retention of observations and VPN sessions</td><td>one table</td><td><code>job_lease</code> row <code>recount</code>, <code>compact</code>, <code>retention</code></td><td>nightly</td></tr>
+<tr><td>notifier (mail, team chat)</td><td>a batch of stamped events with a receiver</td><td><code>SKIP LOCKED</code> on <code>outbox_cursor</code> (sink <code>notify</code>)</td><td>at once, poll 5 s</td></tr>
 </tbody>
 </table>
 <div class="callout why">
@@ -568,6 +582,11 @@ spec:
 <tr><td><code>bembel_worker_last_run_timestamp_seconds</code></td><td>gauge</td><td><code>worker</code></td><td>Last run of each worker</td></tr>
 <tr><td><code>bembel_authz_denied_total</code></td><td>counter</td><td><code>permission</code></td><td>Denied requests (no user names)</td></tr>
 <tr><td><code>bembel_subjects_disabled_total</code></td><td>counter</td><td></td><td>Users that the subject sync found disabled or deleted (<a href="access.html">Access control</a>)</td></tr>
+<tr><td><code>bembel_observations_total</code></td><td>counter</td><td><code>method</code></td><td>Observations written (<a href="allocation.html#observations">Allocation</a>)</td></tr>
+<tr><td><code>bembel_notify_failed_total</code></td><td>counter</td><td><code>channel</code> (mail, chat)</td><td>Notifications that failed after all retries</td></tr>
+<tr><td><code>bembel_vpn_sessions_open</code></td><td>gauge</td><td><code>profile</code>, <code>node</code></td><td>Open VPN sessions (<a href="vpn-wifi.html#sessions">VPN and Wi-Fi</a>)</td></tr>
+<tr><td><code>bembel_vpn_reconcile_last_success_timestamp_seconds</code></td><td>gauge</td><td><code>node</code></td><td>Last good reconcile of a VPN node with the eduVPN admin API</td></tr>
+<tr><td><code>bembel_break_glass_sessions_active</code></td><td>gauge</td><td></td><td>Break-glass sessions that are not expired or revoked (<a href="access.html#break-glass">Access control</a>)</td></tr>
 <tr><td><code>bembel_build_info</code></td><td>gauge (1)</td><td><code>version</code>, <code>commit</code>, <code>schema</code></td><td>Version and schema version</td></tr>
 </tbody>
 </table>
@@ -657,6 +676,17 @@ spec:
           labels: { severity: warning }
           annotations:
             summary: "{{ $value }} objects of the index {{ $labels.index }} wait for an embedding"
+        - alert: BembelBreakGlassUsed
+          expr: max(bembel_break_glass_sessions_active) &gt; 0
+          labels: { severity: critical }
+          annotations:
+            summary: "A break-glass session is open: check the audit log (via = break-glass)"
+        - alert: BembelVpnReconcileFailing
+          expr: time() - max by (node) (bembel_vpn_reconcile_last_success_timestamp_seconds) &gt; 1800
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "VPN node {{ $labels.node }} has no good reconcile for 30 minutes"
         - alert: BembelReplicasLow
           expr: (count(up{job="bembel"} == 1) or vector(0)) &lt; 2
           for: 5m
