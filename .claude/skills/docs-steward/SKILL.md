@@ -57,6 +57,60 @@ pull request which steps you did.
   `pre.term`, `pre > code.language-*`, `span.tag`, `figure.diagram`,
   `figure.shot`.
 
+## 2a. Keep the text compact
+
+Each fact has one home. The other places keep one sentence and a link.
+
+| Topic | Home |
+|---|---|
+| Bundle, manifest, signature, agent pull and checks, release paths, pin, rollback, drift | `delivery.html` |
+| Commands, flags, settings, exit codes, terminal examples | `cli.html` |
+| Problem codes (code, status, when, hint) | `api.html#errors` |
+| Event types | `api.html#events` |
+| ETag, If-Match, preconditions | `api.html#concurrency` |
+| Idempotency-Key | `allocation.html#idempotency` |
+| Roles, permissions, bindings, scopes, issuers, tokens, audit, change requests | `access.html` |
+| Object definitions, fields, relations, DDL | `model.html` (behaviour lives in the chapter) |
+| Import findings `ona.*` and their fix rules | `map-ona.html#problems` |
+| Parallel run (normalise, diff, exit criterion) | `migration.html#parallel` |
+| Story data | `index.html#the-example` |
+| Story moment, UI page template, shell, common parts | `ui.html` |
+| Help system, hints, help pane, assistant | `assistant.html` |
+| Metrics and alerts | `operations.html#observability` |
+| TLS, secrets, key rotation | `operations.html#security` |
+
+Pick the form by the type of information:
+
+| Type of information | Form |
+|---|---|
+| Steps that a user does in order | Numbered list |
+| Cases: condition, result, code | Decision table |
+| Items with two or more attributes | Table |
+| Three or more parallel rules | Bullet list |
+| Term and definition | One sentence; the glossary has the entry |
+| Structure | Diagram |
+| States and transitions | State diagram and a transition table |
+| A process in time where records change | Step explainer |
+| What a page or a terminal shows | Screenshot or `pre.term` |
+| A concept, a reason, a trade-off | Short prose; a reason in a `why` callout |
+| A rule that other parts depend on | `rule` callout |
+
+Remove this bloat:
+
+- The same fact twice on one page. The lede gives the scope in 1 to 3
+  sentences, the key points give 4 to 7 decisions, the body does not repeat
+  them.
+- Meta text: "This section specifies", "The table shows", "see above".
+- Rule walls: 5 or more rules in one paragraph. Add a new case as a table row.
+- More than one link to the same target in one section.
+- A "why" callout that repeats the text before it.
+
+`tools/site/textcheck.py` checks the limits: a sentence has at most 25
+words (20 in a step), a paragraph at most 60 words and 6 sentences, a table
+cell at most 40 words. A sentence with 40 % code or an enumeration of names
+is exempt. A heading comes every 150 to 400 words of running text, with no
+level jump. Change the form only when the type of information changes.
+
 ## 3. Diagrams and explainers
 
 - Each chapter has diagrams: the requester reads pictures first. Prefer a
@@ -91,11 +145,13 @@ change it (`grep -rn '10.20.4.44' docs/`).
 ```sh
 mise run docs              # python3 tools/site/build.py --strict --out _site
 mise run docs:check        # python3 tools/site/glossary.py mockups --check
+mise run docs:text         # python3 tools/site/textcheck.py
 python3 tools/site/glossary.py report            # links per term and repo
 ```
 
 - `--strict` must say `OK`: no broken link, no missing anchor, no page outside
   `nav.json`, no external resource, no class outside the contract.
+- `textcheck` must say `0 findings`. Fix the text, not the limit (section 2a).
 - `mockups --check` must say `0 files to change`. If not, use the skill
   `docs-mockups`.
 - After a change of the text, look at `report KEY` for each new or changed

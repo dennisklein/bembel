@@ -124,59 +124,10 @@
     },
     {
       "number": "II",
-      "title": "Model mappings",
-      "pages": [
-        {
-          "number": 4,
-          "path": "design/map-ona.html",
-          "title": "Mapping from OpenNetAdmin",
-          "short": "Mapping from OpenNetAdmin",
-          "description": "Each ONA table and column, its bembel object, the transform and the data problems.",
-          "anchors": [
-            "summary",
-            "tables",
-            "subnets",
-            "hosts",
-            "interfaces",
-            "dns",
-            "domains",
-            "dhcp",
-            "vlans",
-            "blocks",
-            "locations",
-            "attributes",
-            "auth",
-            "not-mapped",
-            "problems"
-          ]
-        },
-        {
-          "number": 5,
-          "path": "design/map-netbox.html",
-          "title": "Mapping to NetBox",
-          "short": "Mapping to NetBox",
-          "description": "Each bembel object and its NetBox model, the differences and the NetBox import and export.",
-          "anchors": [
-            "summary",
-            "ipam",
-            "dcim",
-            "tenancy",
-            "dns-dhcp",
-            "extras",
-            "auth",
-            "api",
-            "differences",
-            "exchange"
-          ]
-        }
-      ]
-    },
-    {
-      "number": "III",
       "title": "How it works",
       "pages": [
         {
-          "number": 6,
+          "number": 4,
           "path": "design/allocation.html",
           "title": "Allocation and lifecycle",
           "short": "Allocation and lifecycle",
@@ -199,7 +150,7 @@
           ]
         },
         {
-          "number": 7,
+          "number": 5,
           "path": "design/dns.html",
           "title": "DNS and BIND export",
           "short": "DNS and BIND export",
@@ -221,7 +172,7 @@
           ]
         },
         {
-          "number": 8,
+          "number": 6,
           "path": "design/dhcp.html",
           "title": "DHCP and ISC dhcpd export",
           "short": "DHCP and ISC dhcpd export",
@@ -242,7 +193,7 @@
           ]
         },
         {
-          "number": 9,
+          "number": 7,
           "path": "design/fabrics.html",
           "title": "Fabrics",
           "short": "Fabrics",
@@ -260,7 +211,20 @@
           ]
         },
         {
-          "number": 10,
+          "number": 8,
+          "path": "design/delivery.html",
+          "title": "Exports and delivery",
+          "short": "Exports and delivery",
+          "description": "How bembel-agent pulls, verifies, checks and installs a signed bundle, and how a release rolls back or stays pinned.",
+          "anchors": [
+            "delivery",
+            "paths",
+            "rollback",
+            "explainer"
+          ]
+        },
+        {
+          "number": 9,
           "path": "design/routing.html",
           "title": "Routing and firewall",
           "short": "Routing and firewall",
@@ -278,7 +242,7 @@
           ]
         },
         {
-          "number": 11,
+          "number": 10,
           "path": "design/access.html",
           "title": "Access control",
           "short": "Access control",
@@ -303,7 +267,7 @@
           ]
         },
         {
-          "number": 12,
+          "number": 11,
           "path": "design/assets.html",
           "title": "Assets from FNT Command",
           "short": "Assets from FNT Command",
@@ -323,11 +287,11 @@
       ]
     },
     {
-      "number": "IV",
-      "title": "Interfaces",
+      "number": "III",
+      "title": "Programs and terminals",
       "pages": [
         {
-          "number": 13,
+          "number": 12,
           "path": "design/api.html",
           "title": "REST API",
           "short": "REST API",
@@ -348,6 +312,23 @@
           ]
         },
         {
+          "number": 13,
+          "path": "design/cli.html",
+          "title": "CLI",
+          "short": "CLI",
+          "description": "The bembel commands, the global flags, the settings, the exit codes and terminal examples.",
+          "anchors": [
+            "commands",
+            "cli-examples"
+          ]
+        }
+      ]
+    },
+    {
+      "number": "IV",
+      "title": "Web UI",
+      "pages": [
+        {
           "number": 14,
           "path": "design/ui.html",
           "title": "Web UI",
@@ -365,26 +346,6 @@
         },
         {
           "number": 15,
-          "path": "design/assistant.html",
-          "title": "Assistant and help",
-          "short": "Assistant and help",
-          "description": "The help system of the web UI and the CLI, and the assistant on a local LLM: advisory buttons, free chat, tools and limits.",
-          "anchors": [
-            "help",
-            "topics",
-            "hints",
-            "assistant",
-            "llm",
-            "tools",
-            "advisories",
-            "chat",
-            "drafts",
-            "safety",
-            "privacy"
-          ]
-        },
-        {
-          "number": 16,
           "path": "design/ui-addr.html",
           "title": "UI: addressing",
           "short": "UI: addressing",
@@ -401,7 +362,7 @@
           ]
         },
         {
-          "number": 17,
+          "number": 16,
           "path": "design/ui-dns.html",
           "title": "UI: DNS and DHCP",
           "short": "UI: DNS and DHCP",
@@ -415,7 +376,7 @@
           ]
         },
         {
-          "number": 18,
+          "number": 17,
           "path": "design/ui-assets.html",
           "title": "UI: assets and fabrics",
           "short": "UI: assets and fabrics",
@@ -429,7 +390,7 @@
           ]
         },
         {
-          "number": 19,
+          "number": 18,
           "path": "design/ui-access.html",
           "title": "UI: access and migration",
           "short": "UI: access and migration",
@@ -442,6 +403,26 @@
             "import",
             "parallel",
             "integrations"
+          ]
+        },
+        {
+          "number": 19,
+          "path": "design/assistant.html",
+          "title": "Assistant and help",
+          "short": "Assistant and help",
+          "description": "The help system of the web UI and the CLI, and the assistant on a local LLM: advisory buttons, free chat, tools and limits.",
+          "anchors": [
+            "help",
+            "topics",
+            "hints",
+            "assistant",
+            "llm",
+            "tools",
+            "advisories",
+            "chat",
+            "drafts",
+            "safety",
+            "privacy"
           ]
         },
         {
@@ -527,15 +508,58 @@
             "example",
             "sources"
           ]
+        },
+        {
+          "number": 24,
+          "path": "design/map-netbox.html",
+          "title": "Mapping to NetBox",
+          "short": "Mapping to NetBox",
+          "description": "Each bembel object and its NetBox model, the differences and the NetBox import and export.",
+          "anchors": [
+            "summary",
+            "ipam",
+            "dcim",
+            "tenancy",
+            "dns-dhcp",
+            "extras",
+            "auth",
+            "api",
+            "differences",
+            "exchange"
+          ]
         }
       ]
     },
     {
       "number": "VI",
-      "title": "Operations",
+      "title": "Migration and operations",
       "pages": [
         {
-          "number": 24,
+          "number": 25,
+          "path": "design/map-ona.html",
+          "title": "Mapping from OpenNetAdmin",
+          "short": "Mapping from OpenNetAdmin",
+          "description": "Each ONA table and column, its bembel object, the transform and the data problems.",
+          "anchors": [
+            "summary",
+            "tables",
+            "subnets",
+            "hosts",
+            "interfaces",
+            "dns",
+            "domains",
+            "dhcp",
+            "vlans",
+            "blocks",
+            "locations",
+            "attributes",
+            "auth",
+            "not-mapped",
+            "problems"
+          ]
+        },
+        {
+          "number": 26,
           "path": "design/migration.html",
           "title": "Migration from OpenNetAdmin",
           "short": "Migration from OpenNetAdmin",
@@ -553,7 +577,7 @@
           ]
         },
         {
-          "number": 25,
+          "number": 27,
           "path": "design/operations.html",
           "title": "Deployment and operations",
           "short": "Deployment and operations",
@@ -569,7 +593,7 @@
           ]
         },
         {
-          "number": 26,
+          "number": 28,
           "path": "design/questions.html",
           "title": "Open questions and sources",
           "short": "Open questions",

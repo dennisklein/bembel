@@ -7,7 +7,7 @@
 </head>
 <body>
 <h1>Allocation and lifecycle</h1>
-<p class="lede">This chapter specifies how bembel gives out addresses and prefixes. It covers the address states, the two allocate operations, claims, idempotent retries, the locks and constraints that make concurrent calls safe, and the reaper that cleans up.</p>
+<p class="lede">This chapter specifies how bembel gives out addresses and prefixes. It covers the address states, the two allocate operations, claims, idempotent retries, the locks and constraints for safe concurrent calls, and the reaper.</p>
 <ul class="keypoints">
   <li>An address is <code>claimed</code>, <code>allocated</code>, <code>reserved</code> or <code>deprecated</code>. A free address has no row.</li>
   <li><code>POST /v1/prefixes/{id}/addresses:allocate</code> picks the address on the server. The client never reads a list and then writes.</li>
@@ -72,11 +72,20 @@
 <tr><td><code>deprecated</code></td><td>The host is gone. The DNS records and the DHCP reservation stay out of the export, unless <code>dns.publish_deprecated</code> is set. The address cannot be given out again until <code>deprecated_until</code>.</td><td><code>:release</code> (user, libvirt hook, sync)</td><td>reaper after the grace time (default 7 days, <code>allocation.default_release_grace</code>), or <code>reactivate</code></td></tr>
 </tbody>
 </table>
-<p>The events of an address are <code>address.claimed</code> (allocate with <code>claim_ttl</code>), <code>address.allocated</code> (direct allocate, confirm with <code>previous_status: "claimed"</code>, reactivate), <code>address.deprecated</code> (release with a grace time), <code>address.updated</code> (also renew) and <code>address.released</code>. The last one means that the row is deleted. Its <code>reason</code> is <code>released</code>, <code>claim-expired</code>, <code>grace-over</code> or <code>subnet-leaked</code>.</p>
-<div class="callout why">
+<table>
+<thead><tr><th>Event</th><th>Fires when</th></tr></thead>
+<tbody>
+<tr><td><code>address.claimed</code></td><td>Allocate with <code>claim_ttl</code>.</td></tr>
+<tr><td><code>address.allocated</code></td><td>Direct allocate, confirm (with <code>previous_status: "claimed"</code>), reactivate.</td></tr>
+<tr><td><code>address.deprecated</code></td><td>Release with a grace time.</td></tr>
+<tr><td><code>address.updated</code></td><td>Update, and also renew.</td></tr>
+<tr><td><code>address.released</code></td><td>The row is deleted. The <code>reason</code> is <code>released</code>, <code>claim-expired</code>, <code>grace-over</code> or <code>subnet-leaked</code>.</td></tr>
+</tbody>
+</table>
+<aside class="callout why">
 <p class="callout-title">Why a grace time</p>
 <p>A deleted VM or host often comes back, or a cache still points at the old address. If bembel gives the address to the next caller at once, two systems can use it. The grace time keeps the address out of reach for 7 days.</p>
-</div>
+</aside>
 <p>Observed addresses (from the <a href="vms.html#agent">bembel-agent</a>, from a sync, or from IPv6 neighbour data) get the flag <code>observed=true</code> and the state <code>allocated</code>. An observed address blocks allocation of the same value. A user cannot release it while the source still reports it: the answer is <code>409 address.observed</code>.</p>
 
 <h2 id="allocate">Allocate the next free address</h2>
@@ -91,7 +100,12 @@ Content-Type: application/json
   "interface": {"host": "cn-622.kestrel.example.org", "name": "eno1", "mac": "3c:ec:ef:7a:10:22"},
   "owner": "hpc-ops"
 }</code></pre>
-<p>This is the call that the Allocate dialog previews at the story moment: a.berger asks for the next free address for the new node cn-622. The answer is <code>201 Created</code> with a <code>Location</code> header and the new address object. The state is <code>claimed</code> when <code>claim_ttl</code> is set (for example <code>"claim_ttl": "PT10M"</code>, see <a href="#claims">Claims</a>) and <code>allocated</code> when it is not. A request with <code>"status": "reserved"</code> makes a reserved address.</p>
+<p>The Allocate dialog previews this call at the story moment: a.berger asks for the next free address for the new node cn-622. The answer is <code>201 Created</code> with a <code>Location</code> header and the new address object.</p>
+<ul>
+  <li>With <code>claim_ttl</code> (for example <code>"claim_ttl": "PT10M"</code>, see <a href="#claims">Claims</a>) the state is <code>claimed</code>.</li>
+  <li>Without <code>claim_ttl</code> the state is <code>allocated</code>.</li>
+  <li>With <code>"status": "reserved"</code> the address is reserved.</li>
+</ul>
 <pre><code class="language-json">{
   "id": "0197c3a2-5b7e-7c1d-9a40-3f6e2d81b5c4",
   "kind": "address",
@@ -104,7 +118,15 @@ Content-Type: application/json
   "owner": "hpc-ops",
   "revision": 1
 }</code></pre>
-<p>The body takes an interface by id (<code>interface_id</code>) or as an object (<code>interface</code>: host, name, MAC or port GUID), not both (<code>422</code>). With <code>interface</code>, bembel finds or makes the host and the interface. The field <code>reservation: true</code> adds a DHCP reservation and needs a MAC. A request that names <code>address</code> takes that address. If the address is taken, the answer is <code>409 address.conflict</code> with the member <code>holder</code>. A request with a known <code>external_ref</code> returns the existing address with <code>200</code> (<a href="#adoption">Adoption</a>).</p>
+<table>
+<thead><tr><th>Request field</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td><code>interface_id</code> or <code>interface</code></td><td>An interface by id, or as an object (host, name, MAC or port GUID). Both together give <code>422</code>. With <code>interface</code>, bembel finds or makes the host and the interface.</td></tr>
+<tr><td><code>reservation: true</code></td><td>Adds a DHCP reservation. Needs a MAC.</td></tr>
+<tr><td><code>address</code></td><td>Takes that address. If it is taken, the answer is <code>409 address.conflict</code> with the member <code>holder</code>.</td></tr>
+<tr><td>known <code>external_ref</code></td><td>Returns the existing address with <code>200</code> (<a href="#adoption">Adoption</a>).</td></tr>
+</tbody>
+</table>
 
 <h3 id="strategies">Strategies</h3>
 <table>
@@ -122,7 +144,7 @@ Content-Type: application/json
 <p>The allocator never returns these addresses:</p>
 <ul>
   <li>The network address (IPv4 with prefix length &lt; 31), and the subnet-router anycast address <code>::</code> of an IPv6 subnet shorter than /127.</li>
-  <li>The broadcast address (IPv4 with prefix length &lt; 31). A /31 (RFC 3021), a /32, a /127 (RFC 6164) and a /128 have no network or broadcast address, so every address in them can be given out.</li>
+  <li>The broadcast address (IPv4 with prefix length &lt; 31). A /31 (RFC 3021), a /32, a /127 (RFC 6164) and a /128 have no network or broadcast address. The allocator can give out every address in them.</li>
   <li>The gateway of the subnet (<code>10.20.4.1</code> in kestrel-compute).</li>
   <li>Every address in a <a href="dhcp.html#pools">range</a> with the purpose <code>dhcp-pool</code>, <code>reserved</code>, <code>infrastructure</code>, <code>lb-pool</code> or <code>vpn-pool</code>. A range with the purpose <code>static</code> is not skipped.</li>
   <li>A request that names a range (<code>"range": "kestrel-static"</code>) allocates only inside that range. The range must have the purpose <code>static</code>, <code>infrastructure</code> or <code>reserved</code> (the last needs <code>range:update</code>). Any other purpose gives <code>422</code>.</li>
@@ -131,7 +153,13 @@ Content-Type: application/json
 <p>In the story data, <code>10.20.4.0/22</code> has 1 024 addresses. The DHCP pool <code>10.20.7.0–10.20.7.254</code> takes 255. The allocator can use the other 767 minus the gateway and the rows that exist.</p>
 
 <h3 id="gap-query">The gap query</h3>
-<p>The first free address is always directly after a blocked item, or it is the first address of the subnet. A blocked item is an existing address, the gateway, or the end of a skipped range. When the request names a range, the first address of that range is a candidate too. So the query builds a short list of candidates and keeps the lowest one that is free. It never lists the whole subnet. It works for IPv4 and IPv6 without change, because it uses <code>inet</code> arithmetic. Every candidate is a host value (/32 or /128), so the query compares it with <code>host(broadcast(cidr))::inet</code>: an <code>inet</code> comparison includes the mask, and <code>broadcast(cidr)</code> keeps the mask of the subnet.</p>
+<p>The first free address is always directly after a blocked item, or it is the first address of the subnet. A blocked item is an existing address, the gateway, or the end of a skipped range.</p>
+<ul>
+  <li>The query builds a short list of candidates and keeps the lowest one that is free. It never lists the whole subnet.</li>
+  <li>When the request names a range, the first address of that range is a candidate too.</li>
+  <li>It works for IPv4 and IPv6 without change, because it uses <code>inet</code> arithmetic.</li>
+  <li>Every candidate is a host value (/32 or /128), so the query compares it with <code>host(broadcast(cidr))::inet</code>. An <code>inet</code> comparison includes the mask, and <code>broadcast(cidr)</code> keeps the mask of the subnet.</li>
+</ul>
 <pre><code class="language-sql">-- $1 = subnet prefix id, $2 = range id named in the request or NULL. The caller holds the row lock on this prefix.
 WITH p AS (
   SELECT id, cidr, gateway,
@@ -165,11 +193,17 @@ WHERE cand.c &lt;&lt;= p.cidr
 ORDER BY cand.c
 LIMIT 1;</code></pre>
 <p>The strategy <code>last</code> uses the mirror query. It starts at <code>host(broadcast(cidr))::inet - 1</code> for IPv4 shorter than /31, and at <code>host(broadcast(cidr))::inet</code> for a point-to-point prefix (<code>p2p</code>). Its candidates are <code>address - 1</code> and <code>first_addr - 1</code>, in descending order. The cost is O(n log n) for n rows in the subnet and uses the btree index on <code>(prefix_id, address)</code>.</p>
-<p>The allocator tests cover these edge cases: a /22 that is full except the broadcast address gives <code>409</code>; a /31 gives both addresses; a /32 gives its one address; a gateway with a mask other than /32 or /128 is rejected by <code>prefix_gateway_is_host</code>.</p>
-<div class="callout warn">
+<p>The allocator tests cover these edge cases:</p>
+<ul>
+  <li>A /22 that is full except the broadcast address gives <code>409</code>.</li>
+  <li>A /31 gives both addresses.</li>
+  <li>A /32 gives its one address.</li>
+  <li>A gateway with a mask other than /32 or /128 is rejected by <code>prefix_gateway_is_host</code>.</li>
+</ul>
+<aside class="callout warn">
 <p class="callout-title">Never generate_series for IPv6</p>
 <p>A /64 has 2<sup>64</sup> addresses. A query that lists them cannot finish. bembel uses only gap queries for IPv6. For <code>random</code> it draws one value and checks it with the unique index. The same rule applies to IPv4 subnets larger than a /20: the code does not enumerate them.</p>
-</div>
+</aside>
 <p>If the query returns no row, the subnet is full. The answer is <code>409 Conflict</code> with the problem type <code>urn:bembel:problem:prefix.exhausted</code> (<a href="api.html#errors">errors</a>). The body names the subnet and has the members <code>largest_free</code> and <code>utilisation</code>.</p>
 
 <h2 id="prefix-allocate">Allocate a child prefix from a prefix pool</h2>
@@ -233,7 +267,7 @@ Idempotency-Key: 0b8e8f1c-4c2a-4f8e-bf53-0d7a9e61c3d5
 </svg>
 <figcaption>The pool 10.20.0.0/16 with its children (hall2-infra, kestrel-compute, osprey-gpu, ceph-public, the planned Hall 2 row C and kestrel-services). The marker "new" is the cell that the call returns. The cell widths are not to scale beyond the /24 grid.</figcaption>
 </figure>
-<p>The same algorithm works in IPv6. For the pool <code>2001:db8:4200::/48</code> a request for a <code>/64</code> returns the lowest free /64. The pool never hands out a prefix longer than the limit on the pool: <code>max_child_length</code> (default 30 for IPv4, 126 for IPv6; for example a pool can be limited to /64 only).</p>
+<p>The same algorithm works in IPv6. For the pool <code>2001:db8:4200::/48</code> a request for a <code>/64</code> returns the lowest free /64. The pool never hands out a prefix longer than its limit <code>max_child_length</code>. The default is 30 for IPv4 and 126 for IPv6. A pool can be limited to /64 only.</p>
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Rule</th></tr></thead>
 <tbody>
@@ -244,10 +278,17 @@ Idempotency-Key: 0b8e8f1c-4c2a-4f8e-bf53-0d7a9e61c3d5
 <tr><td><code>vlan_id</code> or <code>ib_partition_id</code>, <code>site</code>, <code>owner</code>, <code>tags</code>, <code>external_ref</code></td><td>optional</td><td>Set on the new prefix in the same transaction. A prefix has a VLAN or an IB partition, never both (<code>422</code>).</td></tr>
 </tbody>
 </table>
-<p>A block of addresses inside a subnet, for example the pool of a load balancer, is a range, not a child prefix. <code>POST /v1/prefixes/{id}/ranges:allocate</code> with <code>{size, purpose, name, hint?, external_ref?, tags?}</code> returns the lowest free aligned block of <code>size</code> addresses (a power of two) outside every address row, the gateway and every range, or exactly <code>hint</code> if that block is free. Otherwise the answer is <code>409 prefix.exhausted</code>. The call needs an <code>Idempotency-Key</code> and the permission <code>prefix:allocate</code>, and emits <code>range.created</code>.</p>
+<p>A block of addresses inside a subnet, for example the pool of a load balancer, is a range, not a child prefix. The call is <code>POST /v1/prefixes/{id}/ranges:allocate</code> with <code>{size, purpose, name, hint?, external_ref?, tags?}</code>.</p>
+<ul>
+  <li>It returns the lowest free aligned block of <code>size</code> addresses (a power of two). The block lies outside every address row, the gateway and every range.</li>
+  <li>With <code>hint</code>, it returns exactly that block if it is free.</li>
+  <li>Otherwise the answer is <code>409 prefix.exhausted</code>.</li>
+  <li>The call needs an <code>Idempotency-Key</code> and the permission <code>prefix:allocate</code>. It emits <code>range.created</code>.</li>
+</ul>
 
 <h2 id="claims">Claims</h2>
-<p>A <dfn>claim</dfn> is an address row in status <code>claimed</code> with <code>expires_at</code>. There is no claim table and no claim resource in the API. Only addresses are claimed; prefixes never are. The caller wants to be sure that the address stays free while it does something slow: boot a VM, or create a Neutron port. The caller confirms the claim, gives it up, or lets it end.</p>
+<p>A <dfn>claim</dfn> is an address row in status <code>claimed</code> with <code>expires_at</code>. There is no claim table and no claim resource in the API. Only addresses are claimed; prefixes never are.</p>
+<p>The caller wants to be sure that the address stays free while it does something slow: boot a VM, or create a Neutron port. The caller confirms the claim, gives it up, or lets it end.</p>
 <pre><code class="language-bash"># claim for 10 minutes: 201, status claimed
 POST /v1/prefixes/{id}/addresses:allocate   {"claim_ttl": "PT10M", ...}
 
@@ -259,14 +300,24 @@ POST /v1/addresses/{id}:renew               {"claim_ttl": "PT10M"}
 
 # give up: a claimed address is deleted at once
 POST /v1/addresses/{id}:release</code></pre>
-<p>The confirm body is <code>{fqdn?, interface_id? | interface?, external_ref?, reservation?}</code>, and the call needs an <code>Idempotency-Key</code>. A confirm of an address that is already allocated gives <code>200</code> and changes nothing. A confirm or renew after expiry gives <code>409 claim.expired</code> with the member <code>expired_at</code>: bembel finds the expired claim in the <a href="model.html#history">history table</a>. An unknown id gives <code>404</code>. A renew that takes the total life over <code>max_claim_ttl</code> gives <code>422 validation.failed</code>. The claims of a subnet are listed with <code>GET /v1/addresses?status=claimed</code>, <code>bembel address ls --status claimed</code> or the UI page <code>/addresses?status=claimed</code>.</p>
+<p>The confirm body is <code>{fqdn?, interface_id? | interface?, external_ref?, reservation?}</code>. The call needs an <code>Idempotency-Key</code>.</p>
+<table>
+<thead><tr><th>Call and case</th><th>Answer</th></tr></thead>
+<tbody>
+<tr><td>Confirm of an address that is already allocated</td><td><code>200</code>. Nothing changes.</td></tr>
+<tr><td>Confirm or renew after expiry</td><td><code>409 claim.expired</code> with the member <code>expired_at</code>. bembel finds the expired claim in the <a href="model.html#history">history table</a>.</td></tr>
+<tr><td>Confirm or renew of an unknown id</td><td><code>404</code>.</td></tr>
+<tr><td>Renew that takes the total life over <code>max_claim_ttl</code></td><td><code>422 validation.failed</code>.</td></tr>
+</tbody>
+</table>
+<p>The claims of a subnet are listed with <code>GET /v1/addresses?status=claimed</code>, <code>bembel address ls --status claimed</code> or the UI page <code>/addresses?status=claimed</code>.</p>
 <table>
 <thead><tr><th>Setting</th><th>Default</th><th>Rule</th></tr></thead>
 <tbody>
 <tr><td><code>claim_ttl</code> in the request</td><td>none (allocate at once)</td><td>An ISO 8601 duration from <code>PT10S</code> to <code>max_claim_ttl</code>. It must not be combined with <code>status</code> (<code>422</code>).</td></tr>
 <tr><td><code>publish</code> in the request</td><td><code>false</code></td><td>Only with <code>claim_ttl</code>. The DNS records and the DHCP reservation of the claim go into the export while it is claimed.</td></tr>
 <tr><td><code>allocation.default_claim_ttl</code> (config)</td><td><code>10m</code> (10 minutes)</td><td>What the UI and the CLI send when the user picks "claim" without a time.</td></tr>
-<tr><td><code>allocation.max_claim_ttl</code> (config)</td><td><code>24h</code> (24 hours)</td><td>Longest total life, with renewals. More gives <code>422 validation.failed</code>.</td></tr>
+<tr><td><code>allocation.max_claim_ttl</code> (config)</td><td><code>24h</code> (24 hours)</td><td>Longest total life, with renewals.</td></tr>
 <tr><td><code>allocation.default_release_grace</code> (config)</td><td><code>168h</code> (7 days)</td><td>The grace time of <code>:release</code> when the request has no <code>grace</code>.</td></tr>
 </tbody>
 </table>
@@ -281,17 +332,26 @@ POST /v1/addresses/{id}:release</code></pre>
 </tbody>
 </table>
 <p>The permission kind <code>claim</code> is tested on the subnet of the address (<a href="access.html#permissions">permissions</a>).</p>
-<p>Who uses claims, and who does not:</p>
+<table>
+<thead><tr><th>Client</th><th>Use of claims</th></tr></thead>
+<tbody>
+<tr><td>Neutron driver (<a href="openstack.html#driver">OpenStack</a>)</td><td>Claims at allocate. The OpenStack sync confirms the claim on the next poll after the port commit.</td></tr>
+<tr><td><code>bembel vm prepare</code> (<a href="vms.html#hook">libvirt hook</a>)</td><td>Claims an address and a MAC with <code>publish: true</code> (TTL default 24 h, the maximum). The hook confirms the claim by MAC when the domain starts.</td></tr>
+<tr><td>Cluster API provider (<a href="kubernetes.html#capi">Kubernetes</a>)</td><td>Makes no claim. It allocates directly, one address per <code>IPAddressClaim</code>, found again by <code>external_ref</code> (<a href="#adoption">Adoption</a>).</td></tr>
+</tbody>
+</table>
+<p>A claim is in the address table, so the unique constraint covers it and the gap query skips it. Metrics count open, held and expired claims (<a href="operations.html#observability">Observability</a>).</p>
+<p>The DNS and DHCP exports read these addresses:</p>
 <ul>
-  <li><strong>Neutron driver</strong> (<a href="openstack.html#driver">OpenStack</a>): claims at allocate, and the OpenStack sync confirms it on the next poll after the port commit.</li>
-  <li><strong><code>bembel vm prepare</code></strong> (<a href="vms.html#hook">libvirt hook</a>): claims an address and a MAC with <code>publish: true</code> (TTL default 24 h, the maximum), and the hook confirms it by MAC when the domain starts.</li>
-  <li><strong>Cluster API provider</strong> (<a href="kubernetes.html#capi">Kubernetes</a>): makes no claim. It allocates directly, one address per <code>IPAddressClaim</code>, found again by <code>external_ref</code> (<a href="#adoption">Adoption</a>).</li>
+  <li>allocated addresses;</li>
+  <li>reserved addresses with an FQDN;</li>
+  <li>claimed addresses with <code>publish: true</code>.</li>
 </ul>
-<p>A claim is in the address table, so the unique constraint covers it and the gap query skips it. The DNS and DHCP exports read allocated addresses, reserved addresses with an FQDN, and claimed addresses with <code>publish: true</code>. Deprecated addresses make no record unless <code>dns.publish_deprecated</code> is set (<a href="dns.html#derived">derived records</a>). Metrics count open, held and expired claims (<a href="operations.html#observability">Observability</a>).</p>
-<div class="callout why">
+<p>Deprecated addresses make no record unless <code>dns.publish_deprecated</code> is set (<a href="dns.html#derived">derived records</a>).</p>
+<aside class="callout why">
 <p class="callout-title">Why a TTL and not a lease</p>
 <p>A DHCP lease belongs to a client on the network. A claim belongs to a caller of the API. The caller can crash. If the claim had no time limit, a crash would leak the address for ever. With a TTL, a crash leaks the address only until the TTL ends (default 10 minutes).</p>
-</div>
+</aside>
 
 <h3 id="release">Release</h3>
 <p><code>POST /v1/addresses/{id}:release</code> with <code>{"grace": "P7D"}</code> ends the use of an address. An allocated or reserved address becomes <code>deprecated</code> for the grace time, then the reaper frees it. Its DNS records and DHCP reservation leave the export when it becomes deprecated. A claimed address is deleted at once.</p>
@@ -303,13 +363,19 @@ POST /v1/addresses/{id}:release</code></pre>
 </ul>
 
 <h2 id="idempotency">Idempotency-Key</h2>
-<p>These calls need an <code>Idempotency-Key</code> header (an unguessable string of 8 to 255 characters, a UUID is fine): <code>addresses:allocate</code>, <code>addresses:batchAllocate</code>, <code>prefixes:allocate</code>, <code>ranges:allocate</code> and <code>addresses/{id}:confirm</code>. A call without it gets <code>400 request.invalid</code>, and the detail names the header. Every other <code>POST</code> call, <code>:release</code> and <code>:renew</code> included, accepts the header and treats it the same way. bembel follows the IETF draft <em>The Idempotency-Key HTTP Header Field</em>. The same rules are in <a href="api.html#idempotency">REST API</a>.</p>
+<p>The <code>Idempotency-Key</code> header holds an unguessable string of 8 to 255 characters. A UUID is fine. These calls need it:</p>
+<ul>
+  <li><code>addresses:allocate</code>, <code>addresses:batchAllocate</code></li>
+  <li><code>prefixes:allocate</code>, <code>ranges:allocate</code></li>
+  <li><code>addresses/{id}:confirm</code></li>
+</ul>
+<p>A call without it gets <code>400 request.invalid</code>, and the detail names the header. Every other <code>POST</code> call, <code>:release</code> and <code>:renew</code> included, accepts the header and treats it the same way. bembel follows the IETF draft <em>The Idempotency-Key HTTP Header Field</em>. <a href="api.html#idempotency">REST API</a> adds the stable <code>external_ref</code> of a controller.</p>
 <table>
 <thead><tr><th>Case</th><th>Result</th></tr></thead>
 <tbody>
 <tr><td>New key</td><td>bembel runs the call and stores the key, the request fingerprint, the response and the ids of the objects that the call created.</td></tr>
 <tr><td>Same key, same fingerprint, first call finished</td><td>bembel returns the stored response: the same status code and the same body, with the header <code>Idempotent-Replayed: true</code>. It does not allocate again.</td></tr>
-<tr><td>Same key, same fingerprint, first call still running</td><td>The second call waits on the key row. If the first call commits, the second returns its stored response. If the first call rolls back, the second runs as new. A wait longer than <code>lock_timeout</code> (5 s) gives <code>409 idempotency.in-progress</code> with <code>Retry-After: 1</code>.</td></tr>
+<tr><td>Same key, same fingerprint, first call still running</td><td>The second call waits on the key row. First call commits: the second returns its stored response. First call rolls back: the second runs as new. A wait longer than <code>lock_timeout</code> (5 s) gives <code>409 idempotency.in-progress</code> with <code>Retry-After: 1</code>.</td></tr>
 <tr><td>Same key, different fingerprint</td><td><code>422</code> with the problem type <code>idempotency.mismatch</code>. Nothing changes.</td></tr>
 <tr><td>First call failed with <code>4xx</code> or <code>5xx</code></td><td>bembel does not store the response. The retry runs again. An error that depends on the state, such as <code>prefix.exhausted</code>, can then succeed.</td></tr>
 <tr><td>The object the first call created has since been released, expired or deleted</td><td>The key row went with it. The call runs again as new.</td></tr>
@@ -329,12 +395,19 @@ POST /v1/addresses/{id}:release</code></pre>
 );
 CREATE INDEX idempotency_key_created   ON idempotency_key (created_at);
 CREATE INDEX idempotency_key_resources ON idempotency_key USING gin (resource_ids);</code></pre>
-<p>The key row is inserted in the <em>same transaction</em> as the address. If the transaction rolls back, the key row rolls back too. If it commits, both exist. So there is no state where the address exists and the key does not. A client can retry after a timeout and gets the same address, as long as that address is still claimed or allocated.</p>
-<p>A stored response is valid only while the objects it created are live. Every transaction that releases, expires or deletes such an object also deletes the key rows that point at it, with <code>DELETE FROM idempotency_key WHERE resource_ids &amp;&amp; $ids</code>. This runs in <code>:release</code> (to deprecated or deleted), in the two deletes of the <a href="#reaper">reaper</a> (expired claim and deprecated grace), and in prefix delete and range delete. A later retry with that key then runs as a new call and cannot replay an address that another caller holds now. Calls that only change objects (<code>:release</code>, <code>:confirm</code>, <code>:renew</code>, <code>PATCH</code>) store an empty <code>resource_ids</code>.</p>
-<div class="callout tip">
+<p>The key row is inserted in the <em>same transaction</em> as the address. If the transaction rolls back, the key row rolls back too. If it commits, both exist. So there is no state where the address exists and the key does not.</p>
+<p>A client can retry after a timeout and gets the same address, as long as that address is still claimed or allocated.</p>
+<p>A stored response is valid only while the objects it created are live. Every transaction that releases, expires or deletes such an object also deletes the key rows that point at it. The statement is <code>DELETE FROM idempotency_key WHERE resource_ids &amp;&amp; $ids</code>. It runs in:</p>
+<ul>
+  <li><code>:release</code> (to deprecated or deleted);</li>
+  <li>the two deletes of the <a href="#reaper">reaper</a> (expired claim and deprecated grace);</li>
+  <li>prefix delete and range delete.</li>
+</ul>
+<p>A later retry with that key then runs as a new call and cannot replay an address that another caller holds now. Calls that only change objects (<code>:release</code>, <code>:confirm</code>, <code>:renew</code>, <code>PATCH</code>) store an empty <code>resource_ids</code>.</p>
+<aside class="callout tip">
 <p class="callout-title">Controllers and deterministic names</p>
-<p>A controller that reconciles in a loop should also send a stable name in <code>external_ref</code>, for example <code>k8s:kestrel-mgmt:ipaddressclaim/capi-kestrel/kestrel-k8s-cp-0-eth0</code> (namespace and name; the UID changes on <code>clusterctl move</code>). Then a lost or expired key does not matter: the unique index <code>address_source_ref</code> gives the existing address back.</p>
-</div>
+<p>A controller that reconciles in a loop should also send a stable name in <code>external_ref</code>. Example: <code>k8s:kestrel-mgmt:ipaddressclaim/capi-kestrel/kestrel-k8s-cp-0-eth0</code> (namespace and name; the UID changes on <code>clusterctl move</code>). Then a lost or expired key does not matter: the unique index <code>address_source_ref</code> gives the existing address back.</p>
+</aside>
 
 <h3 id="adoption">Adoption by external_ref</h3>
 <p>The server sets <code>source</code> (and <code>managed_by</code> for an integration subject) from the source mapping of the subject. The client may send <code>external_ref</code> on create. A later change of it gives <code>422</code>. It is unique per source. Inside the allocate transaction, before the gap query, bembel looks for an address with the same <code>(source, external_ref)</code>:</p>
@@ -382,6 +455,7 @@ COMMIT;</code></pre>
   <li>It is visible: <code>pg_locks</code> and <code>pg_stat_activity</code> show who waits for which prefix.</li>
   <li>It locks one row. Calls for other subnets do not wait.</li>
 </ul>
+<h3 id="lock-cases">Lock behaviour</h3>
 <table>
 <thead><tr><th>Situation</th><th>Behaviour</th></tr></thead>
 <tbody>
@@ -394,95 +468,16 @@ COMMIT;</code></pre>
 </tbody>
 </table>
 <p>The lock limits the rate for one subnet. The critical section is one index lookup and two inserts, so the expected time is a few milliseconds. That gives hundreds of allocations per second for one subnet. The number is an estimate. A load test measures it (<a href="operations.html#metrics">Operations</a>).</p>
-<div class="callout note">
+<aside class="callout note">
 <p class="callout-title">The constraint is the second guard</p>
-<p>The lock prevents the conflict. The unique constraint and the exclusion constraint (next section) make sure that a bug in the code, a manual SQL change or an import cannot create one. If the constraint fires, bembel repeats the transaction up to 3 times (for <code>:allocate</code> and for prefix creates), and then maps <code>23505</code> and <code>23P01</code> to <code>409</code>.</p>
-</div>
+<p>The lock prevents the conflict. The unique constraint and the exclusion constraint (next section) stop a conflict from a bug in the code, a manual SQL change or an import. If the constraint fires, bembel repeats the transaction up to 3 times (for <code>:allocate</code> and for prefix creates). Then it maps <code>23505</code> and <code>23P01</code> to <code>409</code>.</p>
+</aside>
 
 <h2 id="constraints">PostgreSQL constraints</h2>
-<p>The database rejects an invalid state. The rules do not rely on the application. This excerpt repeats the allocation-relevant parts of the schema in <a href="model.html#schema">Core model</a>, with the same columns.</p>
-<pre><code class="language-sql">CREATE EXTENSION IF NOT EXISTS btree_gist;
-
-CREATE TABLE prefix (
-  id              uuid PRIMARY KEY DEFAULT uuidv7(),
-  vrf_id          uuid NOT NULL REFERENCES vrf,
-  cidr            cidr NOT NULL,                     -- the cidr type rejects host bits at input (22P02)
-  family          smallint GENERATED ALWAYS AS (family(cidr)) STORED,
-  prefix_kind     prefix_kind NOT NULL,              -- container | subnet
-  status          prefix_status NOT NULL DEFAULT 'active',  -- planned | active | reserved | deprecated
-  is_pool         boolean NOT NULL DEFAULT false,
-  parent_id       uuid REFERENCES prefix,            -- kept by trigger
-  level           smallint NOT NULL,                 -- containing prefixes in the VRF, kept by trigger
-  gateway         inet,
-  vlan_id         uuid REFERENCES vlan,
-  ib_partition_id uuid REFERENCES ib_partition,
-  fabric_id       uuid REFERENCES fabric,
-  twin_id         uuid UNIQUE REFERENCES prefix,     -- symmetric; checked by a deferred constraint trigger
-  dns_zone_id     uuid REFERENCES zone,
-  site_path       ltree,                             -- prefix site
-  owner           uuid REFERENCES team,
-  tags            jsonb NOT NULL DEFAULT '{}',
-  source          text NOT NULL DEFAULT 'local',
-  external_ref    text,
-  managed_by      text,
-  revision        bigint NOT NULL DEFAULT 1,
-  CONSTRAINT prefix_unique_per_vrf    UNIQUE (vrf_id, cidr),
-  CONSTRAINT prefix_pool_is_container CHECK (NOT is_pool OR prefix_kind = 'container'),
-  CONSTRAINT prefix_gateway_inside    CHECK (gateway IS NULL OR gateway &lt;&lt; cidr),
-  CONSTRAINT prefix_gateway_is_host   CHECK (gateway IS NULL OR masklen(gateway) = CASE family(gateway) WHEN 4 THEN 32 ELSE 128 END),
-  CONSTRAINT prefix_vlan_or_partition CHECK (NOT (vlan_id IS NOT NULL AND ib_partition_id IS NOT NULL)),
-  CONSTRAINT prefix_no_sibling_overlap
-    EXCLUDE USING gist (vrf_id WITH =, level WITH =, cidr inet_ops WITH &amp;&amp;)
-    DEFERRABLE INITIALLY IMMEDIATE
-);
-CREATE INDEX prefix_cidr_gist ON prefix USING gist (vrf_id, cidr inet_ops);
-CREATE INDEX prefix_site_path ON prefix USING gist (site_path);
-CREATE INDEX prefix_owner ON prefix (owner);
-CREATE UNIQUE INDEX prefix_source_ref ON prefix (source, external_ref) WHERE external_ref IS NOT NULL;
-
-CREATE TABLE address (
-  id               uuid PRIMARY KEY DEFAULT uuidv7(),
-  vrf_id           uuid NOT NULL REFERENCES vrf,
-  prefix_id        uuid NOT NULL REFERENCES prefix,   -- the subnet
-  address          inet NOT NULL,
-  status           address_status NOT NULL,           -- allocated | reserved | claimed | deprecated
-  shared           boolean NOT NULL DEFAULT false,
-  fqdn             text,                              -- drives derived records
-  expires_at       timestamptz,                       -- claimed only
-  publish          boolean NOT NULL DEFAULT false,    -- export while claimed
-  deprecated_until timestamptz,                       -- deprecated only
-  observed         boolean NOT NULL DEFAULT false,
-  last_seen_at     timestamptz,
-  last_seen_source text,                              -- agent, sync or lease source
-  owner            uuid REFERENCES team,
-  tags             jsonb NOT NULL DEFAULT '{}',
-  source           text NOT NULL DEFAULT 'local',
-  external_ref     text,
-  managed_by       text,
-  created_at       timestamptz NOT NULL DEFAULT now(),
-  revision         bigint NOT NULL DEFAULT 1,
-  CONSTRAINT address_is_host CHECK (masklen(address) = CASE family(address) WHEN 4 THEN 32 ELSE 128 END),
-  CONSTRAINT address_claim_has_expiry CHECK ((status = 'claimed') = (expires_at IS NOT NULL)),
-  CONSTRAINT address_deprecated_has_grace CHECK ((status = 'deprecated') = (deprecated_until IS NOT NULL)),
-  CONSTRAINT address_unique_per_vrf UNIQUE (vrf_id, address)
-);
-CREATE INDEX address_by_prefix ON address (prefix_id, address);
-CREATE INDEX address_claim_expiry ON address (expires_at) WHERE status = 'claimed';
-CREATE UNIQUE INDEX address_source_ref ON address (source, external_ref) WHERE external_ref IS NOT NULL;</code></pre>
-<p>An object that the ONA import merged from several ONA rows keeps the extra refs in <code>object_ref (kind text, object_id uuid, source text, external_ref text, UNIQUE (source, external_ref))</code>. A lookup by ref checks both tables, so it still finds exactly one object.</p>
-<h3 id="level">Why the exclusion uses a level</h3>
-<p>Prefixes in a tree contain each other, so a simple "no overlap" rule would reject a /16 and the /22 inside it. The column <code>level</code> solves this: it counts the prefixes in the same VRF that contain this one. The prefix <code>10.0.0.0/8</code> has level 0, <code>10.20.0.0/16</code> has level 1, and <code>10.20.4.0/22</code> has level 2.</p>
-<p>Two CIDR blocks are either nested or disjoint. While the trigger keeps <code>level</code> correct, two overlapping prefixes always have different levels, so the exclusion never fires in normal use. It catches a wrong level: two concurrent transactions that insert nested prefixes can both compute the same level from snapshots that do not see each other. The exclusion rejects the second with <code>23P01</code>. bembel repeats the transaction up to 3 times, and the retry computes the right level.</p>
-<p>A trigger sets <code>level</code> and <code>parent_id</code> on insert and updates the levels of the descendants when a new prefix lands between a parent and its children. The exclusion constraint is <code>DEFERRABLE</code>, and the trigger sets it to <code>DEFERRED</code> for this update only. <span class="tag warn">to verify</span> The prototype must prove this trigger and measure the cost on a table with 10<sup>5</sup> prefixes before the design is final. The ONA import creates prefixes in top-down order, so the import does not hit this case.</p>
-<p>The same BEFORE trigger (on <code>INSERT</code>, and on <code>UPDATE</code> of <code>cidr</code>, <code>vrf_id</code> or <code>prefix_kind</code>) keeps the tree rule that a subnet has no child prefix. It raises <code>23514</code> in two cases:</p>
-<ul>
-  <li><code>prefix_not_in_subnet</code>: the smallest prefix in the VRF that contains the new prefix is a subnet.</li>
-  <li><code>prefix_subnet_childless</code>: the new prefix is a subnet, and prefixes in the VRF already exist inside it.</li>
-</ul>
-<div class="callout why">
-<p class="callout-title">Why not one constraint on parent_id</p>
-<p>A rule <code>parent_id WITH =</code> would not cover top-level prefixes, because <code>NULL</code> never equals <code>NULL</code> in an exclusion constraint. The level column covers every prefix in the VRF.</p>
-</div>
+<p>The database rejects an invalid state. The rules do not rely on the application. The DDL of the columns, checks, indexes and the exclusion is in <a href="model.html#schema">Core model</a>. This section keeps the reasons and the error mapping.</p>
+<p>A deferred constraint trigger on <code>twin_id</code> checks the twin rules at commit. A lookup by <code>external_ref</code> checks the table <code>object_ref</code> too. The ONA import keeps the extra refs of a merged object there, so the lookup still finds exactly one object. The columns of <code>object_ref</code> are in <a href="model.html#schema">the schema excerpt</a>: <code>kind</code>, <code>object_id</code>, <code>source</code>, <code>external_ref</code> and <code>UNIQUE (source, external_ref)</code>.</p>
+<p>The same address in two VRFs is legal: <code>10.20.4.44</code> in <code>global</code> and in <code>oob</code> are two different addresses. This is the reason for the VRF column in every constraint.</p>
+<h3 id="error-map">Error mapping</h3>
 <table>
 <thead><tr><th>Rule</th><th>Mechanism</th><th>Error code</th><th>API</th></tr></thead>
 <tbody>
@@ -499,11 +494,35 @@ CREATE UNIQUE INDEX address_source_ref ON address (source, external_ref) WHERE e
 </tbody>
 </table>
 <p>The API checks host bits before it writes, and maps a <code>22P02</code> on a prefix write to <code>422</code>, never to <code>500</code>. A caller passes a prefix as text or as a <code>cidr</code> parameter. A cast <code>::inet::cidr</code> silently clears the host bits. Only the ONA importer uses it, on purpose, under the finding <code>ona.subnet-hostbits</code>.</p>
-<p>The same address in two VRFs is legal: <code>10.20.4.44</code> in <code>global</code> and in <code>oob</code> are two different addresses. This is the reason for the VRF column in every constraint.</p>
+
+<h3 id="level">Why the exclusion uses a level</h3>
+<p>Prefixes in a tree contain each other, so a simple "no overlap" rule would reject a /16 and the /22 inside it. The column <code>level</code> solves this: it counts the prefixes in the same VRF that contain this one. The prefix <code>10.0.0.0/8</code> has level 0, <code>10.20.0.0/16</code> has level 1, and <code>10.20.4.0/22</code> has level 2.</p>
+<p>Two CIDR blocks are either nested or disjoint. While the trigger keeps <code>level</code> correct, two overlapping prefixes always have different levels. So the exclusion never fires in normal use.</p>
+<p>It catches a wrong level. Two concurrent transactions that insert nested prefixes can both compute the same level, because their snapshots do not see each other. The exclusion rejects the second with <code>23P01</code>. bembel repeats the transaction up to 3 times, and the retry computes the right level.</p>
+<p>A trigger sets <code>level</code> and <code>parent_id</code> on insert. When a new prefix lands between a parent and its children, the trigger updates the levels of the descendants. The exclusion constraint is <code>DEFERRABLE</code>, and the trigger sets it to <code>DEFERRED</code> for this update only.</p>
+<aside class="callout warn">
+<p class="callout-title">Prototype check</p>
+<p><span class="tag warn">to verify</span> The prototype must prove this trigger and measure the cost on a table with 10<sup>5</sup> prefixes before the design is final. The ONA import creates prefixes in top-down order, so the import does not hit this case.</p>
+</aside>
+<p>The same BEFORE trigger (on <code>INSERT</code>, and on <code>UPDATE</code> of <code>cidr</code>, <code>vrf_id</code> or <code>prefix_kind</code>) keeps the tree rule that a subnet has no child prefix. It raises <code>23514</code> in two cases:</p>
+<ul>
+  <li><code>prefix_not_in_subnet</code>: the smallest prefix in the VRF that contains the new prefix is a subnet.</li>
+  <li><code>prefix_subnet_childless</code>: the new prefix is a subnet, and prefixes in the VRF already exist inside it.</li>
+</ul>
+<aside class="callout why">
+<p class="callout-title">Why not one constraint on parent_id</p>
+<p>A rule <code>parent_id WITH =</code> would not cover top-level prefixes, because <code>NULL</code> never equals <code>NULL</code> in an exclusion constraint. The level column covers every prefix in the VRF.</p>
+</aside>
 
 <h2 id="reaper">The reaper</h2>
 <p>The <dfn>reaper</dfn> is a background worker in the <code>bembel</code> binary. Every replica runs it. The replicas do not need to elect a leader (<a href="operations.html#ha">High availability</a>). Each tick takes work with <code>FOR UPDATE SKIP LOCKED</code>, so two replicas never take the same rows.</p>
-<p>A claim of a source that confirms claims by sync (the column <code>source.confirms_claims</code>; today the kind <code>openstack</code>) needs more than the time. bembel reaps it only after a successful sync run that started after <code>expires_at</code> has not confirmed it. While the sync is late or down, the expired claim is held, so the reaper never frees the address of a live Neutron port. The sync stays the only confirm path for these claims. The <code>claim_ttl</code> of such a source should be at least 3 times its sync <code>interval</code>; this is advice, not a check.</p>
+<p>A claim of a source that confirms claims by sync needs more than the time. The column is <code>source.confirms_claims</code>; today the kind is <code>openstack</code>.</p>
+<ul>
+  <li>bembel reaps such a claim only after a successful sync run that started after <code>expires_at</code> has not confirmed it.</li>
+  <li>While the sync is late or down, the expired claim is held. So the reaper never frees the address of a live Neutron port.</li>
+  <li>The sync stays the only confirm path for these claims.</li>
+  <li>The <code>claim_ttl</code> of such a source should be at least 3 times its sync <code>interval</code>. This is advice, not a check.</li>
+</ul>
 <pre><code class="language-sql">-- every 60 seconds
 WITH expired AS (
   SELECT a.id FROM address a
@@ -563,7 +582,7 @@ Idempotency-Key: 8a0c1e3b-...
 <ul>
   <li>Every batch call accepts <code>"validate_only": true</code>. The server runs all checks and the permission test in a transaction that it rolls back. The answer is the plan: for each row the action (<code>create</code>, <code>update</code>, <code>delete</code>, <code>none</code>), the changed fields and the findings. The plan has a hash.</li>
   <li><code>bembel apply -f rack-a04.csv</code> (or a YAML file) reads the rows, asks for the plan, prints it as a table and asks for a confirm. Then it sends the same calls with <code>plan_hash</code>. If the data changed after the plan, the hash differs and the answer is <code>409 plan.stale</code>.</li>
-  <li>A CSV file has one kind for each file, and a header row with the API field names (<code>fqdn,prefix,mac,interface,owner,tags</code>). A row finds its object by the natural key (FQDN for a host, VRF and address for an address, zone, name and type for a record), so a second apply of the same file changes nothing.</li>
+  <li>A CSV file has one kind for each file, and a header row with the API field names (<code>fqdn,prefix,mac,interface,owner,tags</code>). A row finds its object by the natural key, so a second apply of the same file changes nothing. The keys are FQDN for a host, VRF and address for an address, and zone, name and type for a record.</li>
   <li>A plan with more than <code>access.change_request.bulk_threshold</code> objects (default 50) becomes a change request. The request holds the plan, and the approver sees the same table (<a href="access.html#changes">access.html#changes</a>).</li>
   <li>The Import dialog of the web UI and the bulk edit of the lists use the same calls.</li>
 </ul>
@@ -583,21 +602,37 @@ applied 38 hosts in 0.4 s  (audit origin cli, request 01JC…)</pre>
 <tbody>
 <tr><td><code>POST /v1/addresses/{id}:move</code></td><td>Moves one address to another subnet, or to another address in the same subnet. The checks of an allocation apply.</td><td><code>address:release</code> on the old subnet, <code>address:allocate</code> on the new one</td></tr>
 <tr><td><code>POST /v1/interfaces/{id}:move</code></td><td>Moves an interface with its addresses and its MAC to another host, for example after a mainboard swap. The history of both hosts shows the move.</td><td><code>interface:update</code> on both hosts</td></tr>
-<tr><td><code>POST /v1/prefixes/{id}:renumber</code></td><td>Maps each address of a source span to the same offset in a target subnet. Phase 1 makes the new addresses as claims with <code>publish: true</code>, so both names resolve. Phase 2 (<code>:confirm</code> on the renumber operation) makes them <code>allocated</code> and puts the old addresses in <code>deprecated</code> with the release grace.</td><td><code>address:allocate</code> and <code>address:release</code> on both subnets</td></tr>
+<tr><td><code>POST /v1/prefixes/{id}:renumber</code></td><td>Maps each address of a source span to the same offset in a target subnet in two phases.</td><td><code>address:allocate</code> and <code>address:release</code> on both subnets</td></tr>
 <tr><td><code>POST /v1/prefixes/{id}:resize</code></td><td>Changes the length of a subnet. A grow needs free space next to the subnet and no sibling inside the new CIDR. A shrink needs no address outside the new CIDR. The prefix trigger checks both rules again.</td><td><code>prefix:update</code> on the subnet and its parent</td></tr>
 <tr><td><code>POST /v1/prefixes/{id}:split</code></td><td>Cuts a subnet into equal parts. Each address goes to the part that holds it. The ranges must not cross a cut.</td><td><code>prefix:update</code>, <code>prefix:create</code></td></tr>
 </tbody>
 </table>
+<p>The phases of a renumber:</p>
+<ol class="steps">
+  <li>bembel makes the new addresses as claims with <code>publish: true</code>, so both names resolve.</li>
+  <li><code>:confirm</code> on the renumber operation makes the new addresses <code>allocated</code>. It puts the old addresses in <code>deprecated</code> with the release grace.</li>
+</ol>
 <p>A renumber or a split with more than the bulk threshold of addresses becomes a change request. Each call accepts <code>validate_only</code> and returns a plan first.</p>
 
 <h2 id="utilisation">Utilisation</h2>
 <p><dfn>Utilisation</dfn> shows how full a subnet or a pool is. The UI, the alerts and the advisory buttons use it.</p>
+<table>
+<thead><tr><th>Object</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Subnet, IPv4</td><td><code>used / usable</code>.</td></tr>
+<tr><td><code>usable</code> (IPv4)</td><td>The size minus the network and broadcast address.</td></tr>
+<tr><td><code>used</code> (IPv4)</td><td>The number of address rows plus the addresses in ranges with the purpose <code>dhcp-pool</code>, <code>reserved</code>, <code>infrastructure</code>, <code>lb-pool</code> or <code>vpn-pool</code>, each address counted once. Leases do not count: a pool counts fully, because the allocator never uses it.</td></tr>
+<tr><td>Subnet, IPv6</td><td>The count <code>used</code> and the size as a power of two. A percentage in a /64 has no meaning. The API gives <code>percent: null</code> for subnets larger than a /112. Alerts use the count.</td></tr>
+<tr><td>Pool</td><td>The sum of the sizes of the child prefixes, divided by the size of the pool. The unit is /24 equivalents (IPv4) or /64 equivalents (IPv6).</td></tr>
+</tbody>
+</table>
+<p>Example, kestrel-compute <code>10.20.4.0/22</code>: 1 024 addresses, 1 022 usable.</p>
 <ul>
-  <li><strong>Subnet, IPv4:</strong> <code>used / usable</code>. <code>usable</code> is the size minus the network and broadcast address. <code>used</code> is the number of address rows plus the addresses in ranges with the purpose <code>dhcp-pool</code>, <code>reserved</code>, <code>infrastructure</code>, <code>lb-pool</code> or <code>vpn-pool</code>, each address counted once. Leases do not count: a pool counts fully, because the allocator never uses it.</li>
-  <li><strong>Subnet, IPv6:</strong> the count <code>used</code> and the size as a power of two. A percentage in a /64 has no meaning. The API gives <code>percent: null</code> for subnets larger than a /112. Alerts use the count.</li>
-  <li><strong>Pool:</strong> the sum of the sizes of the child prefixes divided by the size of the pool, counted in /24 equivalents (IPv4) or /64 equivalents (IPv6).</li>
+  <li>The DHCP pool takes 255.</li>
+  <li>There are 686 address rows: 635 allocated, 38 reserved, 7 claimed, 6 deprecated.</li>
+  <li>So <code>used</code> is 941 (of which only 635 are in status <code>allocated</code>), and the utilisation is 92.1 %.</li>
 </ul>
-<p>Example, kestrel-compute <code>10.20.4.0/22</code>: 1 024 addresses, 1 022 usable. The DHCP pool takes 255. There are 686 address rows (635 allocated, 38 reserved, 7 claimed, 6 deprecated). So <code>used</code> is 941 (of which only 635 are in status <code>allocated</code>) and the utilisation is 92.1 %. This is the value in the UI mockup and in the alert tests.</p>
+<p>This is the value in the UI mockup and in the alert tests.</p>
 <p>The table <code>prefix_usage (prefix_id, used, usable)</code> is updated in the allocate transaction, under the parent lock, so it is exact. A nightly job recomputes it from the rows and reports a difference as a finding. The metric <code>bembel_prefix_utilisation_ratio</code> reads this table (<a href="operations.html#observability">Observability</a>).</p>
 <p>The nightly usage recount writes one row for each prefix and day into <code>prefix_usage_daily (prefix_id, day, used, usable)</code>. It keeps the rows for 3 years. The prefix page draws the trend from it, and the report <code>utilisation</code> uses it (<a href="#reports">reports</a>).</p>
 
@@ -626,7 +661,8 @@ applied 38 hosts in 0.4 s  (audit origin cli, request 01JC…)</pre>
   ]
 }</code></pre>
 <ul>
-  <li>The methods are <code>lease</code>, <code>dhcp-ack</code>, <code>arp</code>, <code>nd</code>, <code>icmp</code>, <code>nmap</code>, <code>libvirt</code>, <code>vpn</code> and <code>sync</code>. The DHCP lease ingestion has its own call, because it also keeps the lease state, and it writes the same observations with <code>lease</code> and <code>dhcp-ack</code> (<a href="dhcp.html#leases">dhcp.html#leases</a>).</li>
+  <li>The methods are <code>lease</code>, <code>dhcp-ack</code>, <code>arp</code>, <code>nd</code>, <code>icmp</code>, <code>nmap</code>, <code>libvirt</code>, <code>vpn</code> and <code>sync</code>.</li>
+  <li>The DHCP lease ingestion has its own call, because it also keeps the lease state. It writes the same observations with <code>lease</code> and <code>dhcp-ack</code> (<a href="dhcp.html#leases">dhcp.html#leases</a>).</li>
   <li>A known address gets <code>last_seen_at</code>, <code>last_seen_mac</code>, <code>last_seen_source</code> and, if the MAC differs from the interface, the finding <code>address.mac-mismatch</code>.</li>
   <li>An unknown IPv6 address in a subnet becomes an observed address. An unknown IPv4 address gives the finding <code>address.unknown-seen</code>: someone uses an address that bembel did not give out.</li>
   <li><code>bembel observe import --format nmap-xml scan.xml</code> reads an nmap XML file and sends it with the method <code>nmap</code>. Thus an existing scan job keeps its value.</li>
@@ -636,7 +672,7 @@ applied 38 hosts in 0.4 s  (audit origin cli, request 01JC…)</pre>
 <p>The report <code>stale-addresses</code> uses all methods. Thus a static server that answers ICMP is not stale, although it never asks for a lease.</p>
 
 <h2 id="explainer">Two calls at the same time</h2>
-<p>The explainer shows the story in 5 steps. <code>a.berger</code> and <code>d.klein</code> (subject <code>kc:d.klein</code>, from the CLI) both call <code>addresses:allocate</code> for the subnet <code>10.20.4.0/22</code> with strategy <code>first</code> and no <code>claim_ttl</code>. At the story moment the first free addresses are <code>10.20.4.213</code> and <code>10.20.4.214</code>. The gateway is <code>10.20.4.1</code>.</p>
+<p><code>a.berger</code> and <code>d.klein</code> (subject <code>kc:d.klein</code>, from the CLI) both call <code>addresses:allocate</code> for the subnet <code>10.20.4.0/22</code> with strategy <code>first</code> and no <code>claim_ttl</code>. At the story moment the first free addresses are <code>10.20.4.213</code> and <code>10.20.4.214</code>. The gateway is <code>10.20.4.1</code>.</p>
 <figure class="diagram wide explainer">
 <svg viewBox="0 0 900 420" role="img" aria-labelledby="cc-t">
 <title id="cc-t">Two concurrent allocate calls for 10.20.4.0/22: lock, wait, two different addresses, idempotent retry</title>

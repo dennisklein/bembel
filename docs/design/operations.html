@@ -7,7 +7,7 @@
 </head>
 <body>
 <h1>Deployment and operations</h1>
-<p class="lede">This chapter specifies how an admin runs bembel: the Helm chart for a highly available deployment on Kubernetes, the packages for plain VMs, the configuration, the backup, the metrics, logs and traces, the upgrade path and the security settings.</p>
+<p class="lede">This chapter covers how an admin runs bembel: deployment, configuration, high availability, backup, observability, upgrades and security.</p>
 <ul class="keypoints">
   <li>One static binary and one container image. The API server is stateless: at least 3 replicas behind a Service.</li>
   <li>Background workers run in the same binary in every replica. They coordinate with PostgreSQL: lease rows for long work, transaction locks and <code>SKIP LOCKED</code> for short work. No leader election service is needed.</li>
@@ -164,7 +164,8 @@ metrics:
 <tr><td><code>Service bembel</code></td><td>Ports 8443 (API, UI) and 9090 (metrics)</td></tr>
 <tr><td><code>Ingress</code></td><td>TLS at the edge. A <code>Gateway</code> API route is an option.</td></tr>
 <tr><td><code>PodDisruptionBudget</code></td><td><code>minAvailable: 2</code>. A node drain never takes more than one replica.</td></tr>
-<tr><td><code>Job bembel-migrate</code></td><td>Helm <code>post-install,pre-upgrade</code> hook (<code>helm.sh/hook-weight: "0"</code>, <code>helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded</code>), with its own hook ConfigMap <code>bembel-migrate-config</code> (weight <code>"-5"</code>, <code>before-hook-creation</code>). It runs <code>bembel migrate up --wait 10m</code> on <code>db.direct_url</code>, retries the connection with backoff, and has <code>backoffLimit: 3</code>. Never <code>pre-install</code>: the database does not exist yet at that time.</td></tr>
+<tr><td><code>Job bembel-migrate</code></td><td>Helm <code>post-install,pre-upgrade</code> hook (<code>helm.sh/hook-weight: "0"</code>, <code>helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded</code>). It runs <code>bembel migrate up --wait 10m</code> on <code>db.direct_url</code>, retries the connection with backoff, and has <code>backoffLimit: 3</code>. Never <code>pre-install</code>: the database does not exist yet at that time.</td></tr>
+<tr><td><code>ConfigMap bembel-migrate-config</code></td><td>Hook ConfigMap of the Job (weight <code>"-5"</code>, <code>before-hook-creation</code>)</td></tr>
 <tr><td><code>Cluster bembel-db</code>, <code>ScheduledBackup</code>, <code>ObjectStore bembel-s3</code></td><td>CloudNativePG and barman-cloud objects (when <code>mode: cnpg</code>)</td></tr>
 <tr><td><code>Pooler bembel-db-pooler-rw</code></td><td>CloudNativePG Pooler: <code>type: rw</code>, <code>instances: 2</code>, <code>pgbouncer.poolMode: transaction</code>, <code>pgbouncer.parameters.max_prepared_statements: "200"</code>. The target of <code>db.url</code>.</td></tr>
 <tr><td><code>NetworkPolicy</code></td><td>Ingress only from the ingress controller and Prometheus. Egress as in the table below.</td></tr>
@@ -172,7 +173,15 @@ metrics:
 <tr><td><code>ServiceAccount bembel</code></td><td>No API rights, <code>automountServiceAccountToken: false</code>. The chart makes no Role.</td></tr>
 </tbody>
 </table>
-<p>On the first install the pods start before the schema exists. They stay unready until the post-install Job has migrated the schema to their <code>min_schema</code> (<a href="#stateless">readiness</a>). In <code>mode: cnpg</code> the pods and the Job read the password from the Secret <code>bembel-db-app</code> (key <code>password</code>, env <code>PGPASSWORD</code>) that the operator makes, and the CA from the Secret <code>bembel-db-ca</code> (key <code>ca.crt</code>). In <code>mode: external</code> the Secret <code>bembel-db</code> holds the keys <code>url</code> and <code>direct_url</code>.</p>
+<p>On the first install the pods start before the schema exists. They stay unready until the post-install Job has migrated the schema to their <code>min_schema</code> (<a href="#stateless">readiness</a>). The database secrets depend on the mode:</p>
+<table>
+<thead><tr><th>Mode</th><th>Secret</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td><code>mode: cnpg</code></td><td><code>bembel-db-app</code> (made by the operator)</td><td>Key <code>password</code>, read by the pods and the Job as env <code>PGPASSWORD</code></td></tr>
+<tr><td><code>mode: cnpg</code></td><td><code>bembel-db-ca</code></td><td>Key <code>ca.crt</code>: the CA</td></tr>
+<tr><td><code>mode: external</code></td><td><code>bembel-db</code></td><td>Keys <code>url</code> and <code>direct_url</code></td></tr>
+</tbody>
+</table>
 <table>
 <thead><tr><th>Egress</th><th>Destination</th><th>When</th></tr></thead>
 <tbody>
@@ -325,11 +334,16 @@ metrics:
 <tr><td><code>BEMBEL_CONFIG</code></td><td>flag <code>--config</code></td><td><code>/etc/bembel/bembel.yaml</code></td></tr>
 </tbody>
 </table>
-<p>List keys (issuers, targets) can be set only in the file. <code>bembel config check</code> loads the file, tests both database URLs, the issuers' discovery URLs and the LLM endpoint, and prints the problems. It refuses two issuers with the same <code>issuer</code> URL. The chart runs it in an init container. A change in the ConfigMap needs a rolling restart: the chart adds a checksum annotation to the pods.</p>
+<ul>
+  <li>List keys (issuers, targets) can be set only in the file.</li>
+  <li><code>bembel config check</code> loads the file, tests both database URLs, the issuers' discovery URLs and the LLM endpoint, and prints the problems. It refuses two issuers with the same <code>issuer</code> URL.</li>
+  <li>The chart runs <code>bembel config check</code> in an init container.</li>
+  <li>A change in the ConfigMap needs a rolling restart: the chart adds a checksum annotation to the pods.</li>
+</ul>
 
 <h2 id="ha">High availability</h2>
 <h3 id="stateless">The API is stateless</h3>
-<p>A request touches only PostgreSQL. UI sessions are rows in PostgreSQL (<a href="access.html#login">Access control</a>), and the OIDC key sets (JWKS) are caches that each pod fills itself, so any pod can answer any request and a pod can die at any time.</p>
+<p>A request touches only PostgreSQL. UI sessions are rows in PostgreSQL (<a href="access.html#login">Access control</a>). Each pod fills its own cache of the OIDC key sets (JWKS). So any pod can answer any request, and a pod can die at any time.</p>
 <table>
 <thead><tr><th>Probe</th><th>Path</th><th>Passes when</th></tr></thead>
 <tbody>
@@ -350,7 +364,8 @@ metrics:
 </ol>
 <p>The total is 5 + 30 + 10 seconds, plus 15 seconds of margin: 60 seconds.</p>
 <h3 id="workers">Workers</h3>
-<p>Each pod runs the API and the background workers. No pod is the leader. A worker takes one unit of work with a lock or a lease that PostgreSQL holds, so two pods do not do the same work. Workers act as built-in subjects (<code>system:reaper</code>, <code>system:export</code>, <code>system:subject-sync</code>, <code>system:sync-fnt</code>, <code>system:sync-os-prod</code>, <code>system:ona-import</code>). They have no bindings and fixed rights, and the audit log shows <code>via = system</code> (<a href="access.html">Access control</a>).</p>
+<p>Each pod runs the API and the background workers. No pod is the leader. A worker takes one unit of work with a lock or a lease that PostgreSQL holds, so two pods do not do the same work.</p>
+<p>Workers act as built-in subjects (<code>system:reaper</code>, <code>system:export</code>, <code>system:subject-sync</code>, <code>system:sync-fnt</code>, <code>system:sync-os-prod</code>, <code>system:ona-import</code>). They have no bindings and fixed rights, and the audit log shows <code>via = system</code> (<a href="access.html">Access control</a>).</p>
 <table>
 <thead><tr><th>Worker</th><th>Work unit</th><th>Mechanism</th><th>Interval</th></tr></thead>
 <tbody>
@@ -378,7 +393,8 @@ UPDATE job_lease SET holder = $pod, until = now() + interval '2 minutes'
 SET LOCAL idle_in_transaction_session_timeout = '60s';
 SELECT pg_try_advisory_xact_lock(hashtextextended('export:' || $kind || ':' || $target, 0));
 SELECT pg_try_advisory_xact_lock(hashtextextended('feed:' || $group_name, 0));</code></pre>
-<p>A long job renews its lease every 30 seconds and inside each page transaction (500 objects). A renewal that returns no row aborts the run. Each run is recorded in <code>sync_run</code>. The stamper numbers the outbox rows after commit. So <code>bembelseq</code> is a gap-free, monotonic order number, assigned after commit, and a resume with <code>Last-Event-ID</code> or <code>after_seq</code> loses nothing (<a href="api.html#events">REST API</a>). Its lag shows in <code>bembel_outbox_oldest_age_seconds</code>.</p>
+<p>A long job renews its lease every 30 seconds and inside each page transaction (500 objects). A renewal that returns no row aborts the run. Each run is recorded in <code>sync_run</code>.</p>
+<p>The stamper numbers the outbox rows after commit. So <code>bembelseq</code> is a gap-free, monotonic order number, assigned after commit, and a resume with <code>Last-Event-ID</code> or <code>after_seq</code> loses nothing (<a href="api.html#events">REST API</a>). Its lag shows in <code>bembel_outbox_oldest_age_seconds</code>.</p>
 <figure class="diagram wide">
 <svg viewBox="0 0 900 330" role="img" aria-labelledby="fl-t">
 <title id="fl-t">Data flows and agent flows of bembel: users, services, agents and exports</title>
@@ -524,8 +540,13 @@ spec:
   <li>Point <code>db.url</code> at the Pooler of the restore cluster (<code>bembel-db-restore-pooler-rw</code>) and <code>db.direct_url</code> at <code>bembel-db-restore-rw</code>. Scale the Deployment up.</li>
   <li>Run <code>bembel export build --all</code>. The DNS and DHCP agents pull the restored state at the next poll.</li>
 </ol>
-<p>An agent refuses a bundle with a lower snapshot than its current release (<a href="dns.html#delivery">DNS</a>). A restore to an earlier time can give lower snapshots and serials. The export build after a restore therefore works as a pin: it rolls forward, with a snapshot and serials above those that the agents report.</p>
-<p>For a plain PostgreSQL, use pgBackRest or barman with the same schedule. The runbook is the same. The runbook also asks for a <strong>restore test every month</strong>: restore into a scratch cluster, run <code>bembel migrate status</code> and the read-only smoke test (<code>bembel check</code>).</p>
+<p>An agent refuses a bundle with a lower snapshot than its current release (<a href="delivery.html#verify">Exports and delivery</a>). A restore to an earlier time can give lower snapshots and serials. The export build after a restore therefore works as a pin: it rolls forward, with a snapshot and serials above those that the agents report.</p>
+<p>For a plain PostgreSQL, use pgBackRest or barman with the same schedule. The runbook is the same. It also asks for a <strong>restore test every month</strong>:</p>
+<ol class="steps">
+  <li>Restore into a scratch cluster.</li>
+  <li>Run <code>bembel migrate status</code>.</li>
+  <li>Run the read-only smoke test (<code>bembel check</code>).</li>
+</ol>
 <div class="callout note">
 <p class="callout-title">What is not in the database</p>
 <p>The config file, the secrets, the signing key of the release and the Keycloak data. The chart keeps the first two in Git (config) and in the secret store. Keycloak has its own backup.</p>
@@ -534,64 +555,70 @@ spec:
 <h2 id="observability">Observability</h2>
 <h3 id="metrics">Metrics</h3>
 <p>Prometheus metrics are on <code>:9090/metrics</code>, a separate port that the Ingress does not expose. The Go runtime and process collectors are on too. Label values are bounded: the label <code>route</code> is the route pattern (<code>/v1/prefixes/{id}</code>), never the real path. This table is the single list of bembel metrics. Other chapters use these names.</p>
-<p>The freshness gauges (export, sync and feed) and the claim gauges come from database state, not from variables in the process. On each scrape every pod reads them in one query from the export target, source, address group and address rows (for example <code>source.last_success_at</code> and <code>export_target.last_checked_at</code>). So all pods report the same value, a restarted pod reports the right value at once, and the alert rules aggregate across pods with <code>max</code>.</p>
+<p>The freshness gauges (export, sync and feed) and the claim gauges come from database state, not from variables in the process. On each scrape every pod reads them in one query from the export target, source, address group and address rows (for example <code>source.last_success_at</code> and <code>export_target.last_checked_at</code>). This has three effects:</p>
+<ul>
+  <li>All pods report the same value.</li>
+  <li>A restarted pod reports the right value at once.</li>
+  <li>The alert rules aggregate across pods with <code>max</code>.</li>
+</ul>
 <table>
-<thead><tr><th>Metric</th><th>Type</th><th>Labels</th><th>Meaning</th></tr></thead>
+<thead><tr><th>Metric</th><th>Type</th><th>Labels</th><th>Meaning</th><th>Alert</th></tr></thead>
 <tbody>
-<tr><td><code>bembel_http_request_duration_seconds</code></td><td>histogram</td><td><code>route</code>, <code>method</code>, <code>status_class</code></td><td>Request time per route</td></tr>
-<tr><td><code>bembel_http_requests_in_flight</code></td><td>gauge</td><td></td><td>Requests now</td></tr>
-<tr><td><code>bembel_deprecated_calls_total</code></td><td>counter</td><td><code>route</code></td><td>Calls to deprecated routes (<a href="api.html#versioning">REST API</a>)</td></tr>
-<tr><td><code>bembel_allocations_total</code></td><td>counter</td><td><code>kind</code> (address, prefix), <code>result</code> (ok, replay, full, conflict, error)</td><td>Allocate calls</td></tr>
-<tr><td><code>bembel_allocation_duration_seconds</code></td><td>histogram</td><td><code>kind</code></td><td>Time of the whole transaction</td></tr>
-<tr><td><code>bembel_allocation_lock_wait_seconds</code></td><td>histogram</td><td><code>kind</code></td><td>Time waiting for the row lock</td></tr>
-<tr><td><code>bembel_claims_open</code></td><td>gauge</td><td></td><td>Addresses in state claimed</td></tr>
-<tr><td><code>bembel_claims_expired_total</code></td><td>counter</td><td></td><td>Claims released by the reaper</td></tr>
-<tr><td><code>bembel_claims_held</code></td><td>gauge</td><td><code>source</code></td><td>Expired claims that the reaper holds, because the sync of their source has not succeeded since they expired (<a href="allocation.html#reaper">Allocation</a>)</td></tr>
-<tr><td><code>bembel_claims_expired_unreaped</code></td><td>gauge</td><td></td><td>Expired claims that are not held and are more than 5 minutes past <code>expires_at</code></td></tr>
-<tr><td><code>bembel_prefix_utilisation_ratio</code></td><td>gauge</td><td><code>vrf</code>, <code>prefix</code>, <code>name</code></td><td>Used / usable. Only for prefixes with the tag <code>metrics=true</code> (opt-in), to bound cardinality.</td></tr>
-<tr><td><code>bembel_dhcp_pool_utilisation_ratio</code></td><td>gauge</td><td><code>scope</code>, <code>pool</code></td><td>Leased / size of a DHCP pool</td></tr>
-<tr><td><code>bembel_export_build_duration_seconds</code></td><td>histogram</td><td><code>kind</code> (bind, dhcpd, opensm), <code>target</code></td><td>Build time of an export</td></tr>
-<tr><td><code>bembel_export_last_success_timestamp_seconds</code></td><td>gauge</td><td><code>kind</code>, <code>target</code></td><td>Last good build or no-change check</td></tr>
-<tr><td><code>bembel_export_last_pull_timestamp_seconds</code></td><td>gauge</td><td><code>kind</code>, <code>target</code></td><td>Last pull of the target (DNS or DHCP server)</td></tr>
-<tr><td><code>bembel_export_failures_total</code></td><td>counter</td><td><code>kind</code>, <code>target</code>, <code>reason</code></td><td>Failed builds (checks, <code>named-checkzone</code>, <code>dhcpd -t</code>)</td></tr>
-<tr><td><code>bembel_agent_last_seen_timestamp_seconds</code></td><td>gauge</td><td><code>agent</code></td><td>Last report of a bembel-agent</td></tr>
-<tr><td><code>bembel_agent_bundle_rejected_total</code></td><td>counter</td><td><code>reason</code> (signature, identity, rollback, hash)</td><td>Bundles that an agent refused, from its reports (<a href="dns.html#delivery">DNS</a>)</td></tr>
-<tr><td><code>bembel_feed_revision</code></td><td>gauge</td><td><code>group</code></td><td>Current revision of an address group feed</td></tr>
-<tr><td><code>bembel_feed_entries</code></td><td>gauge</td><td><code>group</code>, <code>family</code></td><td>Entries in the current revision</td></tr>
-<tr><td><code>bembel_feed_held</code></td><td>gauge (0/1)</td><td><code>group</code></td><td>1 while the change guard holds a revision (<a href="routing.html">Routing</a>)</td></tr>
-<tr><td><code>bembel_feed_last_success_timestamp_seconds</code></td><td>gauge</td><td><code>group</code></td><td>Last good build or no-change check of a feed</td></tr>
-<tr><td><code>bembel_feed_requests_total</code></td><td>counter</td><td><code>group</code>, <code>format</code>, <code>status_class</code></td><td>Feed downloads</td></tr>
-<tr><td><code>bembel_sync_runs_total</code></td><td>counter</td><td><code>source</code>, <code>mode</code>, <code>result</code></td><td>Sync runs</td></tr>
-<tr><td><code>bembel_sync_run_duration_seconds</code></td><td>histogram</td><td><code>source</code>, <code>mode</code></td><td>Sync time</td></tr>
-<tr><td><code>bembel_sync_last_success_timestamp_seconds</code></td><td>gauge</td><td><code>source</code></td><td>Last good sync (from <code>source.last_success_at</code>)</td></tr>
-<tr><td><code>bembel_sync_objects_total</code></td><td>counter</td><td><code>source</code>, <code>kind</code>, <code>action</code></td><td>Objects created, updated, missing</td></tr>
-<tr><td><code>bembel_outbox_pending</code></td><td>gauge</td><td><code>sink</code></td><td>Events not yet delivered</td></tr>
-<tr><td><code>bembel_outbox_oldest_age_seconds</code></td><td>gauge</td><td></td><td>Age of the oldest event that is not yet stamped or not yet delivered to every sink (lag)</td></tr>
-<tr><td><code>bembel_outbox_delivered_total</code></td><td>counter</td><td><code>sink</code>, <code>result</code></td><td>Deliveries</td></tr>
-<tr><td><code>bembel_db_pool_connections</code></td><td>gauge</td><td><code>state</code> (acquired, idle, max)</td><td>pgx pool</td></tr>
-<tr><td><code>bembel_db_pool_acquire_duration_seconds</code></td><td>histogram</td><td></td><td>Wait for a connection</td></tr>
-<tr><td><code>bembel_schema_ahead</code></td><td>gauge</td><td></td><td>1 when the schema is newer than this binary knows</td></tr>
-<tr><td><code>bembel_llm_request_duration_seconds</code></td><td>histogram</td><td><code>endpoint</code> (chat, embeddings), <code>model</code>, <code>result</code></td><td>Calls to the LLM service</td></tr>
-<tr><td><code>bembel_llm_tokens_total</code></td><td>counter</td><td><code>model</code>, <code>direction</code> (prompt, completion)</td><td>Token count</td></tr>
-<tr><td><code>bembel_embedding_backlog</code></td><td>gauge</td><td><code>index</code> (knowledge, objects)</td><td>Objects waiting for an embedding</td></tr>
-<tr><td><code>bembel_assistant_requests_total</code></td><td>counter</td><td><code>surface</code> (chat, advisory), <code>result</code></td><td>Assistant requests</td></tr>
-<tr><td><code>bembel_assistant_tool_calls_total</code></td><td>counter</td><td><code>tool</code>, <code>result</code> (ok, denied, error, truncated)</td><td>Tool calls of the assistant</td></tr>
-<tr><td><code>bembel_assistant_rate_limited_total</code></td><td>counter</td><td><code>limit</code></td><td>Assistant requests refused by a limit</td></tr>
-<tr><td><code>bembel_drafts_total</code></td><td>counter</td><td><code>state</code> (created, applied, discarded, expired, stale)</td><td>Drafts by end state</td></tr>
-<tr><td><code>bembel_search_duration_seconds</code></td><td>histogram</td><td><code>mode</code> (exact, text, vector, merge)</td><td>Search time</td></tr>
-<tr><td><code>bembel_worker_last_run_timestamp_seconds</code></td><td>gauge</td><td><code>worker</code></td><td>Last run of each worker</td></tr>
-<tr><td><code>bembel_authz_denied_total</code></td><td>counter</td><td><code>permission</code></td><td>Denied requests (no user names)</td></tr>
-<tr><td><code>bembel_subjects_disabled_total</code></td><td>counter</td><td></td><td>Users that the subject sync found disabled or deleted (<a href="access.html">Access control</a>)</td></tr>
-<tr><td><code>bembel_observations_total</code></td><td>counter</td><td><code>method</code></td><td>Observations written (<a href="allocation.html#observations">Allocation</a>)</td></tr>
-<tr><td><code>bembel_notify_failed_total</code></td><td>counter</td><td><code>channel</code> (mail, chat)</td><td>Notifications that failed after all retries</td></tr>
-<tr><td><code>bembel_vpn_sessions_open</code></td><td>gauge</td><td><code>profile</code>, <code>node</code></td><td>Open VPN sessions (<a href="vpn-wifi.html#sessions">VPN and Wi-Fi</a>)</td></tr>
-<tr><td><code>bembel_vpn_reconcile_last_success_timestamp_seconds</code></td><td>gauge</td><td><code>node</code></td><td>Last good reconcile of a VPN node with the eduVPN admin API</td></tr>
-<tr><td><code>bembel_break_glass_sessions_active</code></td><td>gauge</td><td></td><td>Break-glass sessions that are not expired or revoked (<a href="access.html#break-glass">Access control</a>)</td></tr>
-<tr><td><code>bembel_build_info</code></td><td>gauge (1)</td><td><code>version</code>, <code>commit</code>, <code>schema</code></td><td>Version and schema version</td></tr>
+<tr><td><code>bembel_http_request_duration_seconds</code></td><td>histogram</td><td><code>route</code>, <code>method</code>, <code>status_class</code></td><td>Request time per route</td><td></td></tr>
+<tr><td><code>bembel_http_requests_in_flight</code></td><td>gauge</td><td></td><td>Requests now</td><td></td></tr>
+<tr><td><code>bembel_deprecated_calls_total</code></td><td>counter</td><td><code>route</code></td><td>Calls to deprecated routes (<a href="api.html#versioning">REST API</a>)</td><td></td></tr>
+<tr><td><code>bembel_allocations_total</code></td><td>counter</td><td><code>kind</code> (address, prefix), <code>result</code> (ok, replay, full, conflict, error)</td><td>Allocate calls</td><td></td></tr>
+<tr><td><code>bembel_allocation_duration_seconds</code></td><td>histogram</td><td><code>kind</code></td><td>Time of the whole transaction</td><td></td></tr>
+<tr><td><code>bembel_allocation_lock_wait_seconds</code></td><td>histogram</td><td><code>kind</code></td><td>Time waiting for the row lock</td><td></td></tr>
+<tr><td><code>bembel_claims_open</code></td><td>gauge</td><td></td><td>Addresses in state claimed</td><td></td></tr>
+<tr><td><code>bembel_claims_expired_total</code></td><td>counter</td><td></td><td>Claims released by the reaper</td><td></td></tr>
+<tr><td><code>bembel_claims_held</code></td><td>gauge</td><td><code>source</code></td><td>Expired claims that the reaper holds, because the sync of their source has not succeeded since they expired (<a href="allocation.html#reaper">Allocation</a>)</td><td><code>BembelClaimsHeld</code></td></tr>
+<tr><td><code>bembel_claims_expired_unreaped</code></td><td>gauge</td><td></td><td>Expired claims that are not held and are more than 5 minutes past <code>expires_at</code></td><td><code>BembelClaimLeak</code></td></tr>
+<tr><td><code>bembel_prefix_utilisation_ratio</code></td><td>gauge</td><td><code>vrf</code>, <code>prefix</code>, <code>name</code></td><td>Used / usable. Only for prefixes with the tag <code>metrics=true</code> (opt-in), to bound cardinality.</td><td><code>BembelPrefixAlmostFull</code></td></tr>
+<tr><td><code>bembel_dhcp_pool_utilisation_ratio</code></td><td>gauge</td><td><code>scope</code>, <code>pool</code></td><td>Leased / size of a DHCP pool</td><td><code>BembelDhcpPoolAlmostFull</code></td></tr>
+<tr><td><code>bembel_export_build_duration_seconds</code></td><td>histogram</td><td><code>kind</code> (bind, dhcpd, opensm), <code>target</code></td><td>Build time of an export</td><td></td></tr>
+<tr><td><code>bembel_export_last_success_timestamp_seconds</code></td><td>gauge</td><td><code>kind</code>, <code>target</code></td><td>Last good build or no-change check</td><td><code>BembelExportStale</code></td></tr>
+<tr><td><code>bembel_export_last_pull_timestamp_seconds</code></td><td>gauge</td><td><code>kind</code>, <code>target</code></td><td>Last pull of the target (DNS or DHCP server)</td><td><code>BembelExportNotPulled</code></td></tr>
+<tr><td><code>bembel_export_failures_total</code></td><td>counter</td><td><code>kind</code>, <code>target</code>, <code>reason</code></td><td>Failed builds (checks, <code>named-checkzone</code>, <code>dhcpd -t</code>)</td><td></td></tr>
+<tr><td><code>bembel_agent_last_seen_timestamp_seconds</code></td><td>gauge</td><td><code>agent</code></td><td>Last report of a bembel-agent</td><td></td></tr>
+<tr><td><code>bembel_agent_bundle_rejected_total</code></td><td>counter</td><td><code>reason</code> (signature, identity, rollback, hash)</td><td>Bundles that an agent refused, from its reports (<a href="delivery.html#verify">Exports and delivery</a>)</td><td></td></tr>
+<tr><td><code>bembel_feed_revision</code></td><td>gauge</td><td><code>group</code></td><td>Current revision of an address group feed</td><td></td></tr>
+<tr><td><code>bembel_feed_entries</code></td><td>gauge</td><td><code>group</code>, <code>family</code></td><td>Entries in the current revision</td><td></td></tr>
+<tr><td><code>bembel_feed_held</code></td><td>gauge (0/1)</td><td><code>group</code></td><td>1 while the change guard holds a revision (<a href="routing.html">Routing</a>)</td><td><code>BembelFeedHeld</code></td></tr>
+<tr><td><code>bembel_feed_last_success_timestamp_seconds</code></td><td>gauge</td><td><code>group</code></td><td>Last good build or no-change check of a feed</td><td><code>BembelFeedStale</code></td></tr>
+<tr><td><code>bembel_feed_requests_total</code></td><td>counter</td><td><code>group</code>, <code>format</code>, <code>status_class</code></td><td>Feed downloads</td><td></td></tr>
+<tr><td><code>bembel_sync_runs_total</code></td><td>counter</td><td><code>source</code>, <code>mode</code>, <code>result</code></td><td>Sync runs</td><td></td></tr>
+<tr><td><code>bembel_sync_run_duration_seconds</code></td><td>histogram</td><td><code>source</code>, <code>mode</code></td><td>Sync time</td><td></td></tr>
+<tr><td><code>bembel_sync_last_success_timestamp_seconds</code></td><td>gauge</td><td><code>source</code></td><td>Last good sync (from <code>source.last_success_at</code>)</td><td><code>BembelSyncFailing</code></td></tr>
+<tr><td><code>bembel_sync_objects_total</code></td><td>counter</td><td><code>source</code>, <code>kind</code>, <code>action</code></td><td>Objects created, updated, missing</td><td></td></tr>
+<tr><td><code>bembel_outbox_pending</code></td><td>gauge</td><td><code>sink</code></td><td>Events not yet delivered</td><td></td></tr>
+<tr><td><code>bembel_outbox_oldest_age_seconds</code></td><td>gauge</td><td></td><td>Age of the oldest event that is not yet stamped or not yet delivered to every sink (lag)</td><td><code>BembelOutboxLag</code></td></tr>
+<tr><td><code>bembel_outbox_delivered_total</code></td><td>counter</td><td><code>sink</code>, <code>result</code></td><td>Deliveries</td><td></td></tr>
+<tr><td><code>bembel_db_pool_connections</code></td><td>gauge</td><td><code>state</code> (acquired, idle, max)</td><td>pgx pool</td><td></td></tr>
+<tr><td><code>bembel_db_pool_acquire_duration_seconds</code></td><td>histogram</td><td></td><td>Wait for a connection</td><td></td></tr>
+<tr><td><code>bembel_schema_ahead</code></td><td>gauge</td><td></td><td>1 when the schema is newer than this binary knows</td><td></td></tr>
+<tr><td><code>bembel_llm_request_duration_seconds</code></td><td>histogram</td><td><code>endpoint</code> (chat, embeddings), <code>model</code>, <code>result</code></td><td>Calls to the LLM service</td><td></td></tr>
+<tr><td><code>bembel_llm_tokens_total</code></td><td>counter</td><td><code>model</code>, <code>direction</code> (prompt, completion)</td><td>Token count: cost and quota</td><td></td></tr>
+<tr><td><code>bembel_embedding_backlog</code></td><td>gauge</td><td><code>index</code> (knowledge, objects)</td><td>Objects waiting for an embedding</td><td><code>BembelEmbeddingBacklog</code></td></tr>
+<tr><td><code>bembel_assistant_requests_total</code></td><td>counter</td><td><code>surface</code> (chat, advisory), <code>result</code></td><td>Assistant requests</td><td></td></tr>
+<tr><td><code>bembel_assistant_tool_calls_total</code></td><td>counter</td><td><code>tool</code>, <code>result</code> (ok, denied, error, truncated)</td><td>Tool calls of the assistant. A high count of <code>denied</code> shows a confused model or an attack.</td><td></td></tr>
+<tr><td><code>bembel_assistant_rate_limited_total</code></td><td>counter</td><td><code>limit</code></td><td>Assistant requests refused by a limit. Use it to tune the limits.</td><td></td></tr>
+<tr><td><code>bembel_drafts_total</code></td><td>counter</td><td><code>state</code> (created, applied, discarded, expired, stale)</td><td>Drafts by end state. Shows how useful the drafts are.</td><td></td></tr>
+<tr><td><code>bembel_search_duration_seconds</code></td><td>histogram</td><td><code>mode</code> (exact, text, vector, merge)</td><td>Search time</td><td></td></tr>
+<tr><td><code>bembel_worker_last_run_timestamp_seconds</code></td><td>gauge</td><td><code>worker</code></td><td>Last run of each worker</td><td></td></tr>
+<tr><td><code>bembel_authz_denied_total</code></td><td>counter</td><td><code>permission</code></td><td>Denied requests (no user names)</td><td></td></tr>
+<tr><td><code>bembel_subjects_disabled_total</code></td><td>counter</td><td></td><td>Users that the subject sync found disabled or deleted (<a href="access.html">Access control</a>)</td><td></td></tr>
+<tr><td><code>bembel_observations_total</code></td><td>counter</td><td><code>method</code></td><td>Observations written (<a href="allocation.html#observations">Allocation</a>)</td><td></td></tr>
+<tr><td><code>bembel_notify_failed_total</code></td><td>counter</td><td><code>channel</code> (mail, chat)</td><td>Notifications that failed after all retries</td><td></td></tr>
+<tr><td><code>bembel_vpn_sessions_open</code></td><td>gauge</td><td><code>profile</code>, <code>node</code></td><td>Open VPN sessions (<a href="vpn-wifi.html#sessions">VPN and Wi-Fi</a>)</td><td></td></tr>
+<tr><td><code>bembel_vpn_reconcile_last_success_timestamp_seconds</code></td><td>gauge</td><td><code>node</code></td><td>Last good reconcile of a VPN node with the eduVPN admin API</td><td><code>BembelVpnReconcileFailing</code></td></tr>
+<tr><td><code>bembel_break_glass_sessions_active</code></td><td>gauge</td><td></td><td>Break-glass sessions that are not expired or revoked (<a href="access.html#break-glass">Access control</a>)</td><td><code>BembelBreakGlassUsed</code></td></tr>
+<tr><td><code>bembel_build_info</code></td><td>gauge (1)</td><td><code>version</code>, <code>commit</code>, <code>schema</code></td><td>Version and schema version</td><td></td></tr>
 </tbody>
 </table>
 <p>The allocation target is a p99 of <code>bembel_allocation_duration_seconds</code> under 50 ms at the design load of 50 writes per second, spread across prefixes. A load test measures it. The test with 200 concurrent callers on one subnet checks only correctness, because all its callers wait for one lock.</p>
 <h3 id="alerts">ServiceMonitor and alerts</h3>
+<p>The column Alert of the metrics table names the rule that uses a metric. <code>BembelReplicasLow</code> uses the Prometheus series <code>up{job="bembel"}</code>.</p>
 <pre><code class="language-yaml">apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata: { name: bembel, labels: { release: kube-prometheus-stack } }
@@ -693,7 +720,13 @@ spec:
           labels: { severity: critical }
           annotations:
             summary: "Fewer than 2 bembel pods are up"</code></pre>
-<p>Every rule has a promtool test in <code>deploy/helm/bembel/tests/alerts_test.yaml</code>, and CI runs <code>promtool test rules</code>. <code>BembelReplicasLow</code> has three cases: 3 targets that are all down, no <code>up</code> series at all, and 1 of 3 targets up. Each case fires after 5 minutes. The <code>or vector(0)</code> makes the rule fire when no target is left.</p>
+<p>Every rule has a promtool test in <code>deploy/helm/bembel/tests/alerts_test.yaml</code>, and CI runs <code>promtool test rules</code>. <code>BembelReplicasLow</code> has three cases. Each case fires after 5 minutes:</p>
+<ul>
+  <li>3 targets that are all down.</li>
+  <li>No <code>up</code> series at all.</li>
+  <li>1 of 3 targets up.</li>
+</ul>
+<p>The <code>or vector(0)</code> makes the rule fire when no target is left.</p>
 <h3 id="logs">Logs</h3>
 <p>bembel writes <em>one JSON object per line</em> on stdout (Go <code>log/slog</code>). Promtail and Grafana Alloy pick the lines up from the container log. Loki stores them. The format is the same for all components. Audit events are not logs: they stay in the database. An optional sink streams them to Loki or a SIEM (<code>exports.audit_stream</code>).</p>
 <pre class="term">{"ts":"2026-11-04T09:13:02.771Z","level":"WARN","msg":"export check failed","app":"bembel","component":"export","kind":"dhcpd","target":"dhcp-a","reason":"dhcpd -t: duplicate fixed-address"}
@@ -727,7 +760,13 @@ sum by (route) (count_over_time({app="bembel", component="api"} | json | status 
 # LogQL: follow one request from a user report
 {app="bembel"} | json | request_id="req_01JAZ4KQ9T"</code></pre>
 <h3 id="traces">Traces</h3>
-<p>bembel can send OpenTelemetry traces over OTLP (gRPC or HTTP). It is off until <code>tracing.otlp_endpoint</code> is set. A trace starts at the HTTP handler and covers the SQL queries (the <code>otelpgx</code> tracer), the calls to FNT Command and to the LLM service, and the export builds. bembel reads and writes the W3C header <code>traceparent</code>. The log field <code>trace_id</code> links the logs to the trace in Grafana. The default sample ratio is 5 %. Errors are always kept (tail sampling in the collector).</p>
+<p>bembel can send OpenTelemetry traces over OTLP (gRPC or HTTP). It is off until <code>tracing.otlp_endpoint</code> is set.</p>
+<ul>
+  <li>A trace starts at the HTTP handler. It covers the SQL queries (the <code>otelpgx</code> tracer), the calls to FNT Command and to the LLM service, and the export builds.</li>
+  <li>bembel reads and writes the W3C header <code>traceparent</code>.</li>
+  <li>The log field <code>trace_id</code> links the logs to the trace in Grafana.</li>
+  <li>The default sample ratio is 5 %. Errors are always kept (tail sampling in the collector).</li>
+</ul>
 <h3 id="dashboard">Grafana dashboard</h3>
 <p>The chart ships the dashboard JSON as a ConfigMap (<code>deploy/grafana/bembel.json</code>). The sidecar of Grafana loads it by the label.</p>
 <table>
@@ -797,7 +836,8 @@ sum by (route) (count_over_time({app="bembel", component="api"} | json | status 
 <tr><td>No down migrations in production. Roll back with the previous image; the schema stays. The previous image stays ready until a later contract migration raises <code>min_app_version</code>.</td><td>A down migration loses data. Expand-only changes are safe for the old code.</td></tr>
 </tbody>
 </table>
-<p>The REST API is versioned under <code>/v1</code> and changes only by addition (<a href="api.html#versioning">REST API</a>). So an older <code>bembel</code> CLI, a bembel-agent or the Neutron driver works with a newer server. The agent also works one minor version behind. A PostgreSQL major upgrade uses the CloudNativePG procedure (<code>imageName</code> change with an in-place upgrade, or a new cluster by logical import). Test it on a restored copy first.</p>
+<p>The REST API is versioned under <code>/v1</code> and changes only by addition (<a href="api.html#versioning">REST API</a>). So an older <code>bembel</code> CLI, a bembel-agent or the Neutron driver works with a newer server. The agent also works one minor version behind.</p>
+<p>A PostgreSQL major upgrade uses the CloudNativePG procedure (<code>imageName</code> change with an in-place upgrade, or a new cluster by logical import). Test it on a restored copy first.</p>
 
 <h2 id="security">Security</h2>
 <table>
@@ -805,11 +845,15 @@ sum by (route) (count_over_time({app="bembel", component="api"} | json | status 
 <tbody>
 <tr><td>TLS to clients</td><td>The Ingress terminates TLS with a cert-manager certificate (TLS 1.2 or 1.3). The pod can also serve TLS itself (<code>tls.cert_file</code>, <code>tls.key_file</code>) for the package form. HSTS is on.</td></tr>
 <tr><td>TLS to the database</td><td><code>sslmode=verify-full</code> with the CA of the CloudNativePG cluster, for the Pooler and for the direct connection. The user <code>bembel</code> owns the schema. No superuser at run time.</td></tr>
-<tr><td>Secrets</td><td>Kubernetes secrets mounted as files, filled by External Secrets or sealed secrets. The config file holds only file names. The session key, the OIDC client secrets, the database URLs, the export signing key and the export tokens rotate without a release: bembel re-reads the files on <code>SIGHUP</code> and every 5 minutes. Rotating the session key ends the live UI sessions; users log in again.</td></tr>
-<tr><td>Export signing</td><td>bembel signs the manifest of each bundle with an Ed25519 key (<code>exports.signing</code>). An agent trusts up to two public keys, each named by its <code>key_id</code> (<code>trust.keys</code>), and checks signature, identity, snapshot and hashes (<a href="dns.html#delivery">DNS</a>). To rotate: add the new public key to every agent, switch signing to the new key, then remove the old key from the agents. The signature protects the transport and the ingress path. It does not protect against a compromised bembel pod that holds the key.</td></tr>
-<tr><td>Agents</td><td>Default: OIDC client credentials (a service identity at Keycloak, short tokens). Option: mTLS, with a client certificate from cert-manager and a CA that the config names. The agent can write only the VMs of its own source: a vm-provisioner binding on the subnets of its bridges, plus the source guard. See <a href="access.html#source-guard">Access control</a>.</td></tr>
-<tr><td>Export pull</td><td>A DNS, DHCP or OpenSM agent pulls the signed bundle of its own server with a token for that server. The token gives read access to that one bundle. The bundle URL has an ETag, so an unchanged bundle costs almost nothing.</td></tr>
-<tr><td>Rate limits</td><td>A token bucket per subject: 50 requests per second, and 10 per second for <code>:allocate</code>. An anonymous client (the login and the health paths) is limited per IP to 20 per second. The answer is <code>429</code> with <code>Retry-After</code>. The limits are in the config.</td></tr>
+<tr><td>Secrets</td><td>Kubernetes secrets mounted as files, filled by External Secrets or sealed secrets. The config file holds only file names.</td></tr>
+<tr><td>Secret rotation</td><td>The session key, the OIDC client secrets, the database URLs, the export signing key and the export tokens rotate without a release. bembel re-reads the files on <code>SIGHUP</code> and every 5 minutes.</td></tr>
+<tr><td>Session key rotation</td><td>Rotating the session key ends the live UI sessions. Users log in again.</td></tr>
+<tr><td>Export signing</td><td>bembel signs the manifest of each bundle with an Ed25519 key (<code>exports.signing</code>). Checks and trust rule of the agent: <a href="delivery.html#verify">Exports and delivery</a>. Rotation: <a href="#key-rotation">below</a>.</td></tr>
+<tr><td>Agent login</td><td>Default: OIDC client credentials (a service identity at Keycloak, short tokens). Option: mTLS, with a client certificate from cert-manager and a CA that the config names.</td></tr>
+<tr><td>Agent rights</td><td>The agent can write only the VMs of its own source: a vm-provisioner binding on the subnets of its bridges, plus the source guard. See <a href="access.html#source-guard">Access control</a>.</td></tr>
+<tr><td>Export pull</td><td>A DNS, DHCP or OpenSM agent pulls the signed bundle of its own server with a token for that server. The token gives read access to that one bundle. An ETag makes an unchanged pull cheap. Steps: <a href="delivery.html#steps">Exports and delivery</a>.</td></tr>
+<tr><td>Rate limits</td><td>A token bucket per subject: 50 requests per second, and 10 per second for <code>:allocate</code>. The answer is <code>429</code> with <code>Retry-After</code>. The limits are in the config.</td></tr>
+<tr><td>Anonymous rate limit</td><td>An anonymous client (the login and the health paths) is limited per IP to 20 requests per second.</td></tr>
 <tr><td>Body and time limits</td><td>4 MiB per request, 30 s per request (imports use an operation resource and a worker).</td></tr>
 <tr><td>UI headers</td><td>A strict Content Security Policy (below), <code>X-Content-Type-Options: nosniff</code>, <code>Referrer-Policy: same-origin</code>, <code>Cross-Origin-Opener-Policy: same-origin</code>. The session cookie <code>bembel_session</code> is <code>HttpOnly; Secure; SameSite=Lax</code>. Write calls carry the <code>X-Bembel-Csrf</code> header and get an Origin check.</td></tr>
 <tr><td>Assistant</td><td>The LLM host is on the organisation's network. The assistant tools run with the rights of the user. No data goes to a third party (<a href="assistant.html#privacy">Assistant and help</a>).</td></tr>
@@ -817,6 +861,13 @@ sum by (route) (count_over_time({app="bembel", component="api"} | json | status 
 <tr><td>Audit</td><td>Each change and each deny is an audit event in the database. Deletes of audit events are not possible through the API. The optional stream copies them to a SIEM.</td></tr>
 </tbody>
 </table>
+<h3 id="key-rotation">Signing key rotation</h3>
+<p>An agent trusts up to two public keys at a time, each named by its <code>key_id</code> (<code>trust.keys</code>). To rotate the export signing key:</p>
+<ol class="steps">
+  <li>Add the new public key to every agent.</li>
+  <li>Switch <code>exports.signing</code> to the new key.</li>
+  <li>Remove the old key from the agents.</li>
+</ol>
 <h3 id="csp">Content Security Policy of the UI</h3>
 <pre><code class="language-text">Content-Security-Policy:
   default-src 'none';
@@ -829,7 +880,13 @@ sum by (route) (count_over_time({app="bembel", component="api"} | json | status 
   frame-ancestors 'none';
   base-uri 'none';
   form-action 'self'</code></pre>
-<p>The UI has no inline script and no external resource. The SvelteKit static adapter writes one small bootstrap script. The build uses the SvelteKit CSP mode <code>hash</code>, which adds the hash of that script to <code>script-src</code>. <span class="tag warn">to verify</span> The hash mode must be confirmed with the adapter-static output of the chosen SvelteKit version. The mockups in this record follow the same rule: no inline style and no external resource.</p>
+<p>The UI has no inline script and no external resource.</p>
+<ul>
+  <li>The SvelteKit static adapter writes one small bootstrap script.</li>
+  <li>The build uses the SvelteKit CSP mode <code>hash</code>, which adds the hash of that script to <code>script-src</code>.</li>
+  <li><span class="tag warn">to verify</span> The hash mode must be confirmed with the adapter-static output of the chosen SvelteKit version.</li>
+  <li>The mockups in this record follow the same rule: no inline style and no external resource.</li>
+</ul>
 <h3 id="supply-chain">Supply chain</h3>
 <ul>
   <li><strong>SBOM.</strong> goreleaser makes an SPDX SBOM for the binary and for the image (with syft). The SBOM is a release asset and an OCI attestation.</li>

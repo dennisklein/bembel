@@ -16,6 +16,10 @@ run = "python3 tools/site/build.py --strict --out _site"
 description = "Link the glossary words in the mockups"
 run = "python3 tools/site/glossary.py mockups"
 
+[tasks."docs:text"]
+description = "Check the text image of the pages: sentence, paragraph and cell limits (as in CI)"
+run = "python3 tools/site/textcheck.py"
+
 [tasks."docs:check"]
 description = "Check the glossary links of the mockups (as in CI)"
 run = "python3 tools/site/glossary.py mockups --check"

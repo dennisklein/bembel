@@ -7,7 +7,7 @@
 </head>
 <body>
 <h1>Mapping to NetBox</h1>
-<p class="lede">NetBox is the best known open source IPAM. This chapter maps each bembel object to the NetBox 4.7 model that is closest to it. It names the fields, the direction and the loss. It also says where bembel is different on purpose, and it specifies the NetBox export and import. The mapping serves two groups of readers: sites that already run NetBox, and reviewers who ask why bembel is not just NetBox.</p>
+<p class="lede">NetBox is the best known open source IPAM. This chapter maps each bembel object to the closest NetBox 4.7 model: fields, direction and loss. It lists where bembel differs on purpose, and it specifies the NetBox export and import. Readers are sites that run NetBox and reviewers who ask why bembel is not just NetBox.</p>
 <ul class="keypoints">
   <li>The IPAM core maps well: VRF, prefix, range, address, VLAN, ASN, team, tag and custom attribute have a NetBox model with the same job.</li>
   <li>Four areas have no NetBox core model: DNS, DHCP, fabrics (InfiniBand partitions, RoCEv2 profiles) and claims. The export keeps fabric values in custom fields and tags. DNS and DHCP exist only in two separate plugins on their own release trains (<code>netbox-plugin-dns</code> and the beta <code>netbox-plugin-dhcp</code>). The export loses them, except for the DHCP pool range.</li>
@@ -17,7 +17,7 @@
 </ul>
 
 <h2 id="summary">Summary and model map</h2>
-<p>Both tools store the same kind of data, but they weigh it in different ways. NetBox is a DCIM and IPAM in one tool for a data centre team. bembel is an IPAM that also owns DNS and DHCP data, and it mirrors assets from another tool. The figure shows the objects side by side. Each arrow says what carries the mapping.</p>
+<p>NetBox is a DCIM and IPAM in one tool for a data centre team. bembel is an IPAM that also owns DNS and DHCP data, and it mirrors assets from another tool. In the figure, each arrow says what carries the mapping.</p>
 <figure class="diagram wide">
 <svg viewBox="0 0 960 720" role="img" aria-labelledby="map-t">
 <title id="map-t">bembel objects on the left, NetBox 4.7 models on the right, with the fields that carry each mapping</title>
@@ -135,7 +135,7 @@
 <p>NetBox ids are database numbers. They differ between two NetBox instances. A natural key is the same in both: the <code>rd</code> of a VRF, the <code>asn</code> of an ASN, the pair (VRF, prefix) of a prefix. NetBox itself advises these keys for a bulk import. A re-run of the import then updates objects and makes no duplicates.</p></aside>
 
 <h2 id="ipam">IPAM: addressing</h2>
-<p>This section covers the addressing objects. Each table has the form: bembel <code>object.field</code>, NetBox <code>model.field</code>, direction or transform, note. The arrow in the third column is the direction of the export; the import runs the other way unless the note says otherwise.</p>
+<p>Each table has the columns bembel <code>object.field</code>, NetBox <code>model.field</code>, transform and note. The transform column gives the direction of the export; the import runs the other way unless the note says otherwise.</p>
 
 <h3 id="ipam-vrf">VRF, route distinguisher and route targets</h3>
 <table>
@@ -144,7 +144,7 @@
 <tr><td><code>vrf.name</code></td><td><code>VRF.name</code></td><td>copy</td><td>NetBox does not require a unique name. bembel does. The import renames a clash to <code>NAME-2</code> and adds a finding.</td></tr>
 <tr><td><code>vrf.rd</code></td><td><code>VRF.rd</code> (varchar 21, unique, null)</td><td>copy</td><td>bembel checks the RFC 4364 form (<code>ASN:nn</code> or <code>IP:nn</code>). NetBox checks only the length. The import adds a finding for a value in another form. The natural key of a VRF is <code>rd</code>, then <code>name</code>.</td></tr>
 <tr><td><code>vrf.import_targets</code>, <code>vrf.export_targets</code></td><td><code>VRF.import_targets</code>, <code>VRF.export_targets</code> (M2M to <code>RouteTarget</code>)</td><td>list of values to <code>RouteTarget.name</code></td><td>A route target is an object in NetBox and a value in bembel. The export makes the <code>RouteTarget</code> rows first.</td></tr>
-<tr><td>always on (database constraint)</td><td><code>VRF.enforce_unique</code> (default true)</td><td>export true</td><td>An import of a VRF with <code>enforce_unique=false</code> keeps the first of two equal prefixes and adds a finding for the other. The same rule covers addresses: of two equal non-shared addresses the import keeps the row with the lowest NetBox id (<code>duplicate-address</code>). See <a href="#differences">differences</a>.</td></tr>
+<tr><td>always on (database constraint)</td><td><code>VRF.enforce_unique</code> (default true)</td><td>export true</td><td>An import of a VRF with <code>enforce_unique=false</code> keeps the first of two equal prefixes and adds a finding for the other. Of two equal non-shared addresses it keeps the lowest NetBox id (<code>duplicate-address</code>). See <a href="#differences">differences</a>.</td></tr>
 <tr><td>VRF <code>global</code></td><td>no VRF (<code>vrf = null</code>), the global table</td><td><code>global</code> to null and back</td><td>In NetBox the global table is not an object. In bembel it is the VRF <code>global</code>. See below.</td></tr>
 <tr><td><code>vrf.owner</code> (team)</td><td><code>VRF.tenant</code>, <code>VRF.owner</code></td><td>team name to tenant</td><td>See <a href="#tenancy">tenancy</a>.</td></tr>
 <tr><td><code>vrf.description</code>, tags, attributes</td><td><code>VRF.description</code>, <code>tags</code>, <code>custom_field_data</code></td><td>copy</td><td>See <a href="#extras">extras</a>.</td></tr>
@@ -152,7 +152,11 @@
 </table>
 <p>The story VRFs map as follows: <code>global</code> to the global table, <code>hpc-fabric</code> with <code>rd=64512:200</code> (example value), <code>oob</code> and <code>os-provider</code> to VRF rows with <code>enforce_unique=true</code>.</p>
 <aside class="callout warn"><p class="callout-title">The global table is not a VRF</p>
-<p>In NetBox, a prefix with no VRF lives in the global table. With the default <code>ENFORCE_GLOBAL_UNIQUE=true</code> a duplicate there is an error. A container in the global table can also find children in other VRFs (the source has this rule in <code>get_child_prefixes()</code>). In bembel, VRFs never see each other. If a NetBox site relies on the cross-VRF rule for its utilization numbers, the numbers differ after the import.</p></aside>
+<ul>
+  <li>In NetBox, a prefix with no VRF lives in the global table. With the default <code>ENFORCE_GLOBAL_UNIQUE=true</code> a duplicate there is an error.</li>
+  <li>A container in the global table can also find children in other VRFs (the source has this rule in <code>get_child_prefixes()</code>).</li>
+  <li>In bembel, VRFs never see each other. If a NetBox site relies on the cross-VRF rule for its utilization numbers, the numbers differ after the import.</li>
+</ul></aside>
 
 <h3 id="ipam-prefix">Prefix: container, subnet, status and pool</h3>
 <p>NetBox has one <code>Prefix</code> model. It marks a container with <code>status=container</code>. A top-level prefix with no parent can also be an <code>Aggregate</code>, which needs a <code>RIR</code>. bembel has one prefix model with a <code>prefix_kind</code>.</p>
@@ -162,13 +166,16 @@
 <tr><td><code>prefix.cidr</code></td><td><code>Prefix.prefix</code></td><td>copy, host bits cleared</td><td>Both store a CIDR and clear host bits. bembel stores it as <code>cidr</code> with GiST. NetBox has no unique index on it.</td></tr>
 <tr><td><code>prefix.vrf</code></td><td><code>Prefix.vrf</code></td><td>name to FK; <code>global</code> to null</td><td>Natural key of a prefix: (VRF, CIDR).</td></tr>
 <tr><td><code>prefix.prefix_kind = container</code></td><td><code>Prefix.status = container</code></td><td>prefix_kind to status</td><td>The import reads <code>container</code> as prefix_kind container. A prefix with another status is a subnet, except under the rule <code>nested-subnet</code> below.</td></tr>
-<tr><td>container made from a nested prefix</td><td>a non-container <code>Prefix</code> that has child prefixes in its VRF</td><td>import only, bottom-up by mask length</td><td>bembel forbids a prefix inside a subnet. The import works from the longest mask to the shortest, so it decides each tree level once. A prefix with child prefixes and no address outside its children becomes prefix_kind container. Its NetBox status goes to the tag <code>netbox-status=STATUS</code>, so an export can restore it. A prefix with addresses outside its children stays a subnet. Its children go to the report with <code>nested-subnet</code> and are not imported.</td></tr>
+<tr><td>container made from a nested prefix</td><td>a non-container <code>Prefix</code> that has child prefixes in its VRF</td><td>import only, bottom-up by mask length</td><td>bembel forbids a prefix inside a subnet. The import works from the longest mask to the shortest, so it decides each tree level once.</td></tr>
+<tr><td>nested prefix with no address outside its children</td><td>same <code>Prefix</code></td><td>becomes <code>prefix_kind</code> container</td><td>Its NetBox status goes to the tag <code>netbox-status=STATUS</code>, so an export can restore it.</td></tr>
+<tr><td>nested prefix with addresses outside its children</td><td>same <code>Prefix</code></td><td>stays a subnet</td><td>Its children go to the report with <code>nested-subnet</code> and are not imported.</td></tr>
 <tr><td><code>prefix.prefix_kind = subnet</code>, <code>status = active</code></td><td><code>Prefix.status = active</code></td><td>copy</td><td></td></tr>
 <tr><td><code>prefix.status = reserved</code>, <code>deprecated</code></td><td><code>Prefix.status</code> with the same value</td><td>copy</td><td></td></tr>
 <tr><td><code>prefix.status = planned</code></td><td><code>reserved</code> and tag <code>status=planned</code></td><td>proposal</td><td>NetBox prefixes have no <code>planned</code> status (VLAN and IPRange have no one either). The tag lets the import restore it.</td></tr>
 <tr><td>top-level container of a VRF</td><td><code>Aggregate.prefix</code> and a <code>Prefix</code> with status container</td><td>both rows, global table only</td><td>An <code>Aggregate</code> has no VRF and needs a <code>RIR</code>. The export takes the RIR from the tag <code>rir=NAME</code> and uses <code>bembel-unassigned</code> if the tag is missing. Whether NetBox accepts a prefix equal to an aggregate is not verified here.</td></tr>
 <tr><td><code>prefix.is_pool = true</code> (allocate child prefixes from here)</td><td>custom field <code>bembel_pool</code></td><td>proposal</td><td>Do not use <code>Prefix.is_pool</code>. In NetBox it means "all addresses are usable, also network and broadcast address". It does not mean "allocate child prefixes".</td></tr>
-<tr><td><code>prefix.site</code>, building, floor, room</td><td><code>Prefix.scope_type</code> and <code>scope_id</code> (generic FK)</td><td><code>dcim.site</code> or <code>dcim.location</code></td><td>NetBox accepts region, site group, site and location as scope (<code>LOCATION_SCOPE_TYPES</code>). A CSV import takes <code>scope_type</code> plus <code>scope_name</code> (NetBox 4.5.5 or later). <code>scope_id</code> is needed only when a name is ambiguous, for example a Location name at several sites, because <code>scope_name</code> must match exactly one object. See <a href="#exchange-files">export files</a>.</td></tr>
+<tr><td><code>prefix.site</code>, building, floor, room</td><td><code>Prefix.scope_type</code> and <code>scope_id</code> (generic FK)</td><td><code>dcim.site</code> or <code>dcim.location</code></td><td>NetBox accepts region, site group, site and location as scope (<code>LOCATION_SCOPE_TYPES</code>). A CSV import takes <code>scope_type</code> plus <code>scope_name</code> (NetBox 4.5.5 or later). See <a href="#exchange-files">export files</a>.</td></tr>
+<tr><td>scope with an ambiguous name, for example a Location name at several sites</td><td>CSV column <code>scope_id</code></td><td>only when needed</td><td><code>scope_name</code> must match exactly one object.</td></tr>
 <tr><td><code>prefix.vlan_id</code></td><td><code>Prefix.vlan</code></td><td>FK to FK</td><td>Both link one subnet to one VLAN. The pair (domain, VID) identifies the VLAN in the import.</td></tr>
 <tr><td><code>prefix.owner</code> (team)</td><td><code>Prefix.tenant</code>, <code>Prefix.owner</code></td><td>see tenancy</td><td></td></tr>
 <tr><td><code>prefix.announce</code></td><td>tag <code>announce</code></td><td>flag to tag</td><td>No NetBox field. See <a href="routing.html">routing and firewall</a>.</td></tr>
@@ -185,7 +192,8 @@
 <thead><tr><th>bembel</th><th>NetBox 4.7</th><th>Transform</th><th>Note</th></tr></thead>
 <tbody>
 <tr><td><code>range.first_addr</code>, <code>range.last_addr</code></td><td><code>IPRange.start_address</code>, <code>end_address</code></td><td>add the mask of the subnet</td><td>NetBox needs the same mask length on both ends and a maximum size of 2<sup>32</sup>-1. Ranges in one VRF may not overlap in NetBox. bembel also forbids overlap inside a subnet.</td></tr>
-<tr><td><code>range.purpose = dhcp-pool</code></td><td><code>IPRange.role</code> named <code>dhcp-pool</code>; <code>mark_populated = true</code> only when no exported address lies inside the range</td><td>purpose to Role row</td><td><code>mark_populated</code> (4.3) stops NetBox from creating address rows inside the range. This is the closest to a DHCP pool. The story pool <code>10.20.7.0</code> to <code>10.20.7.254</code> is one IPRange. NetBox runs this check on every new address, and a bulk import is all-or-none, so one address inside a populated range makes the whole <code>09</code> file fail. A pool that holds exported addresses (a reservation in a scope without failover, a reservation with <code>allow_in_pool</code>, an observed IPv6 address) is therefore exported with <code>mark_populated = false</code> and the tag <code>dhcp-pool</code>, and the export reports the finding <code>pool-populated-off</code> with the range and the count.</td></tr>
+<tr><td><code>range.purpose = dhcp-pool</code></td><td><code>IPRange.role</code> named <code>dhcp-pool</code>; <code>mark_populated = true</code> only when no exported address lies inside the range</td><td>purpose to Role row</td><td><code>mark_populated</code> (4.3) stops NetBox from creating address rows inside the range. This is the closest to a DHCP pool. The story pool <code>10.20.7.0</code> to <code>10.20.7.254</code> is one IPRange.</td></tr>
+<tr><td><code>dhcp-pool</code> range that holds exported addresses (a reservation in a scope without failover, a reservation with <code>allow_in_pool</code>, an observed IPv6 address)</td><td><code>IPRange.mark_populated = false</code> and tag <code>dhcp-pool</code></td><td>export only</td><td>NetBox checks <code>mark_populated</code> on every new address. A bulk import is all-or-none, so one address inside a populated range makes the whole <code>09</code> file fail. The export reports the finding <code>pool-populated-off</code> with the range and the count.</td></tr>
 <tr><td><code>range.purpose = reserved</code></td><td><code>IPRange.status = reserved</code></td><td>purpose to status</td><td></td></tr>
 <tr><td><code>range.purpose = static</code>, <code>infrastructure</code>, <code>lb-pool</code>, <code>vpn-pool</code></td><td><code>IPRange.status = active</code>, <code>IPRange.role</code> with the same name</td><td>purpose to Role row</td><td>NetBox roles are rows that the user defines. The export creates them.</td></tr>
 <tr><td>(none)</td><td><code>IPRange.mark_utilized</code></td><td>tag on import</td><td></td></tr>
@@ -196,8 +204,10 @@
 <table>
 <thead><tr><th>bembel</th><th>NetBox 4.7</th><th>Transform</th><th>Note</th></tr></thead>
 <tbody>
-<tr><td><code>address.address</code> and the prefix length of its subnet</td><td><code>IPAddress.address</code> (host and mask)</td><td>join</td><td>bembel stores the host address; the mask comes from the subnet. NetBox stores the mask as typed, and it does not check it against the parent. A wrong mask is common in real data, so the import adds a <a href="#import-findings">finding</a> when the mask differs from the covering subnet.</td></tr>
-<tr><td>address with no subnet</td><td><code>IPAddress</code> with no covering prefix, or only a prefix with status <code>container</code></td><td>import only</td><td>A bembel address needs a subnet. By default the address goes to the report with <code>orphan-address</code> and is not imported. With <code>--orphans=create</code> the import makes a subnet from the mask of the address (host bits cleared) under the nearest container, with a finding. An address with a /32 or /128 mask always goes to the report.</td></tr>
+<tr><td><code>address.address</code> and the prefix length of its subnet</td><td><code>IPAddress.address</code> (host and mask)</td><td>join</td><td>bembel stores the host address; the mask comes from the subnet. NetBox stores the mask as typed, and it does not check it against the parent.</td></tr>
+<tr><td>address mask that differs from the covering subnet</td><td><code>IPAddress.address</code></td><td>import only</td><td>A wrong mask is common in real data, so the import adds a <a href="#import-findings">finding</a>.</td></tr>
+<tr><td>address with no subnet</td><td><code>IPAddress</code> with no covering prefix, or only a prefix with status <code>container</code></td><td>import only</td><td>A bembel address needs a subnet. By default the address goes to the report with <code>orphan-address</code> and is not imported.</td></tr>
+<tr><td>address with no subnet, option <code>--orphans=create</code></td><td>same <code>IPAddress</code></td><td>import only</td><td>The import makes a subnet from the mask of the address (host bits cleared) under the nearest container, with a finding. An address with a /32 or /128 mask always goes to the report.</td></tr>
 <tr><td>one address per VRF</td><td>two or more non-shared <code>IPAddress</code> rows with the same address in one VRF (<code>enforce_unique=false</code>, or the global table with <code>ENFORCE_GLOBAL_UNIQUE=false</code>)</td><td>import only</td><td>The import keeps the row with the lowest NetBox id and reports the others with <code>duplicate-address</code>. Rows whose roles are all in <code>IPADDRESS_ROLES_NONUNIQUE</code> merge into one shared address, as below.</td></tr>
 <tr><td><code>address.status = allocated</code></td><td><code>status = active</code></td><td>rename</td><td></td></tr>
 <tr><td><code>address.status = reserved</code></td><td><code>status = reserved</code></td><td>copy</td><td></td></tr>
@@ -208,7 +218,8 @@
 <tr><td><code>address.shared = true</code>, protocol anycast or vip</td><td><code>role = anycast</code> or <code>vip</code></td><td>one row per bound interface</td><td>NetBox allows the same address twice only when both rows have a role of the set anycast, vip, vrrp, hsrp, glbp or carp (<code>IPADDRESS_ROLES_NONUNIQUE</code>). One <code>IPAddress</code> has one <code>assigned_object</code>. A shared address with three interfaces becomes three rows.</td></tr>
 <tr><td><code>address.shared = true</code>, protocol vrrp, hsrp, glbp or carp</td><td><code>FHRPGroup</code> and <code>FHRPGroupAssignment</code>, one <code>IPAddress</code> assigned to the group</td><td>proposal</td><td>The group id and the priorities come from address attributes. bembel never imports an FHRP <code>auth_key</code>.</td></tr>
 <tr><td><code>address.role</code> loopback, secondary</td><td><code>role = loopback</code>, <code>secondary</code></td><td>tag <code>role=loopback</code> in bembel</td><td>bembel has no role field on an address. The role of the host interface tells the same.</td></tr>
-<tr><td><code>address.interface_ids</code></td><td><code>IPAddress.assigned_object_type</code>, <code>assigned_object_id</code></td><td>FK to generic FK</td><td>In REST and JSON the type is <code>dcim.interface</code> for a host_kind other than vm, and <code>virtualization.vminterface</code> for a VM. The CSV import sets the link with the columns <code>device</code> or <code>virtual_machine</code> plus <code>interface</code> (the interface name). NetBox refuses an address that is the primary address of a device when it moves to another parent.</td></tr>
+<tr><td><code>address.interface_ids</code></td><td><code>IPAddress.assigned_object_type</code>, <code>assigned_object_id</code></td><td>FK to generic FK</td><td>In REST and JSON the type is <code>dcim.interface</code> for a host_kind other than vm, and <code>virtualization.vminterface</code> for a VM. NetBox refuses an address that is the primary address of a device when it moves to another parent.</td></tr>
+<tr><td><code>address.interface_ids</code> in CSV</td><td>columns <code>device</code> or <code>virtual_machine</code> plus <code>interface</code></td><td>name to columns</td><td><code>interface</code> is the interface name.</td></tr>
 <tr><td><code>address.fqdn</code></td><td><code>IPAddress.dns_name</code></td><td>copy, lowercase</td><td>NetBox keeps it as text with no link to a zone. In bembel it drives the <a href="#dns-dhcp">derived records</a>. The import creates the name and lets bembel find the zone by suffix. A name in no zone is a finding.</td></tr>
 <tr><td>host primary FQDN</td><td><code>Device.primary_ip4</code>, <code>primary_ip6</code></td><td>address with that name</td><td>The export sets the primary addresses from the FQDN. The address of the interface <code>bmc</code> in VRF <code>oob</code> goes to <code>oob_ip</code>. In CSV the address row sets this directly with the columns <code>is_primary</code> and <code>is_oob</code>.</td></tr>
 <tr><td><code>address.nat_outside_id</code></td><td><code>IPAddress.nat_inside</code> of the outside address</td><td>FK, turned around</td><td>bembel stores the link on the inside address, NetBox on the outside address. The export and the import turn it around. A NetBox inside address with two outside addresses keeps the first and gives the finding <code>nat-inside</code>.</td></tr>
@@ -247,7 +258,13 @@
 </table>
 
 <h3 id="ipam-fabric">Fabrics, IB partitions and RoCEv2 profiles</h3>
-<p>NetBox does not know the words fabric, IB partition or QoS profile. A P_Key is a 15-bit number from 0x0001 to 0x7ffe. A NetBox VLAN ID stops at 4094, so a partition cannot be a VLAN. A port GUID has 8 bytes, and the 20-byte IPoIB hardware address does not fit the MAC field, which holds an EUI-48 value. The export therefore uses custom fields and tags. This is a proposal, because NetBox has no better place.</p>
+<p>NetBox does not know the words fabric, IB partition or QoS profile. Three facts keep them out of the core models:</p>
+<ul>
+  <li>A P_Key is a 15-bit number from 0x0001 to 0x7ffe. A NetBox VLAN ID stops at 4094, so a partition cannot be a VLAN.</li>
+  <li>A port GUID has 8 bytes.</li>
+  <li>The 20-byte IPoIB hardware address does not fit the MAC field, which holds an EUI-48 value.</li>
+</ul>
+<p>The export therefore uses custom fields and tags. This is a proposal, because NetBox has no better place.</p>
 <table>
 <thead><tr><th>bembel</th><th>NetBox 4.7</th><th>Type</th><th>Note</th></tr></thead>
 <tbody>
@@ -260,7 +277,7 @@
 <tr><td><code>interface.lid</code></td><td>not exported</td><td>-</td><td>The LID comes from the subnet manager and changes.</td></tr>
 </tbody>
 </table>
-<p>The command <code>bembel export netbox --schema</code> writes only the three schema files, each for its own endpoint: <code>00a</code> the choice sets for <code>POST /api/extras/custom-field-choice-sets/</code>, <code>00b</code> the custom fields for <code>POST /api/extras/custom-fields/</code> (a select field names its <code>choice_set</code>), and <code>00c</code> the tags for <code>POST /api/extras/tags/</code>. A full export writes them too. Without these definitions, NetBox refuses the data columns. A select or multiselect field needs its choice set first.</p>
+<p>The command <code>bembel export netbox --schema</code> writes only the schema files <code>00a</code> to <code>00c</code>, each for its own endpoint (see <a href="#exchange-files">export files</a>). A full export writes them too. Without these definitions, NetBox refuses the data columns. A select or multiselect field needs its choice set first.</p>
 
 <h2 id="dcim">DCIM: hosts, interfaces and assets</h2>
 <h3 id="dcim-host">Host: Device or VirtualMachine</h3>
@@ -285,7 +302,9 @@
 <thead><tr><th>bembel</th><th>NetBox 4.7</th><th>Transform</th><th>Note</th></tr></thead>
 <tbody>
 <tr><td><code>interface.name</code></td><td><code>Interface.name</code>, <code>VMInterface.name</code></td><td>copy</td><td>Natural key: (device, name).</td></tr>
-<tr><td><code>interface.mac</code></td><td><code>MACAddress.mac_address</code> assigned to the interface, and <code>Interface.primary_mac_address</code></td><td>one MACAddress row</td><td>Since 4.2, one interface holds many MAC addresses. The CSV row of the MACAddress names the <code>device</code> or <code>virtual_machine</code> and the <code>interface</code>, and sets the primary MAC with <code>is_primary</code>. In REST and JSON the export writes the interface, the MACAddress, then a patch of <code>primary_mac_address</code>. Story: <code>eno1</code> and <code>3c:ec:ef:12:0a:44</code>.</td></tr>
+<tr><td><code>interface.mac</code></td><td><code>MACAddress.mac_address</code> assigned to the interface, and <code>Interface.primary_mac_address</code></td><td>one MACAddress row</td><td>Since 4.2, one interface holds many MAC addresses. Story: <code>eno1</code> and <code>3c:ec:ef:12:0a:44</code>.</td></tr>
+<tr><td><code>interface.mac</code> in CSV</td><td>MACAddress row with <code>device</code> or <code>virtual_machine</code>, <code>interface</code> and <code>is_primary</code></td><td>one row</td><td>The column <code>is_primary</code> sets the primary MAC.</td></tr>
+<tr><td><code>interface.mac</code> in REST and JSON</td><td>Interface, MACAddress, then a patch of <code>primary_mac_address</code></td><td>three writes in this order</td><td></td></tr>
 <tr><td><code>interface.addresses</code></td><td><code>IPAddress.assigned_object</code></td><td>reverse link</td><td>In bembel the interface holds a list. In NetBox each address points to its interface.</td></tr>
 <tr><td><code>interface.port</code> (asset link)</td><td>none (Cable, front port)</td><td>lost</td><td>NetBox models cables. bembel only keeps the link to the FNT port.</td></tr>
 <tr><td>address in a VRF other than the interface VRF</td><td><code>Interface.vrf</code> (empty)</td><td>keep empty</td><td>NetBox allows an address VRF that differs from the VRF of its interface. Story: <code>ib0</code> holds <code>10.100.4.44</code> in <code>hpc-fabric</code>.</td></tr>
@@ -295,7 +314,8 @@
 </table>
 
 <h3 id="dcim-assets">Assets: Site, Location and Rack</h3>
-<p>bembel has a fixed chain: site, building, floor, room, row, rack. NetBox has Region, Site, Location (nested) and Rack. Since 4.6 a Rack can also have a Rack Group, which is flat and global and not a level of this chain. The assets in bembel are a read-only mirror of FNT Command (see <a href="assets.html">assets</a>). The export writes them to NetBox. The import reads them from NetBox only when NetBox, not FNT, is the source of the sites.</p>
+<p>bembel has a fixed chain: site, building, floor, room, row, rack. NetBox has Region, Site, Location (nested) and Rack. Since 4.6 a Rack can also have a Rack Group, which is flat and global and not a level of this chain.</p>
+<p>The assets in bembel are a read-only mirror of FNT Command (see <a href="assets.html">assets</a>). The export writes them to NetBox. The import reads them only when NetBox, not FNT, is the source of the sites.</p>
 <figure class="diagram">
 <svg viewBox="0 0 900 300" role="img" aria-labelledby="loc-t">
 <title id="loc-t">The bembel location chain and the NetBox models that carry it</title>
@@ -328,7 +348,10 @@
 <tr><td><code>site.name</code></td><td><code>Site.name</code>, <code>slug</code></td><td>copy</td><td>A site is a valid scope of prefixes and VLAN groups in both tools.</td></tr>
 <tr><td>site attribute <code>region</code></td><td><code>Site.region</code> (<code>Region</code>, nested)</td><td>proposal</td><td>bembel has no Region. The attribute holds a path such as <code>EU/DE</code>.</td></tr>
 <tr><td><code>building</code>, <code>floor</code>, <code>room</code></td><td><code>Location</code> (nested under the Site or a parent Location)</td><td>one Location per level</td><td>Unique per (site, parent, name). A Location is a valid prefix scope. The kind of level is a tag <code>level=floor</code>.</td></tr>
-<tr><td><code>row</code></td><td><code>Location</code>, or <code>RackGroup</code> since 4.6</td><td>option <code>--rows location|rackgroup</code></td><td>Default: Location. A 4.6+ RackGroup is flat and global: it has no site and no location, and its name and slug are unique across the instance. With <code>--rows rackgroup</code> the export writes a site-qualified name and slug, for example <code>hall-2 / Row A</code> and <code>hall-2-row-a</code>, and keeps the bembel row id in <code>bembel_external_ref</code>. <code>Rack.location</code> is the nearest Location above the row, and <code>Rack.group</code> is the RackGroup. On import, a group's site comes from its racks. A group with racks at several sites, or with no racks, gets the finding <code>rackgroup-site</code>. A rack group is a scope for VLAN groups, but not for prefixes.</td></tr>
+<tr><td><code>row</code></td><td><code>Location</code>, or <code>RackGroup</code> since 4.6</td><td>option <code>--rows location|rackgroup</code></td><td>Default: Location. <code>Rack.location</code> is the nearest Location above the row, and <code>Rack.group</code> is the RackGroup.</td></tr>
+<tr><td><code>row</code> with <code>--rows rackgroup</code></td><td><code>RackGroup</code> name and slug</td><td>qualified by site, for example <code>hall-2 / Row A</code> and <code>hall-2-row-a</code></td><td>A 4.6+ RackGroup is flat and global: it has no site and no location. Its name and slug are unique across the instance.</td></tr>
+<tr><td>bembel row id</td><td>custom field <code>bembel_external_ref</code> on the RackGroup</td><td>with <code>--rows rackgroup</code></td><td>The export keeps the row id here.</td></tr>
+<tr><td>RackGroup on import</td><td>site of the group</td><td>import only</td><td>A group's site comes from its racks. A group with racks at several sites, or with no racks, gets the finding <code>rackgroup-site</code>. A rack group is a scope for VLAN groups, but not for prefixes.</td></tr>
 <tr><td><code>rack.name</code>, <code>height_u</code></td><td><code>Rack.name</code>, <code>u_height</code></td><td>copy</td><td>Story: racks A01, A02 and A03, 47 U.</td></tr>
 <tr><td><code>device.position</code>, <code>height</code>, <code>face</code></td><td><code>Device.position</code>, <code>device_type.u_height</code>, <code>face</code></td><td>copy</td><td>Height is a property of the device type in NetBox.</td></tr>
 <tr><td><code>external_ref</code> (FNT ELID)</td><td>custom field <code>bembel_external_ref</code></td><td>proposal</td><td>The ELID helps a site to match NetBox rows to FNT objects.</td></tr>
@@ -351,7 +374,13 @@
 <p>The import maps a tenant to a team by name. A tenant group does not become a team. If the same tenant name exists twice in two groups, the import adds a finding and uses the first.</p>
 
 <h2 id="dns-dhcp">DNS and DHCP</h2>
-<p>NetBox core has no DNS zone, no record, no DHCP scope, no option, no lease and no reservation. This was checked in the source: no such model exists under <code>netbox/ipam/models/</code>. The only hooks are the text field <code>IPAddress.dns_name</code>, the address status <code>dhcp</code> and the <code>IPRange</code>. Sites that need more use the plugin <code>netbox-plugin-dns</code> (sys4) for zones and records (not verified here: web notes only), and the beta plugin <code>netbox-plugin-dhcp</code> (sys4, MIT, NetBox 4.7.0 or later, no documentation yet, aimed at Kea) or a Kea script for DHCP. The two plugins are separate projects on their own release trains.</p>
+<p>NetBox core has no DNS zone, no record, no DHCP scope, no option, no lease and no reservation. This was checked in the source: no such model exists under <code>netbox/ipam/models/</code>. The only hooks are the text field <code>IPAddress.dns_name</code>, the address status <code>dhcp</code> and the <code>IPRange</code>. Sites that need more use one of these:</p>
+<ul>
+  <li><code>netbox-plugin-dns</code> (sys4) for zones and records (not verified here: web notes only).</li>
+  <li>The beta plugin <code>netbox-plugin-dhcp</code> (sys4, MIT, NetBox 4.7.0 or later, no documentation yet, aimed at Kea).</li>
+  <li>A Kea script for DHCP.</li>
+</ul>
+<p>The two plugins are separate projects on their own release trains.</p>
 <table>
 <thead><tr><th>bembel</th><th>NetBox core</th><th><code>netbox-plugin-dns</code> (web)</th><th>Export to NetBox</th></tr></thead>
 <tbody>
@@ -368,17 +397,33 @@
 <tr><td>ISC dhcpd export</td><td>none</td><td>none</td><td>Not applicable. See <a href="dhcp.html">DHCP</a>.</td></tr>
 </tbody>
 </table>
-<p>The DHCP plugin <code>netbox-plugin-dhcp</code> is not a column of the table, because it is beta. Its models map as follows: a bembel scope to a plugin subnet or shared network, a pool to a pool, an option to an option or an option definition, and a reservation to a host reservation. Whether it models an ISC dhcpd failover pair is not verified. The export has no target for the plugin while the plugin is beta.</p>
+<p>The DHCP plugin <code>netbox-plugin-dhcp</code> is not a column of the table, because it is beta. Its models map as follows:</p>
+<table>
+<thead><tr><th>bembel</th><th><code>netbox-plugin-dhcp</code></th></tr></thead>
+<tbody>
+<tr><td>scope</td><td>subnet or shared network</td></tr>
+<tr><td>pool</td><td>pool</td></tr>
+<tr><td>option</td><td>option or option definition</td></tr>
+<tr><td>reservation</td><td>host reservation</td></tr>
+</tbody>
+</table>
+<p>Whether it models an ISC dhcpd failover pair is not verified. The export has no target for the plugin while the plugin is beta.</p>
 <aside class="callout note"><p class="callout-title">Plugins versus built in</p>
-<p>The plugins prove the demand. <code>netbox-plugin-dns</code> adds zones, records and a sync from <code>dns_name</code>. <code>netbox-plugin-dhcp</code> (beta) adds DHCP data. They are two separate plugins on their own release trains, and each follows the NetBox major releases (<code>netbox-plugin-dns</code> needs NetBox 4.5 or later, <code>netbox-plugin-dhcp</code> 4.7.0 or later). bembel keeps zones and DHCP data in the core, in the same transaction as the address, so a change of an address and its records is one commit. See <a href="#differences">differences</a>.</p></aside>
-
+<p>The plugins prove the demand:</p>
+<ul>
+  <li><code>netbox-plugin-dns</code> adds zones, records and a sync from <code>dns_name</code>. It needs NetBox 4.5 or later.</li>
+  <li><code>netbox-plugin-dhcp</code> (beta) adds DHCP data. It needs NetBox 4.7.0 or later.</li>
+</ul>
+<p>Each plugin follows the NetBox major releases on its own release train. bembel keeps zones and DHCP data in the core, in the same transaction as the address. A change of an address and its records is one commit. See <a href="#differences">differences</a>.</p></aside>
 <h2 id="extras">Extras: tags, attributes, events and history</h2>
 <table>
 <thead><tr><th>bembel</th><th>NetBox 4.7</th><th>Transform</th><th>Note</th></tr></thead>
 <tbody>
-<tr><td><code>tag</code> <code>key=value</code></td><td><code>Tag.name</code>, <code>slug</code>, <code>color</code></td><td>name <code>key=value</code>, slug <code>key-value</code></td><td>NetBox tags are flat and have a name only. <code>Tag.name</code> carries exactly the canonical bembel form <code>key=value</code> (<a href="model.html#common">model</a>): the key matches <code>[a-z0-9._-]+</code>, and the text splits at the first <code>=</code>. The import splits at the first <code>=</code>. A tag with no <code>=</code> gets an empty value. NetBox can restrict a tag to object types; the export does not.</td></tr>
+<tr><td><code>tag</code> <code>key=value</code></td><td><code>Tag.name</code>, <code>slug</code>, <code>color</code></td><td>name <code>key=value</code>, slug <code>key-value</code></td><td>NetBox tags are flat and have a name only. <code>Tag.name</code> carries exactly the canonical bembel form <code>key=value</code> (<a href="model.html#common">model</a>). NetBox can restrict a tag to object types; the export does not.</td></tr>
+<tr><td><code>tag</code> on import</td><td><code>Tag.name</code></td><td>split at the first <code>=</code></td><td>The key matches <code>[a-z0-9._-]+</code>. A tag with no <code>=</code> gets an empty value.</td></tr>
 <tr><td><code>attribute</code> declaration (kind, name, type)</td><td><code>CustomField</code> (<code>object_types</code>, <code>name</code>, <code>type</code>, <code>required</code>, <code>unique</code>, <code>default</code>)</td><td>see types</td><td>A NetBox custom field applies to many object types in one definition. bembel declares it per kind. The export folds equal declarations.</td></tr>
-<tr><td>attribute value</td><td><code>custom_field_data</code> (JSONB)</td><td>copy; on import, a select value comes as <code>{value, label}</code> (NetBox 4.7+) or as a plain string (older), and a multiselect as a list of either. bembel stores <code>.value</code> only. On export it writes the raw value.</td><td>The key is the attribute name. NetBox accepts the raw value on write.</td></tr>
+<tr><td>attribute value</td><td><code>custom_field_data</code> (JSONB)</td><td>copy</td><td>The key is the attribute name. On export bembel writes the raw value, and NetBox accepts the raw value on write.</td></tr>
+<tr><td>attribute value of type <code>enum</code> on import</td><td><code>custom_field_data</code> select or multiselect</td><td>unwrap to <code>.value</code></td><td>A select value comes as <code>{value, label}</code> (NetBox 4.7+) or as a plain string (older). A multiselect comes as a list of either. bembel stores <code>.value</code> only.</td></tr>
 <tr><td>attribute type <code>enum</code></td><td><code>select</code> with a <code>CustomFieldChoiceSet</code></td><td>choice set per attribute</td><td></td></tr>
 <tr><td>(none)</td><td><code>object</code>, <code>multiobject</code></td><td>import only, to string</td><td>A link in bembel is always a typed field of the model, never an attribute. The import keeps the natural key as text and gives the finding <code>object-field</code>.</td></tr>
 <tr><td>attribute types string, text, integer, decimal, boolean, date, datetime, url, json</td><td><code>text</code>, <code>longtext</code>, <code>integer</code>, <code>decimal</code>, <code>boolean</code>, <code>date</code>, <code>datetime</code>, <code>url</code>, <code>json</code></td><td>same name</td><td>The type lists of both tools are equal for plain values.</td></tr>
@@ -400,7 +445,13 @@
 <p>Export templates, config contexts and plugins have no bembel counterpart. The import ignores them. VPN profiles and VPN sessions have no NetBox counterpart either: a NetBox <code>Tunnel</code> describes a site link, not a pool of client addresses.</p>
 
 <h2 id="auth">Access: permissions and tokens</h2>
-<p>NetBox attaches an <code>ObjectPermission</code> to users and groups. A permission names object types, actions and constraints. A constraint is a JSON filter in the syntax of the database layer: a dict means AND, a list of dicts means OR, and several permissions on one model are OR-ed. bembel attaches a <em>binding</em> to a subject: a role and a scope. Both tools allow only. A scope in bembel is a closed list of types.</p>
+<p>NetBox attaches an <code>ObjectPermission</code> to users and groups. A permission names object types, actions and constraints.</p>
+<ul>
+  <li>A constraint is a JSON filter in the syntax of the database layer.</li>
+  <li>A dict means AND. A list of dicts means OR.</li>
+  <li>Several permissions on one model are OR-ed.</li>
+</ul>
+<p>bembel attaches a <em>binding</em> to a subject: a role and a scope. A scope in bembel is a closed list of types. Both tools allow only. The rules of bindings, scopes and tokens are in <a href="access.html">access</a>.</p>
 <figure class="diagram wide">
 <svg viewBox="0 0 960 380" role="img" aria-labelledby="auth-t">
 <title id="auth-t">The bembel binding b-0003 with two scope terms and the two NetBox ObjectPermission rows that approximate it</title>
@@ -441,7 +492,7 @@
 <text class="t-small t-muted" x="620" y="320">it and rolled back if the object no longer</text>
 <text class="t-small t-muted" x="620" y="338">matches the constraint.</text>
 </svg>
-<figcaption>The export can write a starting set of permissions for review. It is not a security equivalent: verbs, field rules and the approver role have no NetBox counterpart. The verb <code>prefix:allocate</code> and the claim verbs are dropped and listed in the review report. Host and interface permissions get their own rows, which the figure does not show.</figcaption>
+<figcaption>The export can write a starting set of permissions for review. It is not a security equivalent: verbs, field rules and the approver role have no NetBox counterpart. Host and interface permissions get their own rows, which the figure does not show.</figcaption>
 </figure>
 <table>
 <thead><tr><th>bembel</th><th>NetBox 4.7</th><th>Transform</th><th>Note</th></tr></thead>
@@ -449,8 +500,13 @@
 <tr><td>subject <code>user</code> (issuer and sub)</td><td><code>User</code></td><td>username from the preferred claim</td><td>NetBox gets users from python-social-auth, LDAP or a proxy header (<code>REMOTE_AUTH</code>).</td></tr>
 <tr><td>subject <code>group</code> (claim)</td><td><code>Group</code></td><td>name</td><td>NetBox has no built-in mapping from OIDC group claims. A custom pipeline step does it (inference from the docs). bembel maps claims in core.</td></tr>
 <tr><td>subject <code>service</code></td><td><code>User</code> with a token</td><td>one user per service</td><td>NetBox has no service identity from a trusted issuer.</td></tr>
-<tr><td>permission <code>kind:verb</code></td><td><code>ObjectPermission.actions</code></td><td><code>read</code> to view; <code>create</code> to add; <code>update</code> to change; <code>delete</code> to delete; <code>release</code> to delete (address only); <code>address:allocate</code> to add on <code>ipam.ipaddress</code></td><td>The NetBox call <code>available-ips</code> also needs view on the parent prefix. The export writes it only when the binding has <code>prefix:read</code>. These verbs are dropped and listed in the review report: <code>prefix:allocate</code> (add on <code>ipam.prefix</code> would allow any prefix in the constraint), <code>traverse</code>, <code>confirm</code>, <code>build</code>, <code>sync</code>, <code>link</code>, <code>approve</code>, <code>apply</code>, <code>use</code>, <code>revoke</code>, <code>admin</code> and every claim verb. NetBox has no match for them, except custom actions that a plugin registers.</td></tr>
-<tr><td>role</td><td>set of <code>ObjectPermission</code> rows</td><td>one row per group of object types with identical action sets</td><td>A bembel role is a named set. A NetBox permission is a row with a type list and an action list, and every action applies to every listed type. No name for a set of rows. A mapping that would grant more than the source binding is omitted and listed in the review report.</td></tr>
+<tr><td>permission <code>read</code></td><td><code>ObjectPermission.actions</code> <code>view</code></td><td>rename</td><td></td></tr>
+<tr><td>permission <code>create</code>, <code>update</code></td><td><code>add</code>, <code>change</code></td><td>rename</td><td></td></tr>
+<tr><td>permission <code>delete</code>; <code>release</code> (address only)</td><td><code>delete</code></td><td>rename</td><td></td></tr>
+<tr><td>permission <code>address:allocate</code></td><td><code>add</code> on <code>ipam.ipaddress</code></td><td>rename</td><td>The NetBox call <code>available-ips</code> also needs view on the parent prefix. The export writes it only when the binding has <code>prefix:read</code>.</td></tr>
+<tr><td>permissions <code>prefix:allocate</code>, <code>traverse</code>, <code>confirm</code>, <code>build</code>, <code>sync</code>, <code>link</code>, <code>approve</code>, <code>apply</code>, <code>use</code>, <code>revoke</code>, <code>admin</code> and every claim verb</td><td>none, except custom actions that a plugin registers</td><td>dropped</td><td>The review report lists them. <code>prefix:allocate</code> has no match because add on <code>ipam.prefix</code> would allow any prefix in the constraint.</td></tr>
+<tr><td>role</td><td>set of <code>ObjectPermission</code> rows</td><td>one row per group of object types with identical action sets</td><td>A bembel role is a named set. A NetBox permission is a row with a type list and an action list, and every action applies to every listed type. No name for a set of rows.</td></tr>
+<tr><td>role mapping that would grant more than the source binding</td><td>none</td><td>omitted</td><td>The review report lists it.</td></tr>
 <tr><td>scope <code>global</code></td><td>empty constraints</td><td></td><td></td></tr>
 <tr><td>scope <code>vrf=NAME</code></td><td><code>{"vrf__name": "NAME"}</code></td><td>per object type</td><td>VLAN has no VRF. For VLAN use the VLAN group.</td></tr>
 <tr><td>scope <code>prefix=CIDR</code> (subtree)</td><td><code>{"prefix__net_contained_or_equal": "CIDR"}</code>; for addresses <code>address__net_host_contained</code></td><td>proposal</td><td>Lookups defined in <code>ipam/lookups.py</code> and registered in <code>ipam/fields.py</code> of NetBox 4.7.4; applied by <code>utilities/permissions.py</code> <code>qs_filter_from_constraints</code>. Not run against a live instance.</td></tr>
@@ -474,10 +530,10 @@
 <tr><td>Header</td><td><code>Authorization: Bearer ...</code></td><td><code>Authorization: Bearer nbt_KEY.SECRET</code></td></tr>
 </tbody>
 </table>
-<p>The v1 token (header <code>Authorization: Token</code>, stored in plain text) is deprecated in NetBox, and its removal is planned for 5.0. The import accepts v2 only. The token needs read rights and may have <code>write_enabled=false</code>.</p>
+<p>The rules of the bembel token are in <a href="access.html#tokens">access</a>. The v1 token (header <code>Authorization: Token</code>, stored in plain text) is deprecated in NetBox, and its removal is planned for 5.0. The import accepts v2 only. The token needs read rights and may have <code>write_enabled=false</code>.</p>
 
 <h2 id="api">API conventions</h2>
-<p>Both APIs are REST over JSON with an OpenAPI document. NetBox follows Django REST Framework. bembel writes the OpenAPI 3.1 document first, and all clients are generated from it (see <a href="api.html">REST API</a>). The chapter on the REST API is the authority for bembel. The right column below shows the design as this chapter knows it.</p>
+<p>Both APIs are REST over JSON with an OpenAPI document. NetBox follows Django REST Framework. bembel writes the OpenAPI 3.1 document first, and all clients are generated from it. The <a href="api.html">REST API</a> chapter is the authority for bembel.</p>
 <table>
 <thead><tr><th>Topic</th><th>NetBox 4.7</th><th>bembel</th></tr></thead>
 <tbody>
@@ -485,25 +541,25 @@
 <tr><td>Allocate an address</td><td><code>POST /api/ipam/prefixes/ID/available-ips/</code>, advisory lock in the database</td><td><code>POST /v1/prefixes/ID/addresses:allocate</code> with <code>Idempotency-Key</code>. With <code>claim_ttl</code> (ISO 8601, for example <code>PT15M</code>) the result is a claimed address that the caller confirms later.</td></tr>
 <tr><td>Allocate a prefix</td><td><code>POST .../available-prefixes/</code></td><td><code>POST /v1/prefixes/ID/prefixes:allocate</code></td></tr>
 <tr><td>Other allocation endpoints</td><td><code>ip-ranges/ID/available-ips/</code>, <code>vlan-groups/ID/available-vlans/</code>, <code>asn-ranges/ID/available-asns/</code> (from memory: only the first two handlers were confirmed in the source)</td><td>Same pattern for each pool kind: <code>:allocate</code> on the parent</td></tr>
-<tr><td>Retry of an allocation</td><td>No key. A retry after a timeout can take a second address.</td><td>The same <code>Idempotency-Key</code> returns the first result.</td></tr>
+<tr><td>Retry of an allocation</td><td>No key. A retry after a timeout can take a second address.</td><td>The same <code>Idempotency-Key</code> returns the first result (<a href="allocation.html#idempotency">idempotency</a>).</td></tr>
 <tr><td>Temporary reservation</td><td>none (<code>status=reserved</code> is a label)</td><td><a href="allocation.html">claims</a> with expiry, confirmed by the caller</td></tr>
 <tr><td>Pagination</td><td>offset and limit (default 50, maximum 1000, <code>count</code> in the answer); cursor with <code>start=ID</code> since 4.6</td><td>cursor only (see REST API chapter)</td></tr>
-<tr><td>Concurrency</td><td><code>ETag</code> and <code>If-Match</code> on update since 4.6</td><td>The <code>revision</code> of an object is the ETag. An update needs <code>If-Match</code>. A stale value gives 412.</td></tr>
+<tr><td>Concurrency</td><td><code>ETag</code> and <code>If-Match</code> on update since 4.6</td><td>The <code>revision</code> of an object is the ETag. An update needs <code>If-Match</code>. A stale value gives 412 (<a href="api.html#concurrency">concurrency</a>).</td></tr>
 <tr><td>Filters</td><td><code>?parent=</code>, <code>within</code>, <code>within_include</code>, <code>contains</code>, <code>mask_length</code>, <code>family</code>, <code>vrf_id</code>, <code>q</code>, <code>cf_NAME=</code>, lookup suffixes <code>__ic</code>, <code>__gte</code></td><td>Where a NetBox filter has a clear meaning, bembel uses the same word. The REST API chapter lists them.</td></tr>
 <tr><td>Related objects</td><td>nested objects with <code>id</code>, <code>url</code>, <code>display</code>; <code>?brief=1</code>; <code>?fields=</code></td><td>reference objects with <code>id</code>, <code>kind</code> and <code>name</code></td></tr>
-<tr><td>Bulk</td><td><code>PATCH</code> or <code>DELETE</code> on the collection with a list; per-object errors since 4.7</td><td>A batch call. A bulk change of more than <code>access.change_request.bulk_threshold</code> objects (default 50) needs a change request.</td></tr>
+<tr><td>Bulk</td><td><code>PATCH</code> or <code>DELETE</code> on the collection with a list; per-object errors since 4.7</td><td>A batch call. A bulk change of more than <code>access.change_request.bulk_threshold</code> objects (default 50) needs a change request (<a href="access.html#changes">change requests</a>).</td></tr>
 <tr><td>Change message</td><td><code>changelog_message</code> field in the body</td><td>A reason field on a change request (<code>ChangeRequest.reason</code>). Plain writes carry no message.</td></tr>
 <tr><td>Query language</td><td>GraphQL at <code>/graphql/</code>, read only</td><td>No GraphQL. The OpenAPI document is the one contract.</td></tr>
 <tr><td>Events</td><td>event rules, webhooks with Jinja2 bodies, RQ workers</td><td>CloudEvents from an outbox: webhooks and the SSE stream <code>/v1/events/stream</code></td></tr>
 <tr><td>Python client</td><td><code>pynetbox</code></td><td>generated clients from OpenAPI; <code>bembel</code> CLI</td></tr>
 </tbody>
 </table>
-<p>A small example shows the difference of the allocation call. In NetBox, a client may send an empty body, or the fields of the new address, and gets the next address:</p>
+<p>Allocation call in NetBox: a client sends an empty body, or the fields of the new address, and gets the next address.</p>
 <pre><code class="language-bash">curl -X POST https://netbox.example.org/api/ipam/prefixes/412/available-ips/ \
   -H 'Authorization: Bearer nbt_4f9a1c.SECRET' \
   -H 'Content-Type: application/json' \
   -d '{"dns_name": "vm-build-07.kestrel.example.org", "status": "active"}'</code></pre>
-<p>In bembel, the same client sends a key, and the call is safe to repeat:</p>
+<p>Allocation call in bembel: the same client sends a key, and the call is safe to repeat.</p>
 <pre><code class="language-bash">curl -X POST https://bembel.example.org/v1/prefixes/$PREFIX_ID/addresses:allocate \
   -H "Authorization: Bearer $BEMBEL_TOKEN" \
   -H 'Idempotency-Key: 6b9d2e0a-2c61-4a58-9d0e-5a1f0c6c2f10' \
@@ -511,30 +567,46 @@
   -d '{"fqdn": "vm-build-07.kestrel.example.org", "claim_ttl": "PT15M"}'</code></pre>
 
 <h2 id="differences">Where bembel is different, and why</h2>
-<p>This table lists the points where bembel does not follow NetBox on purpose. The evidence column cites the NetBox source (research notes, section 7). The table does not say that NetBox is wrong. NetBox serves a wider group of users than bembel.</p>
+<p>Where bembel does not follow NetBox on purpose, the last column cites the NetBox source (research notes, section 7). This is no verdict on NetBox, which serves a wider group of users than bembel.</p>
 <table>
 <thead><tr><th>Topic</th><th>NetBox 4.7</th><th>bembel</th><th>Why, and evidence</th></tr></thead>
 <tbody>
 <tr><td>Uniqueness</td><td>Checked in <code>clean()</code> behind <code>ENFORCE_GLOBAL_UNIQUE</code> and <code>VRF.enforce_unique</code>. No unique index on prefix, address or VRF name (<code>ip.py:309-330</code>, <code>1124-1140</code>; the <code>Meta</code> comments say the pair may be non-unique).</td><td>PostgreSQL exclusion constraints (<code>btree_gist</code>) per VRF.</td><td>Bulk SQL, a restore or two concurrent requests can pass the application check. With the constraint, no path can store an overlap. The cost: bembel refuses data that NetBox accepts (see <a href="#import-findings">findings</a>).</td></tr>
-<tr><td>Generic foreign keys</td><td><code>IPAddress.assigned_object</code>, <code>Prefix.scope</code>, <code>VLANGroup.scope</code>, <code>Service.parent</code>, <code>MACAddress.assigned_object</code>. No referential integrity in the database.</td><td>Typed foreign keys and link tables.</td><td>The database can then check every link and join it. A scope type that NetBox adds later (rack group for a VLAN group, but not for a prefix) is a column change in bembel, not a content-type rule.</td></tr>
+<tr><td>Generic foreign keys</td><td><code>IPAddress.assigned_object</code>, <code>Prefix.scope</code>, <code>VLANGroup.scope</code>, <code>Service.parent</code>, <code>MACAddress.assigned_object</code>. No referential integrity in the database.</td><td>Typed foreign keys and link tables.</td><td>The database can then check every link and join it. A scope type that NetBox adds later is a column change in bembel, not a content-type rule. Example: rack group for a VLAN group, but not for a prefix.</td></tr>
 <tr><td>Scope shapes</td><td>Prefix scope: region, site group, site, location. VLAN group: also rack, cluster. VLAN: legacy <code>site</code>.</td><td>One scope word set for access and one site link for placement.</td><td>A query "what lives here" needs a union of three shapes in NetBox.</td></tr>
 <tr><td>DNS</td><td>Text field <code>dns_name</code>. Plugin for zones.</td><td>Zones, views, records and derived records in the core, BIND export.</td><td>The replaced tool (ONA) manages DNS. A split between two projects with their own release cycle would repeat the problem the migration solves.</td></tr>
-<tr><td>DHCP</td><td>None in core. The beta plugin <code>netbox-plugin-dhcp</code> (NetBox 4.7.0+, aimed at Kea) adds subnets, shared networks, pools, options and host reservations. Issue 9763 (web) documents the pain in core: DHCP ranges look free, 10 000 placeholder addresses. Fixed in part by <code>mark_populated</code> in 4.3.</td><td>Scope, pool, reservation, option, failover pair, dhcpd export.</td><td>Same reason as DNS: DNS and DHCP would be two separate plugins on their own release trains. ONA manages DHCP today, with ISC dhcpd failover. The plugin has no dhcpd export, and its failover model is not verified.</td></tr>
-<tr><td>Allocation workflow</td><td>No request, expiry or approval. <code>reserved</code> is a label.</td><td>Claim with TTL, idempotent allocate, change request with four-eyes.</td><td>The Neutron driver and the libvirt hook need a claim that they can confirm. Cluster API and external-dns need an allocate that they can retry safely. The NetBox branching extension is the nearest to a review, with documented unmergeable states and a limited-use licence.</td></tr>
-<tr><td>Access control</td><td>Model-level permissions with JSON constraints in ORM syntax. No field-level rule. No deny. Subtree scopes are possible as ORM lookups (<code>prefix__net_contained_or_equal</code>, <code>address__net_host_contained</code>, <code>_site__slug</code>), written by hand for each object type. No zone scope. Tokens carry all permissions of the user.</td><td>Roles and bindings with scopes (VRF, prefix subtree, zone, site, team, tag), IdP groups, narrowed tokens. Also allow-only.</td><td>Both are allow-only. bembel adds typed scopes that cannot be written wrongly, and the claims of the IdP decide. The NetBox web form test-runs a constraint for each selected object type when it is saved. The REST API stores constraints without a check, so a wrong constraint made through the API shows up only when it is used. bembel scopes are typed and validated on every path.</td></tr>
+<tr><td>DHCP in core</td><td>None in core. Issue 9763 (web) documents the pain: DHCP ranges look free, 10 000 placeholder addresses. Fixed in part by <code>mark_populated</code> in 4.3.</td><td>Scope, pool, reservation, option, failover pair, dhcpd export.</td><td>ONA manages DHCP today, with ISC dhcpd failover.</td></tr>
+<tr><td>DHCP plugin</td><td>The beta plugin <code>netbox-plugin-dhcp</code> (NetBox 4.7.0+, aimed at Kea) adds subnets, shared networks, pools, options and host reservations.</td><td>The same objects in the core, with the dhcpd export.</td><td>Same reason as DNS: DNS and DHCP would be two separate plugins on their own release trains. The plugin has no dhcpd export, and its failover model is not verified.</td></tr>
+<tr><td>Allocation workflow</td><td>No request, expiry or approval. <code>reserved</code> is a label. The branching extension is the nearest to a review, with documented unmergeable states and a limited-use licence.</td><td>Claim with TTL, idempotent allocate, change request with four-eyes.</td><td>The Neutron driver and the libvirt hook need a claim that they can confirm. Cluster API and external-dns need an allocate that they can retry safely.</td></tr>
+<tr><td>Access control</td><td>Model-level permissions with JSON constraints in ORM syntax. No field-level rule. No deny. Subtree scopes are possible as ORM lookups (<code>prefix__net_contained_or_equal</code>, <code>address__net_host_contained</code>, <code>_site__slug</code>), written by hand for each object type. No zone scope. Tokens carry all permissions of the user.</td><td>Roles and bindings with scopes (VRF, prefix subtree, zone, site, team, tag), IdP groups, narrowed tokens. Also allow-only.</td><td>Both are allow-only. bembel adds typed scopes that cannot be written wrongly, and the claims of the IdP decide.</td></tr>
+<tr><td>Check of a constraint</td><td>The web form test-runs a constraint for each selected object type when it is saved. The REST API stores constraints without a check.</td><td>Scopes are typed and validated on every path.</td><td>A wrong constraint made through the REST API shows up only when it is used.</td></tr>
 <tr><td>Fabrics</td><td>No InfiniBand partition, no GUID, no RoCE profile.</td><td>Fabric, IB partition, QoS profile, OpenSM export.</td><td>The requester runs InfiniBand and RoCEv2 next to Ethernet. Custom fields work, but no generator can rely on them.</td></tr>
-<tr><td>Hierarchy</td><td>Prefix parents found by query on each read; <code>_depth</code> and <code>_children</code> stored and updated on save. Issue 1737 (web) shows the cost. 4.7 moves region and location to <code>ltree</code>.</td><td><code>parent_id</code> and <code>level</code> stored and kept by a trigger; GiST on <code>cidr</code> serves containment; an exclusion on (vrf, level, cidr) keeps siblings apart; <code>ltree</code> for names.</td><td>Not a difference of idea. The difference is that the database does the work and the constraint keeps it correct.</td></tr>
-<tr><td>Operations</td><td>Django, PostgreSQL 15 or later with <code>ltree</code>, Redis, RQ workers, gunicorn. A major release about every four months. 4.7 moved MPTT to <code>ltree</code> with locks that "can last several minutes". A <code>pg_dump</code> restore of a 4.7.0 database lost the <code>ltree</code> cascade triggers. 4.7.1 fixed this (#23130). Paths that had already gone stale need a manual repair (<code>version-4.7.md</code> lines 133, 149 and 170).</td><td>One static binary and PostgreSQL 18. Expand-and-contract migrations. Release cadence is the decision of the project.</td><td>A small team runs the service. Fewer parts mean fewer outages. NetBox plugins also follow each core release.</td></tr>
+<tr><td>Hierarchy</td><td>Prefix parents found by query on each read; <code>_depth</code> and <code>_children</code> stored and updated on save. Issue 1737 (web) shows the cost. 4.7 moves region and location to <code>ltree</code>.</td><td><code>parent_id</code> and <code>level</code> are stored and kept by a trigger. GiST on <code>cidr</code> serves containment. An exclusion on (vrf, level, cidr) keeps siblings apart. <code>ltree</code> serves names.</td><td>Not a difference of idea. The difference is that the database does the work and the constraint keeps it correct.</td></tr>
+<tr><td>Operations</td><td>Django, PostgreSQL 15 or later with <code>ltree</code>, Redis, RQ workers, gunicorn. A major release about every four months.</td><td>One static binary and PostgreSQL 18. Release cadence is the decision of the project.</td><td>A small team runs the service. Fewer parts mean fewer outages. NetBox plugins also follow each core release.</td></tr>
+<tr><td>Upgrade locks</td><td>4.7 moved MPTT to <code>ltree</code> with locks that "can last several minutes".</td><td>Expand-and-contract migrations.</td><td>-</td></tr>
+<tr><td>Restore</td><td>A <code>pg_dump</code> restore of a 4.7.0 database lost the <code>ltree</code> cascade triggers. 4.7.1 fixed this (#23130). Paths that had already gone stale need a manual repair (<code>version-4.7.md</code> lines 133, 149 and 170).</td><td>-</td><td>-</td></tr>
 <tr><td>Licence of extensions</td><td>Core Apache-2.0. Branching and Diode: NetBox Limited Use License 1.0.</td><td>Apache-2.0 for all.</td><td>A replacement cannot adopt a limited-use extension.</td></tr>
 <tr><td>History</td><td><code>ObjectChange</code> log per request, pruned by <code>CHANGELOG_RETENTION</code>.</td><td>Append-only audit events, temporal tables in the database, denies included.</td><td>The audit trail also records denied requests and the binding that allowed a change.</td></tr>
 <tr><td>Ownership by integration</td><td>none</td><td><code>source</code>, <code>managed_by</code>, <code>external_ref</code></td><td>A sync from OpenStack or FNT must stop users from editing its objects.</td></tr>
 </tbody>
 </table>
 <aside class="callout why"><p class="callout-title">Why not just NetBox</p>
-<p>NetBox is a good tool, and for many sites it is the right answer. It has a large community, plugins, a Terraform provider, an Ansible collection, a device type library of more than 400 vendors, cabling, power, circuits, config contexts, scripts and a read-only GraphQL API. bembel has none of the DCIM depth. It mirrors assets and does not manage cables.</p>
-<p>The bembel requirements are different. The tool must replace OpenNetAdmin, which owns DNS and DHCP data. It must serve an OpenStack Neutron driver with claims and Cluster API with allocations, both safe to retry. It must model InfiniBand partitions and RoCEv2 profiles. It must tie access to IdP groups with scopes. With NetBox this means the core plus a DNS plugin, a beta DHCP plugin or a Kea script, a Python plugin for claims and custom fields for fabrics. The DNS and DHCP plugins are two separate plugins on their own release trains, and each part follows the NetBox release train. The <a href="decision.html">decision chapter</a> scores the options.</p>
+<p>NetBox is a good tool, and for many sites it is the right answer. It has:</p>
+<ul>
+  <li>a large community, plugins, a Terraform provider and an Ansible collection;</li>
+  <li>a device type library of more than 400 vendors;</li>
+  <li>cabling, power, circuits, config contexts and scripts;</li>
+  <li>a read-only GraphQL API.</li>
+</ul>
+<p>bembel has none of the DCIM depth. It mirrors assets and does not manage cables. The bembel requirements are different. The tool must:</p>
+<ul>
+  <li>replace OpenNetAdmin, which owns DNS and DHCP data;</li>
+  <li>serve an OpenStack Neutron driver with claims and Cluster API with allocations, both safe to retry;</li>
+  <li>model InfiniBand partitions and RoCEv2 profiles;</li>
+  <li>tie access to IdP groups with scopes.</li>
+</ul>
+<p>With NetBox this means the core plus a DNS plugin and a beta DHCP plugin or a Kea script. It also needs a Python plugin for claims and custom fields for fabrics. Each part follows the NetBox release train. The <a href="decision.html">decision chapter</a> scores the options.</p>
 <p>If a site runs NetBox for DCIM, the two tools can live together. The <a href="#exchange">exchange</a> section is for this case.</p></aside>
-
 <h2 id="exchange">Exchange with NetBox</h2>
 <p>Two commands move data between the tools. Both use the mapping of this chapter. Both are proposals: the command names are fixed, the options can change.</p>
 <figure class="diagram wide">
@@ -616,9 +688,19 @@ done in 3.1 s; import the files in the order of their number</pre>
 <tr><td>10</td><td>patches: ASN site links; update-mode rows found by <code>bembel_id</code></td><td><code>id</code></td></tr>
 </tbody>
 </table>
+<table>
+<thead><tr><th>Related object</th><th>Column in the NetBox CSV</th></tr></thead>
+<tbody>
+<tr><td>most objects</td><td>natural key columns such as <code>vrf</code> and <code>tenant</code> (by name) and <code>status</code> (by slug)</td></tr>
+<tr><td>generic foreign key</td><td>also resolved by natural key</td></tr>
+<tr><td>IP address and MAC address forms</td><td><code>device</code> or <code>virtual_machine</code> plus an interface name</td></tr>
+<tr><td>prefix and VLAN group</td><td><code>scope_type</code> plus <code>scope_name</code></td></tr>
+<tr><td>shared address of an FHRP group</td><td><code>fhrp_group</code> names the group</td></tr>
+</tbody>
+</table>
 <ul>
-  <li>NetBox CSV refers to related objects by natural key columns such as <code>vrf</code> and <code>tenant</code> (by name) and <code>status</code> (by slug). It also resolves generic foreign keys by natural key. The IP address and MAC address forms take <code>device</code> or <code>virtual_machine</code> plus an interface name. Prefixes and VLAN groups take <code>scope_type</code> plus <code>scope_name</code>. The shared address of an FHRP group names the group in the column <code>fhrp_group</code>.</li>
-  <li>The export is a single pass. The option <code>--resolve URL</code> is only for update mode and for ambiguous scope names: it reads the numbers from the NetBox that already holds the earlier files, and it writes <code>scope_id</code> where a scope name matches more than one object.</li>
+  <li>The export is a single pass. The option <code>--resolve URL</code> is only for update mode and for ambiguous scope names.</li>
+  <li>The option <code>--resolve</code> reads the numbers from the NetBox that already holds the earlier files. It writes <code>scope_id</code> where a scope name matches more than one object.</li>
   <li>An <code>id</code> column puts a NetBox bulk import in update mode, and only the given columns change. With <code>--resolve</code>, the export finds the NetBox id by the custom field <code>bembel_id</code> and writes it. A second run updates, and makes no duplicates.</li>
   <li>The format <code>json</code> writes the same rows as REST bodies. The bulk call is <code>POST</code> of a list to the collection URL, and NetBox 4.7 reports an error for each object.</li>
   <li>The command reads through the bembel API with the permissions of the caller. A user sees in the files what the scope of the user allows.</li>
@@ -643,12 +725,23 @@ mapped 10 290 objects; 48 findings
 run imp-20261104-1017 written as a report only; use --apply to write</pre>
 <ol class="steps">
   <li>The command reads each model with <code>GET</code> and the cursor <code>start=ID&amp;limit=1000</code> (NetBox 4.6 or later; offset paging on older versions).</li>
-  <li>Select and multiselect custom field values are unwrapped to their raw value, so both shapes are accepted: an object <code>{value, label}</code> from NetBox 4.7 and a plain string from older versions.</li>
-  <li>It maps each row with the tables of this chapter, prefixes bottom-up by mask length, and finds the object by natural key: VRF by <code>rd</code> then name, ASN by number, prefix and address by (VRF, value), VLAN by (group, VID), interface by (device, name).</li>
+  <li>It unwraps select and multiselect custom field values to the raw value. It accepts an object <code>{value, label}</code> from NetBox 4.7 and a plain string from older versions.</li>
+  <li>It maps each row with the tables of this chapter, prefixes bottom-up by mask length.</li>
+  <li>It finds each object by natural key (table below).</li>
   <li>It writes a report of the objects it would create, update or skip, with the findings.</li>
   <li>With <code>--apply</code> it writes the objects with <code>source=netbox-import</code> and <code>external_ref=netbox:INSTANCE:MODEL:ID</code>. A re-run updates the same objects.</li>
   <li>It adds one audit event for the run with the origin <code>netbox-import</code>.</li>
 </ol>
+<table>
+<thead><tr><th>Object</th><th>Natural key</th></tr></thead>
+<tbody>
+<tr><td>VRF</td><td><code>rd</code>, then name</td></tr>
+<tr><td>ASN</td><td>number</td></tr>
+<tr><td>prefix, address</td><td>(VRF, value)</td></tr>
+<tr><td>VLAN</td><td>(group, VID)</td></tr>
+<tr><td>interface</td><td>(device, name)</td></tr>
+</tbody>
+</table>
 <p>The import tests use both custom field shapes: a 4.7 payload with <code>custom_fields.bembel_fabric = {"value":"infiniband","label":"InfiniBand"}</code>, and a pre-4.7 payload with <code>"infiniband"</code>.</p>
 <h3 id="import-findings">Findings of the import</h3>
 <table>
@@ -695,7 +788,13 @@ run imp-20261104-1017 written as a report only; use --apply to write</pre>
 <tr><td>NAT, service, contact, cable, circuit, power, config context</td><td>-</td><td>not imported</td><td>no</td></tr>
 </tbody>
 </table>
-<aside class="callout tip"><p class="callout-title">Use cases</p>
-<p><strong>Evaluation:</strong> import a copy of a NetBox, read the findings, and see how clean the data is. <strong>Migration:</strong> a site that moves from NetBox runs the import once, adds DNS and DHCP data by hand or with <a href="map-ona.html">the ONA import</a>, and cuts over. <strong>Coexistence:</strong> a site keeps NetBox for cabling and power, and runs the export every night so that NetBox shows the current addresses.</p></aside>
-</body>
+<h3 id="use-cases">Use cases</h3>
+<table>
+<thead><tr><th>Use case</th><th>What the site does</th></tr></thead>
+<tbody>
+<tr><td>Evaluation</td><td>Import a copy of a NetBox, read the findings, and see how clean the data is.</td></tr>
+<tr><td>Migration</td><td>A site that moves from NetBox runs the import once, adds DNS and DHCP data by hand or with <a href="map-ona.html">the ONA import</a>, and cuts over.</td></tr>
+<tr><td>Coexistence</td><td>A site keeps NetBox for cabling and power, and runs the export every night so that NetBox shows the current addresses.</td></tr>
+</tbody>
+</table></body>
 </html>

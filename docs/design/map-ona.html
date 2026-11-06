@@ -24,7 +24,7 @@
 </aside>
 
 <h2 id="summary">Summary</h2>
-<p>The ONA schema is flat. It has no VRF, no prefix tree, no tenant, no history and no address status. bembel has all of them. The import therefore adds information that ONA cannot hold. It takes this information from a <em>map file</em> (<a href="migration.html#import">migration.html#import</a>), for example the VRF of a subnet or the fabric of a prefix.</p>
+<p>The ONA schema is flat. It has no VRF, no prefix tree, no tenant, no history and no address status. bembel has all of them. ONA cannot hold this information. The import takes it from a <em>map file</em> (<a href="migration.html#import">migration.html#import</a>), for example the VRF of a subnet or the fabric of a prefix.</p>
 <figure class="diagram wide">
 <svg viewBox="0 0 900 670" role="img" aria-labelledby="map-sum-t">
 <title id="map-sum-t">ONA tables on the left, bembel objects on the right, one arrow per mapping</title>
@@ -115,7 +115,7 @@
 <path class="edge" d="M292,633 L566,633" marker-end="url(#arrow)"/>
 <text class="t-small t-muted" x="430" y="628" text-anchor="middle">permission table</text>
 </svg>
-<figcaption>Every ONA table has a target. The label on the arrow names the rule. Sections below give the columns.</figcaption>
+<figcaption>Every ONA table has a target. The label on the arrow names the rule.</figcaption>
 </figure>
 <p>Four rules apply to every table.</p>
 <ol class="steps">
@@ -126,7 +126,7 @@
 </ol>
 
 <h2 id="tables">All tables and the import order</h2>
-<p>The table lists every ONA table that holds data. The pass number gives the order of the import. A later pass needs the objects of the earlier passes. Two links are circular, <code>hosts.primary_dns_id</code> and <code>devices.primary_host_id</code>, so the host pass runs in two steps.</p>
+<p>The pass number gives the import order. A later pass needs the objects of the earlier passes. Two links are circular, <code>hosts.primary_dns_id</code> and <code>devices.primary_host_id</code>, so the host pass runs in two steps.</p>
 <table>
 <thead><tr><th>Pass</th><th>ONA table</th><th>bembel target</th><th>Section</th></tr></thead>
 <tbody>
@@ -149,7 +149,14 @@
 <tr><td>none</td><td><code>sequences</code>, <code>sessions</code>, <code>contexts</code>, <code>defaults</code>, <code>ona_logs</code>, <code>dcm_module_list</code>, <code>racks</code>, <code>rack_assignments</code></td><td>not mapped</td><td><a href="#not-mapped">not-mapped</a></td></tr>
 </tbody>
 </table>
-<p>The import checks the schema before it reads data. It reads <code>sys_config.upgrade_index</code> and <code>version</code>. It compares the columns with the list from <code>install/ona-table_schema.xml</code> of v19.0.3, where each column is required or optional (legacy). Old databases miss <code>dns.dns_view_id</code> or still have INT columns for the IP address. Only a missing required column stops the import with a clear message. A missing legacy column is ok. An INT column is fine, because the import reads all numbers as big integers. The length and truncation checks use the column widths that <code>information_schema.COLUMNS</code> gives for the source database.</p>
+<h3 id="schema-check">Schema check</h3>
+<p>The import checks the schema before it reads data. It reads <code>sys_config.upgrade_index</code> and <code>version</code>. It compares the columns with the list from <code>install/ona-table_schema.xml</code> of v19.0.3, where each column is required or optional (legacy).</p>
+<ul>
+  <li>A missing required column stops the import with a clear message.</li>
+  <li>A missing legacy column is ok. Old databases miss <code>dns.dns_view_id</code>, for example.</li>
+  <li>An INT column for the IP address is fine, because the import reads all numbers as big integers. Old databases still have such columns.</li>
+  <li>The length and truncation checks use the column widths that <code>information_schema.COLUMNS</code> gives for the source database.</li>
+</ul>
 
 <h3 id="decimal">Decimal IP addresses</h3>
 <p>ONA stores every address as an integer. The columns <code>subnets.ip_addr</code>, <code>subnets.ip_mask</code>, <code>interfaces.ip_addr</code>, <code>blocks.ip_addr_start</code> and <code>blocks.ip_addr_end</code> are DECIMAL(39,0) unsigned. MariaDB returns them as strings. The import never uses a float. It reads the string into a 128-bit integer.</p>
@@ -165,10 +172,10 @@
 </table>
 <p>ONA has no family column. Its code treats a value up to 4294967295 (<code>0xFFFFFFFF</code>) as IPv4. An IPv6 address below 2<sup>32</sup> has the same number as an IPv4 address. The import uses this rule.</p>
 <ol class="steps">
-  <li>A subnet mask bigger than <code>0xFFFFFFFF</code> is IPv6. A prefix mask of /1 or more in IPv6 always has its top bits set, so a subnet is never unclear.</li>
+  <li>A subnet mask bigger than <code>0xFFFFFFFF</code> is IPv6. In IPv6, a prefix mask of /1 or more always has its top bits set. A subnet is therefore never unclear.</li>
   <li>An interface takes the family of its subnet. The import first uses <code>interfaces.subnet_id</code>. If that id is stale, it searches the containing subnet (<code>ona.stale-subnet-id</code>).</li>
   <li>A value bigger than <code>0xFFFFFFFF</code> is IPv6.</li>
-  <li>A small value that no subnet contains is IPv4 by default. If an IPv6 subnet in <code>::/96</code> also contains it, the import raises <code>ona.ipv6-ambiguous</code> and waits for a decision in the map file.</li>
+  <li>A small value that no subnet contains is IPv4 by default. If an IPv6 subnet in <code>::/96</code> also contains it, the import raises <code>ona.ipv6-ambiguous</code>. It then waits for a decision in the map file.</li>
 </ol>
 <p>The other columns need the same care. <code>dhcp_pools.ip_addr_start</code> and <code>ip_addr_end</code> are still INT UNSIGNED, so they are always IPv4. ONA cannot store an IPv6 pool.</p>
 
@@ -191,9 +198,9 @@
 </tbody>
 </table>
 <h3 id="subnet-types">Subnet types</h3>
-<p><code>subnet_types</code> has the columns <code>id</code>, <code>short_name</code>, <code>display_name</code> and <code>notes</code>. The seed has loopback, WAN, VLAN, p2p, VPN, Wireless LAN and LAN. The import does not create an object for it. It writes the tag <code>subnet-type</code> on each subnet. The notes go to the tag description once.</p>
+<p><code>subnet_types</code> has the columns <code>id</code>, <code>short_name</code>, <code>display_name</code> and <code>notes</code>. The seed has loopback, WAN, VLAN, p2p, VPN, Wireless LAN and LAN. The import creates no object for it. It writes the tag <code>subnet-type</code> on each subnet. The notes go to the tag description once.</p>
 <h3 id="parent">Parent and children</h3>
-<p>ONA has no parent. bembel computes the parent from containment. The import creates the subnets first and the container prefixes of <a href="#blocks">blocks</a> after them. The tree forms by itself. The map file can add container prefixes that ONA never had, for example <code>10.110.0.0/16</code> "osprey RoCE" in VRF <code>hpc-fabric</code>, the parent of the eight rail subnets:</p>
+<p>ONA has no parent. bembel computes the parent from containment. The import creates the subnets first and the container prefixes of <a href="#blocks">blocks</a> after them. The tree forms by itself. The map file can add container prefixes that ONA never had. Example: <code>10.110.0.0/16</code> "osprey RoCE" in VRF <code>hpc-fabric</code> is the parent of the eight rail subnets:</p>
 <pre><code class="language-yaml">prefixes:
   - cidr: 10.110.0.0/16
     vrf: hpc-fabric
@@ -204,10 +211,12 @@
 </code></pre>
 <p>A <code>prefixes:</code> entry follows these rules, in this order.</p>
 <ol class="steps">
-  <li>An entry whose CIDR and VRF equal a prefix that the import creates from an ONA subnet or block does not create a second prefix. It fills only the fields that ONA lacks (site, team, fabric, the name when it is empty). The object keeps its ref <code>ona:subnets:ID</code> or <code>ona:blocks:ID</code>, and the filled fields go into its row hash. The ONA block "Hall 2 HPC" (<code>10.20.0.0/16</code>) gets its site in this way.</li>
-  <li>An entry with no ONA match creates a container with the external ref <code>map:prefixes:CIDR</code> (for example <code>map:prefixes:10.110.0.0/16</code>), the source <code>ona-import</code> and <code>managed_by = ona-import</code>. A re-import finds it by that ref. When the entry is removed, the import marks the container deprecated.</li>
+  <li>An entry with the same CIDR and VRF as an imported ONA subnet or block creates no second prefix. It fills only the fields that ONA lacks: site, team, fabric, and the name when empty. The object keeps its ref <code>ona:subnets:ID</code> or <code>ona:blocks:ID</code>. The filled fields go into its row hash.</li>
+  <li>An entry with no ONA match creates a container. The container has the external ref <code>map:prefixes:CIDR</code> (for example <code>map:prefixes:10.110.0.0/16</code>), the source <code>ona-import</code> and <code>managed_by = ona-import</code>. A re-import finds it by that ref. When the entry is removed, the import marks the container deprecated.</li>
   <li>An entry that overlaps a subnet but does not contain it creates nothing. The import raises <code>ona.map-prefix-overlap</code> (error).</li>
 </ol>
+
+<p>Example for the first rule: the ONA block "Hall 2 HPC" (<code>10.20.0.0/16</code>) gets its site from a map file entry.</p>
 
 <h2 id="hosts">Hosts and devices</h2>
 <p>ONA splits a machine into <code>hosts</code>, <code>devices</code>, <code>device_types</code>, <code>models</code>, <code>manufacturers</code> and <code>roles</code>. bembel has one <em>host</em>. The device of bembel is a physical asset from FNT Command (see <a href="assets.html">assets.html</a>). The import does not create asset devices. It keeps the asset data as host attributes. The FNT sync later links host and device by serial, asset tag, MAC and name.</p>
@@ -238,10 +247,10 @@
   <li>Read the dns row with the id <code>primary_dns_id</code>.</li>
   <li>Build the domain FQDN. Walk <code>domains.parent_id</code> up to the root and join the labels (<a href="#domains">domains</a>).</li>
   <li>Join <code>dns.name</code> and the domain FQDN. Row 90211 has the name <code>cn-004</code> in the domain <code>kestrel</code>. The host is <code>cn-004.kestrel.example.org</code>.</li>
-  <li>If <code>primary_dns_id</code> is 0 or the row is missing, use the A record with the lowest id on an interface of the host. Raise <code>ona.orphan-dns</code> (warn).</li>
+  <li>If <code>primary_dns_id</code> is 0 or the row is missing, use the lowest-id A record on an interface of the host. Raise <code>ona.orphan-dns</code> (warn).</li>
   <li>If the host has no A record at all, the host gets no name. The import raises <code>ona.host-no-name</code> (error) and keeps the host out of the model. Its addresses stay as addresses without an interface.</li>
 </ol>
-<p>The host name must be unique. ONA checks this only in PHP, per domain. If two hosts have the same FQDN, the import keeps the one with the lower id and raises <code>ona.dup-host</code> for the other; its name gets the suffix <code>-ID</code>. In the story data this finding does not occur.</p>
+<p>The host name must be unique. ONA checks this only in PHP, per domain. If two hosts have the same FQDN, the import keeps the host with the lower id. For the other host it raises <code>ona.dup-host</code>, and its name gets the suffix <code>-ID</code>. In the story data this finding does not occur.</p>
 <h3 id="vms">Virtual machines</h3>
 <p>ONA has no VM model. VMs are hosts with a device type such as "KVM guest" or an empty type. bembel has the host kinds <code>physical</code>, <code>vm</code>, <code>hypervisor</code>, <code>appliance</code> and <code>container-node</code>, and the link <code>runs_on</code>. The import cannot know the hypervisor. The map file rules set the kind:</p>
 <pre><code class="language-yaml">hosts:
@@ -319,7 +328,11 @@
 </svg>
 <figcaption>Rows 4412 and 4413 have the same host and the same name, so they share one interface. The subnet of each address decides the VRF.</figcaption>
 </figure>
-<p>InfiniBand needs special care. The column <code>mac_addr</code> holds only 12 hex digits. An InfiniBand port GUID has 16 digits and the IPoIB address has 20 bytes. ONA cannot store them. Site admins often put the GUID in the description. The map file rule <code>interfaces.guid_from: description</code> reads a 16-digit GUID from the description and writes it to <code>interface.port_guid</code> (16 lowercase hex digits, for example <code>0c42a1030071a2b4</code>). The map file puts the prefix <code>10.100.0.0/16</code> in the InfiniBand fabric <code>kestrel-ib</code>.</p>
+<p>The column <code>mac_addr</code> holds only 12 hex digits. An InfiniBand port GUID has 16 digits and the IPoIB address has 20 bytes, so ONA cannot store them. Site admins often put the GUID in the description. The map file handles InfiniBand in two ways:</p>
+<ul>
+  <li>The rule <code>interfaces.guid_from: description</code> reads a 16-digit GUID from the description and writes it to <code>interface.port_guid</code> (16 lowercase hex digits, for example <code>0c42a1030071a2b4</code>).</li>
+  <li>The map file puts the prefix <code>10.100.0.0/16</code> in the InfiniBand fabric <code>kestrel-ib</code>.</li>
+</ul>
 <h3 id="clusters">Interface clusters</h3>
 <p>The table <code>interface_clusters</code> has the key (<code>interface_id</code>, <code>host_id</code>) and a <code>name</code>. It makes a VIP, CARP or VRRP address. The interface row belongs to one host. Other hosts share it with their own local interface name.</p>
 <table>
@@ -333,7 +346,12 @@
 <p>A cluster row whose interface or host is gone gives <code>ona.orphan-interface</code>. The import drops the row.</p>
 
 <h2 id="dns">DNS records</h2>
-<p>All record types are in one table, <code>dns</code>. The value is never in the row. For A and PTR the value is the IP of <code>interface_id</code>. For CNAME, NS, MX and SRV the value is the name of the row that <code>dns_id</code> points to. The type AAAA does not exist. An A row with an IPv6 interface is an AAAA record.</p>
+<p>All record types are in one table, <code>dns</code>. The value is never in the row. It comes from a link:</p>
+<ul>
+  <li>A and PTR: the IP of <code>interface_id</code>.</li>
+  <li>CNAME, NS, MX and SRV: the name of the row that <code>dns_id</code> points to.</li>
+</ul>
+<p>The type AAAA does not exist. An A row with an IPv6 interface is an AAAA record.</p>
 <table>
 <thead><tr><th>ONA column</th><th>Type</th><th>bembel field</th><th>Transform</th><th>Note</th></tr></thead>
 <tbody>
@@ -347,7 +365,7 @@
 <tr><td><code>ebegin</code></td><td>timestamp</td><td><code>record.disabled</code>, <code>record.active_from</code></td><td>See the ebegin table below.</td><td>build_bind skips every record with a future <code>ebegin</code>.</td></tr>
 <tr><td><code>notes</code></td><td>varchar(128)</td><td><code>record.description</code></td><td>Decode.</td><td>build_bind prints it as a comment.</td></tr>
 <tr><td><code>mx_preference</code></td><td>int(5), old: tinyint</td><td><code>record.data</code> (MX)</td><td>Number first: <code>10 mail.example.org.</code></td><td>Old tables cap at 255. The import reads the value as it is.</td></tr>
-<tr><td><code>txt</code></td><td>varchar(191)</td><td><code>record.data</code> (TXT)</td><td>Quote, split in strings of 255 bytes.</td><td>ONA writes the text in double quotes, without escaping and without splitting. The compat export keeps that, but splits a value over 255 bytes in UTF-8 (KD-002). <code>txt</code> holds at most 191 characters, so only multi-byte UTF-8 text passes 255 bytes.</td></tr>
+<tr><td><code>txt</code></td><td>varchar(191)</td><td><code>record.data</code> (TXT)</td><td>Quote, split in strings of 255 bytes.</td><td>ONA writes the text in double quotes, without escaping or splitting. The compat export keeps that, but splits a value over 255 bytes in UTF-8 (KD-002). Only multi-byte UTF-8 text passes 255 bytes, because <code>txt</code> holds at most 191 characters.</td></tr>
 <tr><td><code>srv_pri</code>, <code>srv_weight</code>, <code>srv_port</code></td><td>int(5) unsigned</td><td><code>record.data</code> (SRV)</td><td><code>pri weight port target</code>.</td><td></td></tr>
 <tr><td><code>dns_view_id</code></td><td>int, 0 = default</td><td><code>record.view</code></td><td>0 gives the default view. Others by the map file <code>views</code>.</td><td>ONA ignores the view in its export. See below.</td></tr>
 </tbody>
@@ -410,7 +428,7 @@
 </ol>
 <p>A CNAME that shares a name with other data is not valid in DNS. ONA blocks this only in PHP. The import raises <code>ona.cname-conflict</code> (error) and keeps the CNAME out. The same rule holds for a CNAME at the apex of a zone.</p>
 <h3 id="views">Views</h3>
-<p>ONA has the table <code>dns_views</code> (<code>id</code>, <code>name</code>, <code>description</code>). The seed has only <code>DEFAULT</code>. The switch is <code>sys_config.dns_views = 1</code>. A view is a label on a dns row. The ONA export ignores it (open ONA issue 169). Split-horizon DNS is therefore new in bembel. The map file names the views:</p>
+<p>ONA has the table <code>dns_views</code> (<code>id</code>, <code>name</code>, <code>description</code>). The seed has only <code>DEFAULT</code>. The switch is <code>sys_config.dns_views = 1</code>. A view is a label on a dns row. The ONA export ignores it (open ONA issue 169), so split-horizon DNS is new in bembel. The map file names the views:</p>
 <pre><code class="language-yaml">views:
   DEFAULT: internal          # records without a view
   external: external         # ONA view name to bembel view name
@@ -433,7 +451,8 @@ zones_in_views:
 <tr><td><code>ctime</code></td><td>timestamp</td><td><code>zone.created_at</code></td><td>Zero date to null.</td><td></td></tr>
 </tbody>
 </table>
-<p>The column <code>domains.mtime</code> exists only in databases first created from the legacy <code>install/ona-tables.sql</code>. It is optional and never required. It is not imported, because the serial rule does not use it. Databases first created by an older release keep <code>varchar(255)</code> and <code>smallint</code> columns, because the ADOdb upgrade does not shrink or drop columns. The import reads the real widths from <code>information_schema.COLUMNS</code>.</p>
+<p>The column <code>domains.mtime</code> exists only in databases first created from the legacy <code>install/ona-tables.sql</code>. It is optional, never required, and not imported, because the serial rule does not use it.</p>
+<p>Databases first created by an older release keep <code>varchar(255)</code> and <code>smallint</code> columns, because the ADOdb upgrade does not shrink or drop columns. The import reads the real widths from <code>information_schema.COLUMNS</code>.</p>
 <figure class="diagram">
 <svg viewBox="0 0 900 506" role="img" aria-labelledby="map-dom-t">
 <title id="map-dom-t">The domain tree becomes a short list of zones</title>
@@ -479,13 +498,25 @@ zones_in_views:
 <figcaption>Only domains with a server row become zones. The others stay as labels inside the zone above them.</figcaption>
 </figure>
 <h3 id="zone-rule">Which domain becomes a zone</h3>
-<p>A domain becomes a zone only when the table <code>dns_server_domains</code> has at least one row for it. This is the exact set of zones that build_bind exports. The SOA columns do not decide: ONA fills them from <code>sys_config</code> when it creates a domain, so they say nothing about whether the domain is a zone. The map file can override the rule: <code>zones: [fqdn, …]</code> forces a zone, and <code>labels: [fqdn, …]</code> forces a label.</p>
-<p>All other domains are labels. Their records move into the nearest zone above. The record name gets the labels as a suffix. A record <code>node1</code> in the domain <code>hpc</code> becomes <code>node1.hpc</code> in the zone <code>example.org</code>. ONA never published these records, because build_bind writes only the records of a served domain. The import therefore sets <code>record.disabled = true</code> on them and raises <code>ona.unpublished-record</code> (warn), so the export stays the same as ONA. If no zone exists above, the import raises <code>ona.no-zone</code> (warn) and creates a zone without a DNS server. bembel does not export a zone without a server.</p>
+<p>A domain becomes a zone only when the table <code>dns_server_domains</code> has at least one row for it. This is the exact set of zones that build_bind exports. The SOA columns say nothing about zones, because ONA fills them from <code>sys_config</code> when it creates a domain.</p>
+<p>The map file can override the rule:</p>
+<ul>
+  <li><code>zones: [fqdn, …]</code> forces a zone.</li>
+  <li><code>labels: [fqdn, …]</code> forces a label.</li>
+</ul>
+<p>All other domains are labels. Their records move into the nearest zone above, and the record name gets the labels as a suffix. A record <code>node1</code> in the domain <code>hpc</code> becomes <code>node1.hpc</code> in the zone <code>example.org</code>.</p>
+<table>
+<thead><tr><th>Case</th><th>Import behaviour</th></tr></thead>
+<tbody>
+<tr><td>A zone exists above the label domain</td><td>ONA never published these records, because build_bind writes only the records of a served domain. The import sets <code>record.disabled = true</code> on them and raises <code>ona.unpublished-record</code> (warn), so the export stays the same as ONA.</td></tr>
+<tr><td>No zone exists above</td><td>The import raises <code>ona.no-zone</code> (warn) and creates a zone without a DNS server. bembel does not export a zone without a server.</td></tr>
+</tbody>
+</table>
 <h3 id="reverse">Reverse zones</h3>
 <p>Reverse domains are ordinary rows, for example <code>20.10.in-addr.arpa</code>. bembel computes reverse zones from the subnets (<a href="dns.html#reverse">dns.html#reverse</a>). The import creates no PTR records. It does these checks.</p>
 <ol class="steps">
   <li>For each reverse domain that is a zone, find the computed reverse zone with the same name. If it exists, attach the DNS servers of the ONA domain to it.</li>
-  <li>If the name is not computable (a name of RFC 2317 style, such as <code>0-27.4.20.10.in-addr.arpa</code>), the import creates a classless reverse zone for the subnet and maps the servers. The label style of the export follows the old name.</li>
+  <li>If the name is not computable, the import creates a classless reverse zone for the subnet and maps the servers. Example: an RFC 2317 name such as <code>0-27.4.20.10.in-addr.arpa</code>. The label style of the export follows the old name.</li>
   <li>If no subnet matches, the import keeps the zone as a plain zone and raises <code>ona.no-zone</code>.</li>
 </ol>
 <h3 id="servers">DNS servers</h3>
@@ -548,7 +579,7 @@ zones_in_views:
 <table>
 <thead><tr><th>ONA column</th><th>Type</th><th>bembel field</th><th>Transform</th><th>Note</th></tr></thead>
 <tbody>
-<tr><td><code>dhcp_options.name</code>, <code>number</code></td><td>varchar, int</td><td><code>dhcp_option.name</code>, <code>code</code></td><td>Match against the built-in options of ISC dhcpd 4.4.</td><td>ONA writes a definition for every code above 100 (an arbitrary rule in build_isc_dhcp). The import matches each ONA option by code and name against the ISC dhcpd 4.4 built-in options. A match maps to that standard option and keeps the ONA name as an alias. Only a code that dhcpd does not know (normally 224–254) becomes a site-defined <code>dhcp_option</code> with the ONA type. A name or code conflict gives the finding <code>ona.dhcp-option-conflict</code> (warn).</td></tr>
+<tr><td><code>dhcp_options.name</code>, <code>number</code></td><td>varchar, int</td><td><code>dhcp_option.name</code>, <code>code</code></td><td>Match against the built-in options of ISC dhcpd 4.4.</td><td>See the matching rules below the table.</td></tr>
 <tr><td><code>dhcp_options.type</code></td><td>char(1)</td><td><code>dhcp_option.type</code></td><td><code>L</code> to <code>ip-list</code>, <code>S</code> to <code>string</code>, <code>N</code> to <code>integer</code>, <code>I</code> to <code>ip</code>, <code>B</code> to <code>boolean</code>.</td><td>A value that does not fit the type: <code>ona.dhcp-orphan</code> (warn).</td></tr>
 <tr><td><code>dhcp_option_entries.value</code></td><td>varchar(127)</td><td><code>dhcp_option_value.value</code></td><td>Decode, check the type.</td><td></td></tr>
 <tr><td><code>subnet_id</code> set</td><td>int</td><td>scope of the value: the scope of that subnet</td><td></td><td>The option <code>routers</code> also sets <code>prefix.gateway</code>.</td></tr>
@@ -558,13 +589,24 @@ zones_in_views:
 <tr><td><code>sys_default</code>, <code>display_name</code></td><td></td><td>(none)</td><td>Not imported.</td><td>UI texts of ONA.</td></tr>
 </tbody>
 </table>
+<p>The import maps each ONA option as follows. ONA writes a definition for every code above 100 (an arbitrary rule in build_isc_dhcp).</p>
+<ul>
+  <li>It matches the option by code and name against the ISC dhcpd 4.4 built-in options.</li>
+  <li>A match maps to that standard option and keeps the ONA name as an alias.</li>
+  <li>Only a code that dhcpd does not know (normally 224–254) becomes a site-defined <code>dhcp_option</code> with the ONA type.</li>
+  <li>A name or code conflict gives the finding <code>ona.dhcp-option-conflict</code> (warn).</li>
+</ul>
 <h3 id="reservations">Reservations</h3>
 <p>A bembel reservation is an address with the MAC of its interface in a scope that has a DHCP server. The import marks an address as reserved if its interface has a MAC and one of these is true.</p>
 <ul>
   <li>The subnet is in <code>dhcp_server_subnets</code>.</li>
   <li>The subnet has a pool in a failover group.</li>
 </ul>
-<p>This is the same selection as in the build_isc_dhcp plugin. The compat export therefore writes the same <code>host</code> blocks. Entries for a subnet without a scope, or for a missing option, give <code>ona.dhcp-orphan</code>. A subnet with a scope but without a <code>routers</code> value gets <code>ona.no-gateway</code> (warn). The ONA generator skips such a subnet. The compat export skips it too, and the native export writes it.</p>
+<p>This is the same selection as in the build_isc_dhcp plugin, so the compat export writes the same <code>host</code> blocks. Two cases give a finding.</p>
+<ul>
+  <li>Entries for a subnet without a scope, or for a missing option, give <code>ona.dhcp-orphan</code>.</li>
+  <li>A subnet with a scope but without a <code>routers</code> value gives <code>ona.no-gateway</code> (warn). The ONA generator skips such a subnet. The compat export skips it too, and the native export writes it.</li>
+</ul>
 <p>The shared-network name that ONA derives from a VLAN (campus, VLAN number and name) is not stored. bembel computes it again from the VLAN, so the compat export keeps the name.</p>
 
 <h2 id="vlans">VLANs and campuses</h2>
@@ -679,7 +721,11 @@ zones_in_views:
 <tr><td><code>permission_assignments</code></td><td><code>binding</code></td><td>Subject (user or group) + the custom role <code>ona-NAME</code> (or <code>network-admin</code>, see below) + scope <code>global</code>.</td><td>A row with a missing permission or group: <code>ona.perm-orphan</code>.</td></tr>
 </tbody>
 </table>
-<p>The import never rounds up to a built-in role. For each ONA group or user it makes a custom role <code>ona-NAME</code> (the name of the group or user) with exactly the mapped permissions, plus the viewer reads when <code>read_all: true</code>. A subject that holds every ONA core permission maps to <code>network-admin</code>. It never gives more than ONA gave. The names come from the <code>auth()</code> calls in the ONA modules.</p>
+<p>The import never rounds up to a built-in role. It never gives more than ONA gave. The permission names come from the <code>auth()</code> calls in the ONA modules.</p>
+<ul>
+  <li>For each ONA group or user, the import makes a custom role <code>ona-NAME</code> (NAME is the name of the group or user). The role has exactly the mapped permissions, plus the viewer reads when <code>read_all: true</code>.</li>
+  <li>A subject that holds every ONA core permission maps to <code>network-admin</code>.</li>
+</ul>
 <table>
 <thead><tr><th>ONA permission</th><th>bembel permissions</th><th>Note</th></tr></thead>
 <tbody>
@@ -727,7 +773,8 @@ zones_in_views:
 <p>ONA data that has no source in ONA also exists. The map file supplies it: VRF, fabric, team, site of a container, QoS profile and host kind.</p>
 
 <h2 id="problems">Data problems and finding codes</h2>
-<p>ONA keeps data integrity in PHP code. A hand edit, a failed multi-step action or a bulk SQL load leaves broken rows. The import tests all of them. Each class of problem has a finding code, a severity and a fix rule. A finding names the ONA row as <code>ona:TABLE:ID</code>. The fix is either a change in ONA or a rule in the map file. The next import closes the finding.</p>
+<p>ONA keeps data integrity in PHP code. A hand edit, a failed multi-step action or a bulk SQL load leaves broken rows. The import tests all of them.</p>
+<p>Each class of problem has a finding code, a severity and a fix rule. A finding names the ONA row as <code>ona:TABLE:ID</code>. The fix is either a change in ONA or a rule in the map file. The next import closes the finding.</p>
 <table>
 <thead><tr><th>Code</th><th>Severity</th><th>What the import sees</th><th>Import behaviour and fix rule</th></tr></thead>
 <tbody>
@@ -768,7 +815,13 @@ zones_in_views:
 <p class="callout-title">Why one code per class</p>
 <p>A count per code shows the progress of the clean-up. The import knows 30 codes. The run <code>imp-20261104-0912</code> has 214 findings in 22 of them. The migration chapter shows the list (<a href="migration.html#findings">migration.html#findings</a>). The assistant explains a code to a user and finds the rows (<a href="assistant.html#advisories">assistant.html#advisories</a>).</p>
 </div>
-<p>A finding is data. It has an id, a run, a code, a severity, the ONA ref, a text, a suggested fix, and a state: <code>open</code>, <code>accepted</code> (with a reason and an audit event; the permission is <code>source:sync</code>) or <code>closed</code> (a later run found the data clean, after a fix in ONA or a map file rule). Until <code>bembel import ona --release</code> the import page has no edit actions.</p>
+<p>A finding is data with these fields: id, run, code, severity, ONA ref, text, suggested fix and state. The state has three values.</p>
+<ul>
+  <li><code>open</code>.</li>
+  <li><code>accepted</code>: with a reason and an audit event. The permission is <code>source:sync</code>.</li>
+  <li><code>closed</code>: a later run found the data clean, after a fix in ONA or a map file rule.</li>
+</ul>
+<p>Until <code>bembel import ona --release</code> the import page has no edit actions.</p>
 <figure class="shot"><a href="mockups/ui/import.html"><img src="img/ui-import.webp" alt="The import page with run imp-20261104-0912, the 214 findings by code and the open findings list" loading="lazy"></a><figcaption>The import page. Findings by code, severity filter, and for each finding the suggested fix in ONA or in the map file.</figcaption></figure>
 </body>
 </html>

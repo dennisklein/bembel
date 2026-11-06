@@ -3,14 +3,15 @@
 <head>
 <meta charset="utf-8">
 <title>Web UI</title>
-<meta name="description" content="Principles, layout, colours and type, keys, permission display, page list and mobile rules of the bembel web UI.">
+<meta name="description" content="Principles, shell, common parts, colours and type, keys, permission display, page template, story moment, page list and mobile rules of the bembel web UI.">
 </head>
 <body>
 <h1>Web UI</h1>
 <p class="lede">The web UI is a dense tool for users who work in it every day. It shows the state of the address space first and makes the common changes fast. This chapter gives the rules for all pages. The chapters <a href="ui-addr.html">Addressing pages</a>, <a href="ui-dns.html">DNS and DHCP pages</a>, <a href="ui-assets.html">Asset pages</a> and <a href="ui-access.html">Access and integration pages</a> describe each page with its mockup.</p>
 <ul class="keypoints">
-<li>One shell for all pages: a top bar with the VRF switcher, the jump box, the change request chip, the assistant and the help, and a sidebar with six groups.</li>
+<li>One shell for all pages. A top bar holds the VRF switcher, the jump box, the change request chip, the assistant and the help. A sidebar has six groups.</li>
 <li>Each page uses the public API only. Each action shows the CLI command that does the same.</li>
+<li>Each page follows one template: screenshot, purpose, parts, states, URL, API and CLI. All screenshots show one story moment.</li>
 <li>The UI shows what the user cannot do, and why. A disabled button tells the missing permission and the binding that would give it.</li>
 <li>Colours have a meaning: one colour per domain, and fixed state colours. The UI never uses colour as the only signal.</li>
 <li>Keys for all frequent actions. <kbd>/</kbd> opens the jump box, <kbd>?</kbd> opens the help pane, <kbd>Shift</kbd> <kbd>A</kbd> opens the assistant, <kbd>a</kbd> opens the Allocate dialog. No single key allocates, deletes or approves.</li>
@@ -23,7 +24,7 @@
 <tbody>
 <tr><td>Data first</td><td>The page opens with the data, not with a form. Numbers are right aligned and in a monospace font.</td><td>The prefix page opens with the utilisation bar and the address map.</td></tr>
 <tr><td>One click to the next free</td><td>Each subnet and each pool has an "Allocate" button. The dialog proposes the next free address or prefix.</td><td>Allocate in <code>10.20.4.0/22</code> proposes <code>10.20.4.213</code>.</td></tr>
-<tr><td>Show the source</td><td>Each object shows its source and, if set, <code>managed_by</code>. A managed object has no edit buttons.</td><td>A Neutron port shows "managed by openstack:os-prod".</td></tr>
+<tr><td>Show the source</td><td>Each object shows its source badge (<a href="#common">common parts</a>) and, if set, <code>managed_by</code>. A managed object has no edit buttons.</td><td>A Neutron port shows "managed by openstack:os-prod".</td></tr>
 <tr><td>Preview before change</td><td>Each change that affects DNS, DHCP or an export shows the effect before the user applies it.</td><td>The record dialog shows the BIND lines that change.</td></tr>
 <tr><td>Explain the denial</td><td>A disabled action has a "why not" text.</td><td>"Needs <code>prefix:delete</code> on 10.20.0.0/16. Ask hpc-ops admins."</td></tr>
 <tr><td>Same words everywhere</td><td>The UI uses the glossary words. A dotted word opens a hint.</td><td>"claim", not "lease" or "hold".</td></tr>
@@ -75,13 +76,43 @@
 </svg>
 <figcaption>The shell. The right panel holds the help pane or the assistant, never both.</figcaption>
 </figure>
+<table>
+<thead><tr><th>Top bar element, from left to right</th><th>Behaviour</th></tr></thead>
+<tbody>
+<tr><td>Brand</td><td>The brand mark.</td></tr>
+<tr><td>VRF switcher</td><td>Filters all lists. The URL carries <code>?vrf=global</code>.</td></tr>
+<tr><td>Jump box</td><td>Parses the input first: IP, CIDR, MAC, port GUID, FQDN, VLAN id, ELID. An exact hit opens the object. Otherwise it shows the hybrid search results (<a href="assistant.html#embeddings">assistant.html#embeddings</a>).</td></tr>
+<tr><td>Change request chip</td><td>Shows the number of requests that the user can approve. Own requests do not count, because the approver must differ from the requester.</td></tr>
+<tr><td>Assistant button</td><td>Opens the assistant panel (<kbd>Shift</kbd> <kbd>A</kbd>).</td></tr>
+<tr><td>Live dot</td><td>The event stream is connected.</td></tr>
+<tr><td>User menu, help, theme</td><td>The user menu, the help button and the theme toggle.</td></tr>
+</tbody></table>
 <dl class="facts">
-<dt>Top bar</dt><dd>Brand, VRF switcher (filters all lists, the URL carries <code>?vrf=global</code>), jump box, change request chip with the number of requests that the user can approve (own requests do not count, because the approver must differ from the requester; the story chip reads "1 to approve"), assistant button, live dot (the event stream is connected), user menu, help, theme.</dd>
-<dt>Jump box</dt><dd>It parses the input first: IP, CIDR, MAC, port GUID, FQDN, VLAN id, ELID. An exact hit opens the object. Otherwise it shows the hybrid search results (<a href="assistant.html#embeddings">assistant.html#embeddings</a>).</dd>
-<dt>Sidebar</dt><dd>Six groups that follow the domains. Each group has the colour of its domain on the active item.</dd>
+<dt>Sidebar</dt><dd>Six groups follow the domains. Addressing holds Prefixes, Hosts, VLANs and partitions, Fabrics, Routing and groups. DNS and DHCP holds Zones, DHCP scopes, Exports. The others are Overview, Assets, Access and Integrations. Each group has the colour of its domain on the active item. A domain colour marks a domain and never a state.</dd>
 <dt>Main area</dt><dd>Breadcrumb (VRF › container › subnet), title, source chip, the actions on the right. Then a summary strip and tabs.</dd>
 <dt>Right panel</dt><dd>The help pane (as in brig) or the assistant panel.</dd>
 </dl>
+
+<h2 id="common">Common parts of all pages</h2>
+<p>The page head holds the title, one line of facts, a CLI toggle, at most one assistant button and at most one filled button. A UI page chapter describes only the parts of its own page.</p>
+<table>
+<thead><tr><th>Rule</th><th>What the page does</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>One filled button</td><td>A page has at most one filled button, for the real next step. It sits in the page head.</td><td>The user sees the main action at once. Dangerous actions are never primary.</td></tr>
+<tr><td>Filled button: examples</td><td>"Allocate…" on Overview and Prefixes, "Allocate address…" on the prefix page, "Add interface…" on the host page. On the DNS pages: "New zone…", "New record…", "New reservation…", "Build now".</td><td>–</td></tr>
+<tr><td>Filled button: exceptions</td><td>On a page without a head action (Search) it is the button of the next-step result card ("Allocate a /24…"). A dialog or the assistant drawer may have a filled confirm button. Row, card and form-submit buttons are never filled.</td><td>–</td></tr>
+<tr><td>CLI toggle</td><td>The page head holds the CLI commands of the page and of its dialogs. A dialog repeats its own command with a copy button.</td><td>The UI teaches the CLI. A user moves to a script without a manual.</td></tr>
+<tr><td>Values</td><td>IP, prefix, MAC, FQDN and VLAN id use one mono style with no line break. The prefix length and the domain part are muted.</td><td>The eye finds the part that changes.</td></tr>
+<tr><td>State pill</td><td>A pill shows only a state that needs a look (stale, failed, new, unexplained). The normal state is a dot and a word.</td><td>One list holds all states.</td></tr>
+<tr><td>Source badge</td><td>A badge shows <code>local</code>, <code>ona-import</code>, <code>fnt</code>, <code>openstack:&lt;cloud&gt;</code>, <code>k8s:&lt;cluster&gt;</code>, <code>libvirt:&lt;hv&gt;</code>, <code>eduvpn:&lt;node&gt;</code> or <code>xiq</code>. A managed source has a lock mark. A user cannot edit a managed object.</td><td>The user knows who owns the data before an edit.</td></tr>
+<tr><td>Assistant</td><td>An advisory button has a ✦ mark and a fixed prompt, for example "Find stale addresses". It reads data with the tools of the user. It changes nothing. It can give a draft.</td><td>The assistant is never a stronger subject than the user (<a href="assistant.html">assistant</a>).</td></tr>
+<tr><td>Offline</td><td>A banner at the top of main says "Offline" and the page shows old data. It tries again every 5 s.</td><td>Old data must not look live.</td></tr>
+<tr><td>Notes</td><td>Each object page has a Notes tab with a count. A pinned <code>warn</code> note shows as a yellow line above the page head ("PSU 2 failed, ticket 8812", m.huber).</td><td>Facts that are not fields still need a place, near the object (<a href="model.html#extras">notes</a>).</td></tr>
+<tr><td>Banner</td><td>A banner shows under the top bar on all pages. A user can close it until its text changes.</td><td>–</td></tr>
+<tr><td>Links to other tools</td><td>The link templates of the kind show as outline buttons in the page head, next to Open in FNT ("Grafana", "Ticket search").</td><td>A user goes from the object to the other tool in one click, with the right values in the URL.</td></tr>
+<tr><td>Saved filters</td><td>A list page has "Save filter…" in its filter bar. The sidebar lists the saved filters of the user and of the teams under "Saved". A pinned filter is a card on Overview with its count.</td><td>A user repeats the same list every day. A name is faster than six chips.</td></tr>
+</tbody></table>
+<p>The pages are responsive with a container query on <code>main</code>. When the drawer is open, <code>main</code> is narrower. The tables then drop their least important columns first: source, then team and fabric, then kind and VLAN.</p>
 
 <h2 id="colours">Colours and type</h2>
 <p>The UI and the design record follow the GSI design system. They share one set of tokens (<code>docs/design/mockups/assets/bembel.css</code> for the UI, <code>docs/assets/site.css</code> for the record), in light and in dark. Two rules apply:</p>
@@ -146,8 +177,8 @@
 <p>The UI asks the API what the user can do. The API returns, with each object, the list of allowed verbs for the current user (<code>allowed_actions: ["read","update","allocate"]</code>, <a href="access.html#allowed-actions">access.html#allowed-actions</a>). The UI uses it as follows:</p>
 <ul>
 <li>An allowed action is a normal button.</li>
-<li>An action that needs a change request keeps its label (for example "Delete…") and shows the note "Needs a change request". It opens the form with a reason field, and the confirm button of the form is "Request approval".</li>
-<li>A denied action is a disabled button with a "why not" text: the missing permission, the scope and the teams that can give it.</li>
+<li>An action that needs a change request keeps its label (for example "Delete…") and shows the note "Needs a change request". It opens the form with a reason field, and the confirm button of the form is "Request approval". A second user with <code>approver</code> in scope approves (<a href="access.html#changes">change requests</a>).</li>
+<li>A denied action is a disabled button (<code>aria-disabled</code>) with a "why not" text in its <code>title</code>. The text names the missing permission, the scope and the teams that can give it. A hidden button leaves the user to guess; the text tells the user whom to ask. Example: "Needs the permission record:create. Roles with it: dns-editor, network-admin, admin."</li>
 <li>The UI never hides an object that the user can read. It hides actions only on objects that the user cannot change at all, to keep the page calm.</li>
 </ul>
 <figure class="diagram">
@@ -168,8 +199,30 @@
 <figcaption>The UI shows what the user can do, what needs a second person and what is denied, with the reason.</figcaption>
 </figure>
 
+<h2 id="template">Page template and story moment</h2>
+<p>Each page chapter follows one template. Each page gets a screenshot of its mockup and the sections of this table.</p>
+<table>
+<thead><tr><th>Section</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td>Screenshot</td><td>The screenshot of the mockup of the page.</td></tr>
+<tr><td>Purpose</td><td>What the page is for.</td></tr>
+<tr><td>Layout</td><td>Where the parts sit.</td></tr>
+<tr><td>Parts and why</td><td>Each part with the reason for it.</td></tr>
+<tr><td>States</td><td>The states of the page.</td></tr>
+<tr><td>URL, API, CLI, keys</td><td>The URL, the API calls, the CLI command and the keys of the page.</td></tr>
+</tbody></table>
+<p>All screenshots show one moment of the story, with these values:</p>
+<dl class="facts">
+<dt>Moment</dt><dd>Wednesday 4 November 2026, 18:02.</dd>
+<dt>User</dt><dd><code>d.klein</code> with the roles <code>network-admin</code> (global) and <code>approver</code> (prefix <code>10.20.0.0/16</code>).</dd>
+<dt>VRF</dt><dd><code>global</code></dd>
+<dt>Exports</dt><dd>Bundle <code>b-7c41e0</code> is the newest bundle of the DNS and DHCP servers. Their agents run in shadow mode and the servers are in compat mode, because ONA is the writer until the freeze on 2026-11-09. Night 12 of 14 of the parallel run with ONA is over.</dd>
+<dt>Chip</dt><dd>The change request chip reads "1 to approve": cr-0042, which d.klein may approve. cr-0043 is a request of d.klein and does not count.</dd>
+<dt>FNT</dt><dd>The last FNT delta ran at 17:45. The hall is Hall 2, the floor is the ground floor, the row is Row A with racks A01, A02 and A03.</dd>
+</dl>
+
 <h2 id="pages">Pages</h2>
-<p>The mockups are high-fidelity HTML pages with the story data. Each page is in <a href="mockups/index.html">Mockups</a>. The table groups the pages by the chapter that describes them. The sidebar groups pages differently: Routing and address groups, Fabrics and VLANs are in the sidebar group Addressing.</p>
+<p>The mockups are high-fidelity, static HTML and CSS pages with the story data, in <code>docs/design/mockups/ui/</code>. Each page is in <a href="mockups/index.html">Mockups</a>. The table groups the pages by the chapter that describes them. The sidebar groups pages differently: Routing and address groups, Fabrics and VLANs are in the sidebar group Addressing.</p>
 <table>
 <thead><tr><th>Chapter group</th><th>Page</th><th>Mockup</th><th>Chapter</th></tr></thead>
 <tbody>
@@ -214,7 +267,7 @@
 <li>Tables show the key columns only (IP, name, state). A row opens the object page.</li>
 <li>The address map of a prefix becomes a list of ranges with counts.</li>
 <li>Read pages work fully. Edit dialogs work, but bulk actions and the rack editor are desktop only.</li>
-<li>The assistant and the help open as full-screen sheets.</li>
+<li>The assistant, the help and a drawer open as full-screen sheets.</li>
 </ul>
 <p>Pages with <code>data-shot-mobile</code> in the mockups also get a phone screenshot at 390 × 844 px.</p>
 </body>
