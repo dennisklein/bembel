@@ -40,6 +40,10 @@ jobs:
       - name: Check the glossary links of the mockups
         run: mise run docs:check
 
+      # Fails on a long sentence, paragraph or table cell, or on meta text.
+      - name: Check the text image of the pages
+        run: mise run docs:text
+
       # Only for a deploy: the artifact that deploy-pages publishes.
       - if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v6
