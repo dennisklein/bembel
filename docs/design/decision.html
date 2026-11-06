@@ -10,10 +10,10 @@
 <p class="lede">The organisation uses OpenNetAdmin (ONA) for addresses, DNS and DHCP. ONA works, but its model and its interface stop the next steps: IPv6, VRFs, InfiniBand, self-service for teams and automation from OpenStack and Kubernetes. This chapter records the problems, the requirements, the options and the decision to build bembel.</p>
 <ul class="keypoints">
 <li>ONA keeps its data integrity in PHP code. The database has no foreign keys, IPv6 is stored as a decimal number and permissions are global verbs without scope.</li>
-<li>The requirements are API first, OIDC access control with scopes, IPv4 and IPv6 as equals, InfiniBand and RoCEv2 fabrics, BIND and ISC dhcpd exports, assets from FNT Command, and a safe migration from ONA.</li>
+<li>Requirements: API first, scoped OIDC access, IPv4 and IPv6 as equals, InfiniBand and RoCEv2, BIND and ISC dhcpd exports, FNT Command assets, safe ONA migration.</li>
 <li>Five options were scored: NetBox, Nautobot, phpIPAM, a commercial DDI suite and a new tool. NetBox is the strongest product, but its DNS and DHCP story, its access model and its migration path fit worse than a focused new tool.</li>
 <li>The decision is a new tool, bembel: Go, PostgreSQL 18, SvelteKit, one binary, Apache-2.0.</li>
-<li>The name comes from the Hessian stoneware jug that holds the apple wine and pours it out, as an IPAM holds addresses and gives them out.</li>
+<li>The name is the Hessian stoneware jug that holds apple wine and pours it out, as an IPAM holds addresses and gives them out.</li>
 </ul>
 
 <h2 id="today">ONA today</h2>
@@ -90,19 +90,17 @@
 </table>
 
 <h2 id="options">Options</h2>
-<p>The research examined five options. Each option is described with what it gives and what it does not give for the requirements.</p>
-<dl class="facts">
-<dt>NetBox 4.7 (Apache-2.0)</dt>
-<dd>The reference product for IPAM and DCIM. Rich model: VRF, prefix, IP range, IP address, VLAN groups, racks, devices, cables, VMs. REST and read-only GraphQL. Object permissions with ORM filter constraints. OIDC through python-social-auth. DNS and DHCP are not in core: plugins exist, netbox-plugin-dns for zones and records, and netbox-plugin-dhcp (beta, Kea-oriented, NetBox 4.7+) for DHCP. Each plugin is a separate project on its own release train. No plugin writes an ISC dhcpd export with failover. Its own DCIM overlaps with FNT Command. A migration from ONA needs a custom script.</dd>
-<dt>Nautobot (Apache-2.0)</dt>
-<dd>A NetBox fork with jobs, a GraphQL API and apps. It shares the model and the permission design of NetBox. It adds a larger platform to run (Celery, Redis) and a second plugin ecosystem.</dd>
-<dt>phpIPAM (GPL-3.0)</dt>
-<dd>A PHP IPAM with sections, subnets and a simple API. It has a light DNS (PowerDNS) link. It has no fabric model, a weak API and the same PHP risk class as ONA.</dd>
-<dt>Commercial DDI (for example Infoblox, EfficientIP, BlueCat)</dt>
-<dd>Complete DNS, DHCP and IPAM with appliances and support. High license cost per object or per appliance. It replaces BIND and ISC dhcpd, which the organisation does not want to replace now. InfiniBand is not in its model.</dd>
-<dt>New tool (bembel)</dt>
-<dd>A focused IPAM, DNS and DHCP source of truth with exports to the existing servers. It mirrors assets from FNT Command and does not repeat DCIM. Its model, access control and migration are designed for this organisation. Cost: the development and the maintenance by the team.</dd>
-</dl>
+<p>The research examined five options against the requirements.</p>
+<table>
+<thead><tr><th>Option</th><th>Gives</th><th>Gaps and cost</th><th>Fit with the organisation</th></tr></thead>
+<tbody>
+<tr><td>NetBox 4.7 (Apache-2.0)</td><td>The reference product for IPAM and DCIM. Rich model: VRF, prefix, IP range, IP address, VLAN groups, racks, devices, cables, VMs. REST and read-only GraphQL. Object permissions with ORM filter constraints. OIDC through python-social-auth.</td><td>DNS and DHCP are not in core. Plugins exist: netbox-plugin-dns for zones and records, and netbox-plugin-dhcp (beta, Kea-oriented, NetBox 4.7+). Each plugin is a separate project on its own release train.</td><td>No plugin writes an ISC dhcpd export with failover. Its own DCIM overlaps with FNT Command. A migration from ONA needs a custom script.</td></tr>
+<tr><td>Nautobot (Apache-2.0)</td><td>A NetBox fork with jobs, a GraphQL API and apps.</td><td>A larger platform to run (Celery, Redis) and a second plugin ecosystem.</td><td>It shares the model and the permission design of NetBox.</td></tr>
+<tr><td>phpIPAM (GPL-3.0)</td><td>A PHP IPAM with sections, subnets and a simple API. A light DNS (PowerDNS) link.</td><td>No fabric model and a weak API.</td><td>The same PHP risk class as ONA.</td></tr>
+<tr><td>Commercial DDI (for example Infoblox, EfficientIP, BlueCat)</td><td>Complete DNS, DHCP and IPAM with appliances and support.</td><td>High license cost per object or per appliance. InfiniBand is not in its model.</td><td>It replaces BIND and ISC dhcpd, which the organisation does not want to replace now.</td></tr>
+<tr><td>New tool (bembel)</td><td>A focused IPAM, DNS and DHCP source of truth with exports to the existing servers. It mirrors assets from FNT Command and does not repeat DCIM.</td><td>Cost: the development and the maintenance by the team.</td><td>Its model, access control and migration are designed for this organisation.</td></tr>
+</tbody>
+</table>
 
 <h2 id="scores">Scores</h2>
 <p>Each option has a score from 0 (no) to 3 (complete) per requirement. A plugin or a script that the organisation must write counts as 1.</p>
@@ -123,7 +121,7 @@
 <tr><td><strong>Sum (max 33)</strong></td><td><strong>20</strong></td><td><strong>20</strong></td><td><strong>10</strong></td><td><strong>19</strong></td><td><strong>32</strong></td></tr>
 </tbody>
 </table>
-<p>bembel gets the full score by design, so the sum alone is not a fair argument. The table shows a more useful fact: NetBox is strong on the generic parts (R1, R3) and weak exactly where this organisation is special (R4 to R8). These weak parts are the core of the daily work of the network team.</p>
+<p>bembel gets the full score by design, so the sum alone is not a fair argument. A more useful fact: NetBox is strong on the generic parts (R1, R3) and weak where this organisation is special (R4 to R8). These parts are the core of the daily work of the network team.</p>
 <figure class="diagram">
 <svg viewBox="0 0 760 260" role="img" aria-labelledby="sc-t">
 <title id="sc-t">Score per option: bembel 32, NetBox 20, Nautobot 20, DDI 19, phpIPAM 10 of 33</title>
@@ -142,13 +140,17 @@
 <ol>
 <li><strong>The special parts are the daily work.</strong> InfiniBand partitions, RoCEv2 rails, BIND views and dhcpd failover are not edge cases here. In NetBox they are plugins or custom fields that the database does not check.</li>
 <li><strong>FNT Command stays the DCIM.</strong> NetBox would be a second DCIM next to FNT Command, with two sources for racks and devices. bembel only mirrors the assets and links hosts to devices.</li>
-<li><strong>The migration is the risk.</strong> A tool that knows the ONA model can import it, compare the exports byte by byte and switch over without a flag day (<a href="migration.html#parallel-run">migration.html#parallel-run</a>).</li>
+<li><strong>The migration is the risk.</strong> A tool that knows the ONA model can import it and compare the exports byte by byte. Then it switches over without a flag day (<a href="migration.html#parallel-run">parallel run</a>).</li>
 </ol>
 <aside class="callout rule">
 <p class="callout-title">Condition: stay small</p>
 <p>bembel is an IPAM, DNS and DHCP source of truth. It is not a DCIM, not a DNS server, not a DHCP server, not a firewall manager and not a config generator for routers. Each feature request outside this scope needs a decision record. The NetBox mapping (<a href="map-netbox.html">map-netbox.html</a>) keeps a way open: if bembel fails, its data exports to NetBox.</p>
 </aside>
-<p>The stack is decided in <a href="architecture.html#backend">architecture.html#backend</a>: Go instead of Rust, PostgreSQL 18, SvelteKit, mise. The requester proposed Rust. Go wins because the server, the CLI, the Kubernetes controllers, the Cluster API provider and the external-dns webhook share one language and one module, and because the other tools of the author (brig, sind, repoctl, radar) are Go.</p>
+<p>The stack is decided in <a href="architecture.html#backend">Architecture</a>: Go instead of Rust, PostgreSQL 18, SvelteKit, mise. The requester proposed Rust. Go wins for two reasons:</p>
+<ul>
+<li>The server, the CLI, the Kubernetes controllers, the Cluster API provider and the external-dns webhook share one language and one module.</li>
+<li>The other tools of the author (brig, sind, repoctl, radar) are Go.</li>
+</ul>
 
 <h2 id="name">Name</h2>
 <p>The requester asked for a name that plays with "IP" and with something funny from Hesse. The organisation is near Frankfurt. The shortlist:</p>
@@ -162,7 +164,17 @@
 <tr><td>torrens</td><td><code>torrens</code></td><td>The Torrens title: a land register where the entry is the title. A good source-of-truth picture, but not Hessian.</td><td>first working name</td></tr>
 </tbody>
 </table>
-<p>The names were free on crates.io, npm and PyPI on 2026-11-04. A trademark search and a Go module path check must follow before the first release. Writing rules: "bembel" in lower case in prose and in commands; "Bembel" only at the start of a sentence. Token prefix <code>bem_pat_</code>. Helm chart, container image and Debian package: <code>bembel</code>. The repository is <code>dennisklein/bembel</code>, and the design record is at <code>https://dennisklein.github.io/bembel/</code>.</p>
+<p>The names were free on crates.io, npm and PyPI on 2026-11-04. A trademark search and a Go module path check must follow before the first release.</p>
+<table>
+<thead><tr><th>Item</th><th>Rule or value</th></tr></thead>
+<tbody>
+<tr><td>Writing</td><td>"bembel" in lower case in prose and in commands. "Bembel" only at the start of a sentence.</td></tr>
+<tr><td>Token prefix</td><td><code>bem_pat_</code></td></tr>
+<tr><td>Helm chart, container image, Debian package</td><td><code>bembel</code></td></tr>
+<tr><td>Repository</td><td><code>dennisklein/bembel</code></td></tr>
+<tr><td>Design record</td><td><code>https://dennisklein.github.io/bembel/</code></td></tr>
+</tbody>
+</table>
 <figure class="diagram">
 <svg viewBox="0 0 760 220" role="img" aria-labelledby="nm-t">
 <title id="nm-t">The bembel picture: one jug, many glasses; one address space, many consumers</title>
@@ -196,7 +208,7 @@
 <tr><td>MPL-2.0</td><td>File-level copyleft.</td><td>Less common in the Go and Kubernetes ecosystem.</td></tr>
 </tbody>
 </table>
-<p>Third-party parts keep their licenses: the IBM Plex fonts and the Barlow fonts in the mockups use the SIL Open Font License 1.1, with their license files next to the fonts.</p>
+<p>Third-party parts keep their licenses. The IBM Plex fonts and the Barlow fonts in the mockups use the SIL Open Font License 1.1. Their license files are next to the fonts.</p>
 
 <h2 id="sources">Sources</h2>
 <ul>

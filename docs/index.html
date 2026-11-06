@@ -15,7 +15,8 @@
 <p class="hero-tagline">Hold the address space. Pour out addresses, names and networks.</p>
 </div>
 <div class="hero-side">
-<p class="hero-text">bembel is the source of truth for IP addresses, DNS and DHCP of a research and HPC organisation. It replaces OpenNetAdmin. It is API first: the web UI, the CLI, the OpenStack and Kubernetes integrations and the export agents use only the public REST API. Access control uses OIDC with roles and scopes. bembel models IPv4 and IPv6, VRFs, Ethernet, RoCEv2 and InfiniBand. It exports BIND zones, <code>dhcpd.conf</code> and OpenSM partitions, and shows the racks from FNT Command.</p>
+<p class="hero-text">bembel is the source of truth for IP addresses, DNS and DHCP of a research and HPC organisation. It replaces OpenNetAdmin. It is API first: the web UI, the CLI, the OpenStack and Kubernetes integrations and the export agents use only the public REST API.</p>
+<p class="hero-text">Access control uses OIDC with roles and scopes. bembel models IPv4 and IPv6, VRFs, Ethernet, RoCEv2 and InfiniBand. It exports BIND zones, <code>dhcpd.conf</code> and OpenSM partitions, and shows the racks from FNT Command.</p>
 <p class="hero-actions"><a class="button button-primary" href="design/decision.html">Read chapter 1</a><a class="button" href="design/mockups/index.html">Mockup gallery</a></p>
 </div>
 </div>
@@ -66,17 +67,17 @@
 <h2 id="key-decisions">Key decisions</h2>
 <p class="section-intro">The twelve decisions that shape the design. Each card links to the chapter that specifies it.</p>
 <ol class="decisions">
-<li><a class="decision" href="design/decision.html#choice"><span class="decision-text"><b>Build, not adopt:</b> NetBox is strong on the generic parts and weak on fabrics, DNS, DHCP, assets and the ONA migration, which are the daily work here.</span><span class="decision-link">Why a new tool</span></a></li>
-<li><a class="decision" href="design/architecture.html#backend"><span class="decision-text"><b>Go, PostgreSQL 18, SvelteKit:</b> one binary with an embedded static UI, one language for the server, the CLI and the Kubernetes parts.</span><span class="decision-link">Architecture and stack</span></a></li>
+<li><a class="decision" href="design/decision.html#choice"><span class="decision-text"><b>Build, not adopt:</b> NetBox is strong on the generic parts. It is weak on fabrics, DNS, DHCP, assets and the ONA migration: the daily work here.</span><span class="decision-link">Why a new tool</span></a></li>
+<li><a class="decision" href="design/architecture.html#backend"><span class="decision-text"><b>Go, PostgreSQL 18, SvelteKit:</b> one binary with an embedded static UI. One language serves the server, the CLI and the Kubernetes parts.</span><span class="decision-link">Architecture and stack</span></a></li>
 <li><a class="decision" href="design/architecture.html#api-first"><span class="decision-text"><b>Spec first:</b> <code>api/openapi.yaml</code> is the reviewed contract, and all clients are generated from it.</span><span class="decision-link">API first</span></a></li>
 <li><a class="decision" href="design/model.html#principles"><span class="decision-text"><b>The database enforces the model:</b> unique addresses per VRF, no overlapping siblings, typed links, history for each row.</span><span class="decision-link">Core model</span></a></li>
-<li><a class="decision" href="design/model.html#dns"><span class="decision-text"><b>Derive, do not copy:</b> A, AAAA and PTR records, reverse zones and DHCP reservations follow from addresses and interfaces.</span><span class="decision-link">DNS in the model</span></a></li>
+<li><a class="decision" href="design/model.html#dns"><span class="decision-text"><b>Derive, do not copy:</b> addresses and interfaces give A, AAAA and PTR records, reverse zones and DHCP reservations.</span><span class="decision-link">DNS in the model</span></a></li>
 <li><a class="decision" href="design/fabrics.html#kinds"><span class="decision-text"><b>Fabrics are first class:</b> Ethernet, RoCEv2 with QoS profiles and rails, InfiniBand with partitions and port GUIDs.</span><span class="decision-link">Fabrics</span></a></li>
-<li><a class="decision" href="design/access.html#scopes"><span class="decision-text"><b>Scoped bindings:</b> a role in a VRF, a prefix subtree, a zone subtree, a site, a team or a tag. Dangerous changes need a second person.</span><span class="decision-link">Access control</span></a></li>
+<li><a class="decision" href="design/access.html#scopes"><span class="decision-text"><b>Scoped bindings:</b> a role in a VRF, a prefix subtree, a zone subtree, a site, a team or a tag. Dangerous changes need a second user.</span><span class="decision-link">Access control</span></a></li>
 <li><a class="decision" href="design/dns.html#export"><span class="decision-text"><b>Export to the servers we have:</b> BIND and ISC dhcpd stay. Agents pull signed bundles, check them and reload.</span><span class="decision-link">DNS export</span></a></li>
 <li><a class="decision" href="design/migration.html#parallel-run"><span class="decision-text"><b>No flag day:</b> import ONA, diff the exports of both tools each night, switch over after 14 clean nights.</span><span class="decision-link">Migration</span></a></li>
 <li><a class="decision" href="design/assets.html#scope"><span class="decision-text"><b>FNT Command stays the DCIM:</b> bembel mirrors racks and devices read-only and links hosts to them.</span><span class="decision-link">Assets</span></a></li>
-<li><a class="decision" href="design/assistant.html#safety"><span class="decision-text"><b>A local assistant that cannot change data:</b> it reads with the permissions of the user and proposes drafts that the user applies.</span><span class="decision-link">Assistant</span></a></li>
+<li><a class="decision" href="design/assistant.html#safety"><span class="decision-text"><b>A local assistant that cannot change data:</b> it reads with the permissions of the user. It proposes drafts that the user applies.</span><span class="decision-link">Assistant</span></a></li>
 <li><a class="decision" href="design/operations.html#ha"><span class="decision-text"><b>Stateless and observable:</b> three replicas in Kubernetes, CloudNativePG, Prometheus metrics, JSON logs for Loki.</span><span class="decision-link">Operations</span></a></li>
 </ol>
 </section>

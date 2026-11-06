@@ -96,7 +96,12 @@
 </figure>
 <aside class="callout why">
 <p class="callout-title">Why spec first and not code first</p>
-<p>The API is the product for the integrations. A code-first framework (huma) makes the spec a side effect of Go types, and a refactor can change the contract without a review. With the spec first, each change to the contract is a diff in <code>api/openapi.yaml</code>. ogen makes typed handlers, so the server cannot return a shape that the spec does not allow. If ogen does not support a needed OpenAPI 3.1 feature, oapi-codegen with the strict server is the fallback.</p>
+<p>The API is the product for the integrations. A code-first framework (huma) makes the spec a side effect of Go types, so a refactor can change the contract without a review.</p>
+<ul>
+<li>With the spec first, each change to the contract is a diff in <code>api/openapi.yaml</code>.</li>
+<li>ogen makes typed handlers, so the server cannot return a shape that the spec does not allow.</li>
+<li>Fallback: if ogen does not support a needed OpenAPI 3.1 feature, oapi-codegen with the strict server takes its place.</li>
+</ul>
 </aside>
 
 <h2 id="backend">Backend: Go</h2>
@@ -117,7 +122,7 @@
 <p>The decision is Go 1.27. Rust is a good choice too, and nothing blocks it. The main libraries:</p>
 <dl class="facts">
 <dt>HTTP and API</dt><dd><code>net/http</code> ServeMux, ogen handlers, RFC 9457 problem details for errors.</dd>
-<dt>Database</dt><dd>pgx v5 (pool through PgBouncer; one direct connection per pod for <code>LISTEN</code>), sqlc for queries, goose for migrations (embedded in the binary, run on the direct connection).</dd>
+<dt>Database</dt><dd>pgx v5 (pool through PgBouncer; one direct connection per pod for <code>LISTEN</code>). sqlc for queries. goose for migrations (embedded in the binary, run on the direct connection).</dd>
 <dt>Identity</dt><dd><code>coreos/go-oidc</code> v3 and <code>golang.org/x/oauth2</code>.</dd>
 <dt>IP</dt><dd><code>net/netip</code>, <code>go4.org/netipx</code>.</dd>
 <dt>Logs, metrics, traces</dt><dd><code>log/slog</code> JSON, <code>prometheus/client_golang</code>, OpenTelemetry SDK.</dd>
@@ -147,7 +152,7 @@
 </aside>
 
 <h2 id="frontend">Frontend: SvelteKit</h2>
-<p>The web UI is SvelteKit 3 with Svelte 5 runes, TypeScript and <code>adapter-static</code>. The build output goes into the Go binary with <code>go:embed</code>. The server serves the files and the API on one origin, so the browser needs no CORS, and the session cookie is <code>SameSite=Lax</code>, with the <code>X-Bembel-Csrf</code> header and an Origin check on write calls (see <a href="access.html#login">Access control</a>).</p>
+<p>The web UI is SvelteKit 3 with Svelte 5 runes, TypeScript and <code>adapter-static</code>. The build output goes into the Go binary with <code>go:embed</code>. The server serves the files and the API on one origin, so the browser needs no CORS. The session cookie is <code>SameSite=Lax</code>, with the <code>X-Bembel-Csrf</code> header and an Origin check on write calls (see <a href="access.html#login">Access control</a>).</p>
 <ul>
 <li>API calls: <code>openapi-fetch</code> with types from <code>openapi-typescript</code>.</li>
 <li>Tables: TanStack Table (sort, filter, virtual rows for 40 000 hosts).</li>
@@ -157,11 +162,12 @@
 </ul>
 <aside class="callout why">
 <p class="callout-title">Why not server-rendered HTML with htmx</p>
-<p>repoctl and brig render HTML on the server. bembel has dense, editable tables, a rack view, a prefix tree with drag selection and an assistant panel with streaming. These parts need client-side state. A static SvelteKit build keeps the deployment simple (no Node.js on the server) and uses only the public API, which proves that the API is complete.</p>
+<p>repoctl and brig render HTML on the server. bembel has dense, editable tables, a rack view, a prefix tree with drag selection and an assistant panel with streaming. These parts need client-side state. A static SvelteKit build keeps the deployment simple (no Node.js on the server). It uses only the public API, which proves that the API is complete.</p>
 </aside>
 
 <h2 id="toolchain">Toolchain: mise</h2>
-<p><code>mise.toml</code> pins every tool. With the first code commit, <code>mise.lock</code> also pins the checksums. A new contributor runs <code>mise install</code> and has the same versions as CI. Today the repository holds only the design record, so <code>mise.toml</code> pins only Python and Node and has the <code>docs</code> tasks. The first code commit extends it as follows. Tools that mise fetches from GitHub releases get the <code>http:</code> backend with a checksum per platform, as in brig.</p>
+<p><code>mise.toml</code> pins every tool. With the first code commit, <code>mise.lock</code> also pins the checksums. A new contributor runs <code>mise install</code> and has the same versions as CI.</p>
+<p>Today the repository holds only the design record, so <code>mise.toml</code> pins only Python and Node and has the <code>docs</code> tasks. The first code commit extends it as follows. Tools that mise fetches from GitHub releases get the <code>http:</code> backend with a checksum per platform, as in brig.</p>
 <pre><code class="language-toml">[tools]
 go = "1.27.3"
 node = "26"
@@ -179,7 +185,12 @@ run = "python3 tools/site/build.py --strict --out _site"
 [tasks."docs:shots"]
 description = "Make the mockup screenshots"
 run = "node tools/site/shots.mjs"</code></pre>
-<p>The repository has tasks for the code from the first commit of code: <code>gen</code> (ogen, sqlc, openapi-typescript), <code>lint</code>, <code>test</code>, <code>build</code>, <code>dev</code> (server with a local PostgreSQL in a container and the Vite dev server).</p>
+<p>From the first commit of code, the repository has these tasks:</p>
+<ul>
+<li><code>gen</code>: ogen, sqlc, openapi-typescript.</li>
+<li><code>lint</code>, <code>test</code>, <code>build</code>.</li>
+<li><code>dev</code>: the server with a local PostgreSQL in a container, and the Vite dev server.</li>
+</ul>
 
 <h2 id="deployment">Deployment</h2>
 <p>bembel runs in Kubernetes with a Helm chart, or on a VM with the .deb or .rpm package and a systemd unit. The chapter <a href="operations.html">Operations</a> gives the details.</p>
