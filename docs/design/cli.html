@@ -10,41 +10,61 @@
 <p class="lede">The CLI <code>bembel</code> is the same binary as the server. This chapter lists its commands, flags and exit codes, and shows terminal examples.</p>
 
 <h2 id="commands">Commands</h2>
-<p>The CLI is the same binary as the server. It is a thin shell over the generated Go client. It adds output formats, the device login, shell completion and the help system (<a href="assistant.html#help">help</a>). Global flags: <code>--server</code>, <code>-o table|json|yaml|name</code>, <code>--no-color</code>, <code>--idempotency-key</code>. Settings come from <code>~/.config/bembel/cli.yaml</code>, then <code>BEMBEL_SERVER</code> and <code>BEMBEL_TOKEN</code>.</p>
+<p>The CLI is a thin shell over the generated Go client. It adds output formats, the device login, shell completion and the help system (<a href="assistant.html#help">help</a>).</p>
+
+<h3 id="cli-global">Global flags and settings</h3>
+<dl class="facts">
+<dt>Global flags</dt><dd><code>--server</code>, <code>-o table|json|yaml|name</code>, <code>--no-color</code>, <code>--idempotency-key</code></dd>
+<dt>Settings</dt><dd>The file <code>~/.config/bembel/cli.yaml</code>, then the variables <code>BEMBEL_SERVER</code> and <code>BEMBEL_TOKEN</code>.</dd>
+</dl>
+
+<h3 id="cli-list">Command list</h3>
 <table>
-<thead><tr><th>Command</th><th>Does</th></tr></thead>
+<thead><tr><th>Area</th><th>Command</th><th>Does</th></tr></thead>
 <tbody>
-<tr><td><code>bembel login</code> / <code>logout</code> / <code>whoami</code></td><td>Device login, forget tokens, show <code>/v1/me</code></td></tr>
-<tr><td><code>bembel prefix ls|show|create|edit|rm|free</code></td><td>Prefixes. <code>ls --vrf --within --depth --contains --status --tag</code></td></tr>
-<tr><td><code>bembel prefix allocate PARENT --length N --name NAME</code></td><td>Child prefix from a pool</td></tr>
-<tr><td><code>bembel address ls|show|allocate|confirm|renew|release|edit</code></td><td>Addresses and claims. <code>allocate --prefix CIDR --name FQDN --mac MAC --reservation</code>; <code>--claim-ttl 10m</code> makes a claim; <code>ls --status claimed</code> lists the claims</td></tr>
-<tr><td><code>bembel host ls|show|create|edit|rm</code></td><td>Hosts and interfaces. <code>--kind vm --runs-on hv-03</code> (<code>--kind</code> sets <code>host_kind</code>)</td></tr>
-<tr><td><code>bembel zone ls|show|create|rm</code></td><td>Zones. <code>rm</code> opens a change request</td></tr>
-<tr><td><code>bembel record ls|add|edit|rm ZONE</code></td><td>Manual records. <code>add ZONE ssh CNAME login --ttl 300</code></td></tr>
-<tr><td><code>bembel export bind|dhcpd|opensm|prefix-list|address-group|eduvpn</code></td><td>Build or fetch an export. See below.</td></tr>
-<tr><td><code>bembel apply -f FILE</code></td><td>Read a CSV or YAML file, show the plan, apply after a confirm (<a href="allocation.html#plan">plan and apply</a>). <code>--yes</code> skips the question, <code>--plan-only</code> stops after the plan.</td></tr>
-<tr><td><code>bembel address move</code>, <code>bembel interface move</code>, <code>bembel prefix renumber|resize|split</code></td><td>Moves (<a href="allocation.html#renumber">renumber</a>). <code>renumber</code> waits for <code>--confirm OPERATION</code> before phase 2.</td></tr>
-<tr><td><code>bembel record enable|disable ZONE NAME TYPE</code></td><td>Turn a manual record on or off without a delete</td></tr>
-<tr><td><code>bembel note add|ls|rm</code></td><td>Notes. <code>add host/cn-004 --level warn --pin "PSU 2 failed, ticket 8812"</code></td></tr>
-<tr><td><code>bembel observe import --format nmap-xml FILE</code></td><td>Send an nmap scan as observations</td></tr>
-<tr><td><code>bembel vni allocate|ls</code></td><td>VNIs from a VNI range</td></tr>
-<tr><td><code>bembel vpn profile ls|show</code>, <code>bembel vpn session ls --address IP --at TIME</code></td><td>VPN profiles and the session lookup (<a href="vpn-wifi.html#sessions">sessions</a>)</td></tr>
-<tr><td><code>bembel report NAME</code></td><td>Print a report as a table or CSV</td></tr>
-<tr><td><code>bembel admin break-glass --user NAME --reason TEXT</code></td><td>Emergency session when the IdP is down. Runs only on a server host (<a href="access.html#break-glass">break-glass</a>).</td></tr>
-<tr><td><code>bembel import ona|netbox</code></td><td>Import from a MariaDB dump, an ONA API or a NetBox API. <code>--dry-run</code> makes findings only.</td></tr>
-<tr><td><code>bembel sync fnt</code></td><td>Start and watch an FNT sync</td></tr>
-<tr><td><code>bembel vm prepare</code></td><td>Claim the addresses with <code>publish: true</code> (DNS, DHCP) and print cloud-init network config</td></tr>
+<tr><td rowspan="5">Session and access</td><td><code>bembel login</code> / <code>logout</code> / <code>whoami</code></td><td>Device login, forget tokens, show <code>/v1/me</code></td></tr>
 <tr><td><code>bembel access check [--explain] [--as SUBJECT] PERMISSION KIND/ID</code></td><td>Check a permission and explain it (<code>POST /v1/me/permissions:check</code>)</td></tr>
 <tr><td><code>bembel binding ls|create|delete</code>, <code>bembel token ls|create|revoke</code></td><td>Manage bindings and tokens</td></tr>
 <tr><td><code>bembel change ls|show|approve|reject|withdraw</code></td><td>Change requests</td></tr>
+<tr><td><code>bembel admin break-glass --user NAME --reason TEXT</code></td><td>Emergency session when the IdP is down. Runs only on a server host (<a href="access.html#break-glass">break-glass</a>).</td></tr>
+<tr><td rowspan="10">Addressing</td><td><code>bembel prefix ls|show|create|edit|rm|free</code></td><td>Prefixes. <code>ls --vrf --within --depth --contains --status --tag</code></td></tr>
+<tr><td><code>bembel prefix allocate PARENT --length N --name NAME</code></td><td>Child prefix from a pool</td></tr>
+<tr><td><code>bembel address ls|show|allocate|confirm|renew|release|edit</code></td><td>Addresses and claims. <code>allocate --prefix CIDR --name FQDN --mac MAC --reservation</code>; <code>--claim-ttl 10m</code> makes a claim; <code>ls --status claimed</code> lists the claims</td></tr>
+<tr><td><code>bembel host ls|show|create|edit|rm</code></td><td>Hosts and interfaces. <code>--kind vm --runs-on hv-03</code> (<code>--kind</code> sets <code>host_kind</code>)</td></tr>
+<tr><td><code>bembel address move</code>, <code>bembel interface move</code>, <code>bembel prefix renumber|resize|split</code></td><td>Moves (<a href="allocation.html#renumber">renumber</a>). <code>renumber</code> waits for <code>--confirm OPERATION</code> before phase 2.</td></tr>
+<tr><td><code>bembel vni allocate|ls</code></td><td>VNIs from a VNI range</td></tr>
+<tr><td><code>bembel apply -f FILE</code></td><td>Read a CSV or YAML file, show the plan, apply after a confirm (<a href="allocation.html#plan">plan and apply</a>). <code>--yes</code> skips the question, <code>--plan-only</code> stops after the plan.</td></tr>
+<tr><td><code>bembel observe import --format nmap-xml FILE</code></td><td>Send an nmap scan as observations</td></tr>
+<tr><td><code>bembel note add|ls|rm</code></td><td>Notes. <code>add host/cn-004 --level warn --pin "PSU 2 failed, ticket 8812"</code></td></tr>
+<tr><td><code>bembel report NAME</code></td><td>Print a report as a table or CSV</td></tr>
+<tr><td rowspan="4">DNS and exports</td><td><code>bembel zone ls|show|create|rm</code></td><td>Zones. <code>rm</code> opens a change request</td></tr>
+<tr><td><code>bembel record ls|add|edit|rm ZONE</code></td><td>Manual records. <code>add ZONE ssh CNAME login --ttl 300</code></td></tr>
+<tr><td><code>bembel record enable|disable ZONE NAME TYPE</code></td><td>Turn a manual record on or off without a delete</td></tr>
+<tr><td><code>bembel export bind|dhcpd|opensm|prefix-list|address-group|eduvpn</code></td><td>Build or fetch an export. Example: <a href="#cli-examples">terminal examples</a>.</td></tr>
+<tr><td rowspan="6">Integrations</td><td><code>bembel vpn profile ls|show</code>, <code>bembel vpn session ls --address IP --at TIME</code></td><td>VPN profiles and the session lookup (<a href="vpn-wifi.html#sessions">sessions</a>)</td></tr>
+<tr><td><code>bembel import ona|netbox</code></td><td>Import from a MariaDB dump, an ONA API or a NetBox API. <code>--dry-run</code> makes findings only.</td></tr>
+<tr><td><code>bembel sync fnt</code></td><td>Start and watch an FNT sync</td></tr>
+<tr><td><code>bembel sync openstack push-pools os-prod</code> (with the driver)</td><td>Update the Neutron subnet pools from the bembel prefix pools (<a href="openstack.html#driver-pools">driver pools</a>)</td></tr>
+<tr><td><code>bembel vm prepare</code></td><td>Claim the addresses with <code>publish: true</code> (DNS, DHCP) and print cloud-init network config</td></tr>
 <tr><td><code>bembel events tail</code></td><td>Follow the SSE stream</td></tr>
-<tr><td><code>bembel api METHOD PATH [-d JSON]</code></td><td>Raw call with auth, like <code>gh api</code></td></tr>
+<tr><td rowspan="5">Tools and server</td><td><code>bembel api METHOD PATH [-d JSON]</code></td><td>Raw call with auth, like <code>gh api</code></td></tr>
 <tr><td><code>bembel help [TOPIC]</code></td><td>Help topics (same text as the UI help pane)</td></tr>
 <tr><td><code>bembel mcp</code></td><td>MCP server for agents, over stdio or HTTP</td></tr>
 <tr><td><code>bembel serve</code></td><td>Run the server: API, UI, workers (<a href="architecture.html#deployment">deployment</a>)</td></tr>
 <tr><td><code>bembel migrate up|down|status</code></td><td>Database migrations (goose, embedded)</td></tr>
 </tbody></table>
-<p>Exit codes: 0 ok, 1 error from the server, 2 usage, 3 not found, 4 denied, 5 held for approval (the change request id is printed).</p>
+
+<h3 id="cli-exit">Exit codes</h3>
+<table class="compact">
+<thead><tr><th>Code</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>ok</td></tr>
+<tr><td>1</td><td>error from the server</td></tr>
+<tr><td>2</td><td>usage</td></tr>
+<tr><td>3</td><td>not found</td></tr>
+<tr><td>4</td><td>denied</td></tr>
+<tr><td>5</td><td>held for approval (the change request id is printed)</td></tr>
+</tbody></table>
 
 <h2 id="cli-examples">Terminal examples</h2>
 <p>Login, then look at the tree of Hall 2.</p>
