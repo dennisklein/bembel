@@ -15,7 +15,7 @@
   <li>The agent compares the sessions with the admin API of eduVPN every 5 minutes. A lost event becomes a corrected session, not a hole in the record.</li>
   <li>A VPN session answers "who had 10.40.0.17 at 14:02". It is personal data: it needs <code>vpn-session:read</code>, bembel keeps it 90 days, and each read is in the audit log.</li>
   <li>A plain WireGuard server uses normal allocation. Each peer has an address and an interface with its public key. bembel never holds a private key.</li>
-  <li>Wi-Fi needs no new kind: one VLAN and one subnet for each SSID, a DHCP scope for the clients, and hosts of the kind <code>appliance</code> for the access points. A sync mirrors the access points and the active clients from ExtremeCloud IQ, read only.</li>
+  <li>Wi-Fi needs no new kind. Each SSID has one VLAN, one subnet and a DHCP scope for the clients. The access points are hosts of the kind <code>appliance</code>. A sync mirrors the access points and the active clients from ExtremeCloud IQ, read only.</li>
 </ul>
 
 <h2 id="scope">Scope</h2>
@@ -34,7 +34,8 @@
 </table>
 
 <h2 id="eduvpn">eduVPN</h2>
-<p>eduVPN is the VPN server of many universities and research sites. One portal (<code>vpn-user-portal</code>) has profiles. Each profile runs on one or more nodes, with WireGuard, OpenVPN or both. eduVPN gives each client an address from the range of its profile, node and protocol, and takes it back at the disconnect. bembel does not allocate these addresses. It gives eduVPN the ranges and records what eduVPN did.</p>
+<p>eduVPN is the VPN server of many universities and research sites. One portal (<code>vpn-user-portal</code>) has profiles. Each profile runs on one or more nodes, with WireGuard, OpenVPN or both.</p>
+<p>eduVPN gives each client an address from the range of its profile, node and protocol, and takes it back at the disconnect. bembel does not allocate these addresses. It gives eduVPN the ranges and records what eduVPN did.</p>
 <figure class="diagram wide">
 <svg viewBox="0 -10 960 410" role="img" aria-labelledby="vpn-flow-t">
 <title id="vpn-flow-t">eduVPN and bembel: the ranges go to the node, the sessions come back</title>
@@ -96,7 +97,8 @@
 </tbody>
 </table>
 <ul>
-<li>A VPN profile has a <code>kind</code> (<code>eduvpn</code> or <code>wireguard</code>), a <code>profile_id</code> (the eduVPN <code>profileId</code>), a display name, the host name of the service, the DNS settings and an owner team. Its pools are a list of (node host, protocol, subnet).</li>
+<li>A VPN profile has a <code>kind</code> (<code>eduvpn</code> or <code>wireguard</code>) and a <code>profile_id</code> (the eduVPN <code>profileId</code>). It also has a display name, the host name of the service, the DNS settings and an owner team.</li>
+<li>The pools of a profile are a list of (node host, protocol, subnet).</li>
 <li>The eduVPN rule is that the ranges of all profiles and nodes are unique and do not overlap. bembel tests the same rule in the database: a pool is a subnet, and subnets do not overlap.</li>
 <li>The route list can name prefixes or an address group. bembel resolves the group at each export, so a new HPC subnet goes to the <code>hpc</code> profile without an edit of the profile.</li>
 <li>The DNS servers come from the resolvers of the site (10.20.2.53 and 10.20.2.54). A change of a resolver changes the profile export.</li>
@@ -144,7 +146,7 @@ eduvpn:
   reconcile_interval: 5m</code></pre>
 
 <h3 id="reconcile">Reconcile</h3>
-<p>A hook event can get lost: the agent was down, or the node restarted during a disconnect. Every 5 minutes the agent reads <code>connection_list</code> of the eduVPN admin API with <code>show_all</code> (eduVPN 3.10 or later), and compares it with the open sessions of its node in bembel.</p>
+<p>A hook event can get lost: the agent was down, or the node restarted during a disconnect. Every 5 minutes the agent reads <code>connection_list</code> of the eduVPN admin API with <code>show_all</code> (eduVPN 3.10 or later). It compares the list with the open sessions of its node in bembel.</p>
 <table class="compact">
 <thead><tr><th>Case</th><th>Result</th></tr></thead>
 <tbody>
@@ -163,7 +165,7 @@ PROFILE  NODE    PROTO      USER                 IPV4         IPV6              
 staff    vpn-01  wireguard  m.huber@example.org  10.40.0.17   2001:db8:4200:400::11   2026-11-04 13:41  2026-11-04 15:07
 1 session (read recorded in the audit log)</pre>
 <ul>
-<li>The question has an exact answer, because eduVPN gives an address to one client at a time, and a session has a start and an end. An overlap of two sessions with the same address is a finding <code>vpn.session-overlap</code>.</li>
+<li>The question has an exact answer. eduVPN gives an address to one client at a time, and a session has a start and an end. An overlap of two sessions with the same address is a finding <code>vpn.session-overlap</code>.</li>
 <li><code>vpn-session:read</code> is not in <code>*:read</code> and not in <code>viewer</code>. The story gives it to the group <code>kc:netsec</code> with global scope. <code>network-admin</code> also holds it.</li>
 <li>Each read of a session is an audit event with the filter of the query. The audit log thus shows who looked up whom.</li>
 <li>The reaper deletes a session 90 days after its end (<code>vpn.session_retention</code>). This value must agree with the data protection rules of the site. bembel keeps no session longer, also not in the history tables.</li>
@@ -186,7 +188,7 @@ AllowedIPs = 10.40.32.11/32, 2001:db8:4200:420::11/128, 172.16.40.0/22</code></p
 <p>The route of a site behind a peer (here <code>172.16.40.0/22</code>) comes from a static route of the peer in bembel (<a href="routing.html#routes">routing</a>).</p>
 
 <h2 id="wifi">Wi-Fi</h2>
-<p>A Wi-Fi network needs these values: one VLAN and one subnet for each SSID, a DHCP scope with a large pool and a short lease time for the clients, the management addresses of the access points, and their names. All of them are objects of the model already.</p>
+<p>A Wi-Fi network needs no new object kind. Everything in the table below is an object of the model already.</p>
 <figure class="diagram wide">
 <svg viewBox="0 0 960 330" role="img" aria-labelledby="wifi-t">
 <title id="wifi-t">The data of a Wi-Fi network in bembel, and the mirror of ExtremeCloud IQ</title>
@@ -232,14 +234,14 @@ AllowedIPs = 10.40.32.11/32, 2001:db8:4200:420::11/128, 172.16.40.0/22</code></p
 <thead><tr><th>Value</th><th>Object in bembel</th><th>Rule</th></tr></thead>
 <tbody>
 <tr><td>SSID</td><td>Tag <code>ssid=eduroam</code> on the VLAN</td><td>The SSID name only. Its settings stay in the Wi-Fi management.</td></tr>
-<tr><td>Client network</td><td>VLAN, subnet pair, DHCP scope</td><td>A pool of the purpose <code>dhcp-pool</code> covers most of the subnet. A Wi-Fi subnet is large and its use changes during the day. The utilisation alert uses the peak of the day.</td></tr>
+<tr><td>Client network</td><td>VLAN, subnet pair, DHCP scope</td><td>A pool of the purpose <code>dhcp-pool</code> covers most of the subnet, and the lease time is short. A Wi-Fi subnet is large and its use changes during the day. The utilisation alert uses the peak of the day.</td></tr>
 <tr><td>Access point</td><td>Host of the kind <code>appliance</code>, tag <code>role=wifi-ap</code></td><td>One interface with the MAC, one address in <code>wlan-mgmt</code> with a DHCP reservation, the name <code>ap-h2-01.example.org</code></td></tr>
 <tr><td>Place</td><td>Asset link to an FNT room or floor</td><td>An access point is often not a rack device. The link to the room is enough.</td></tr>
 <tr><td>RADIUS clients</td><td>Address group <code>wlan-ap</code> (tag <code>role=wifi-ap</code>)</td><td>The feed <code>/v1/feeds/wlan-ap?format=text</code> gives the client list of the RADIUS server.</td></tr>
 <tr><td>Guest isolation</td><td>Address group <code>wlan-guest</code></td><td>The firewall feed blocks the guest subnet from the internal prefixes.</td></tr>
 </tbody>
 </table>
-<p>The lease ingestion of the DHCP servers gives the active Wi-Fi clients, and the pool utilisation with its alert works as for any other scope (<a href="dhcp.html#leases">DHCP leases</a>).</p>
+<p>The lease ingestion of the DHCP servers gives the active Wi-Fi clients. The pool utilisation and its alert work as for any other scope (<a href="dhcp.html#leases">DHCP leases</a>).</p>
 
 <h3 id="xiq">ExtremeCloud IQ mirror</h3>
 <p>The access points of the site are managed in ExtremeCloud IQ (XIQ). XIQ is the cloud product that was earlier named HiveManager NG. The old local HiveManager Classic is no longer sold, and its developer API is closed. bembel uses only the public XIQ REST API at <code>api.extremecloudiq.com</code> with an API token.</p>

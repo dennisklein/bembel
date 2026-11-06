@@ -19,7 +19,7 @@
 </ul>
 
 <h2 id="summary">Summary</h2>
-<p>OpenStack has its own address management. Neutron stores networks, subnets, ports and floating IPs in its own database. A campus IPAM that does not know this data cannot find an overlap, a double use or a stale address. bembel joins the two worlds in two modes.</p>
+<p>Neutron stores networks, subnets, ports and floating IPs in its own database. A campus IPAM that does not know this data cannot find an overlap, a double use or a stale address. bembel joins the two worlds in two modes.</p>
 <ol class="steps">
   <li>The sync reads. bembel shows every OpenStack subnet, port and floating IP next to the campus data, and reports conflicts. Nothing in OpenStack changes.</li>
   <li>The driver writes. Neutron asks bembel for each address and each subnet. bembel becomes the one place that decides which address is free.</li>
@@ -84,7 +84,12 @@
 </figure>
 
 <h2 id="sync">Read-only sync</h2>
-<p>The sync worker is a job of the bembel binary. A source <code>os-prod</code> in the bembel config starts it. The worker needs no change in OpenStack, except one Keystone application credential. It polls the REST APIs and writes <em>observed</em> objects. An observed object has <code>source=openstack:os-prod</code>, an <code>external_ref</code> and <code>managed_by=openstack-sync</code>. A user cannot edit it in bembel; the cloud is the owner. The worker runs inside bembel as the built-in subject <code>system:sync-os-prod</code> (<a href="#keystone-svc">Service identities</a>).</p>
+<p>The sync worker is a job of the bembel binary. A source <code>os-prod</code> in the bembel config starts it. The worker needs no change in OpenStack, except one Keystone application credential. It polls the REST APIs and writes <em>observed</em> objects.</p>
+<ul>
+  <li>An observed object has <code>source=openstack:os-prod</code>, an <code>external_ref</code> and <code>managed_by=openstack-sync</code>.</li>
+  <li>A user cannot edit it in bembel; the cloud is the owner.</li>
+  <li>The worker runs inside bembel as the built-in subject <code>system:sync-os-prod</code> (<a href="#keystone-svc">Service identities</a>).</li>
+</ul>
 
 <h3 id="sync-config">Source configuration</h3>
 <pre><code class="language-yaml"># /etc/bembel/bembel.yaml (excerpt)
@@ -132,15 +137,36 @@ sources:
 <h3 id="sync-loop">Poll, reconcile, conflicts</h3>
 <ol class="steps">
   <li>Every <code>interval</code> the worker lists ports, subnets and floating IPs. It compares <code>revision_number</code> with the stored value. It upserts only the objects that changed.</li>
-  <li>Every <code>full_every</code> the worker compares the complete lists with the stored set. An object that is missing in two full lists becomes <code>deprecated</code>. After the grace time bembel releases it. A prefix with <code>managed_by=openstack-driver</code> whose Neutron subnet is missing from two full lists is deleted, with the audit reason <code>subnet-leaked</code> (<a href="#driver-map">driver</a>).</li>
+  <li>Every <code>full_every</code> the worker compares the complete lists with the stored set. An object that is missing in two full lists becomes <code>deprecated</code>. After the grace time bembel releases it.</li>
+  <li>bembel deletes a prefix with <code>managed_by=openstack-driver</code> when its Neutron subnet is missing from two full lists. The audit reason is <code>subnet-leaked</code> (<a href="#driver-map">driver</a>).</li>
   <li>For each new or changed subnet the worker checks the prefix tree. An overlap with a prefix that a user manages becomes a finding, not a prefix. The prefix that the driver made for the same Neutron subnet (same <code>external_ref</code>) is not an overlap.</li>
-  <li>The worker writes the run result: counts, duration and errors. A successful run sets <code>last_success_at</code> and <code>last_success_started_at</code> on the source row; the reaper reads the second (<a href="#driver-rollback">rollback</a>). The metrics <code>bembel_sync_run_duration_seconds</code> and <code>bembel_sync_runs_total{result="error"}</code> carry the label <code>source="os-prod"</code>.</li>
+  <li>The worker writes the run result: counts, duration and errors.</li>
+  <li>A successful run sets <code>last_success_at</code> and <code>last_success_started_at</code> on the source row. The reaper reads the second (<a href="#driver-rollback">rollback</a>).</li>
+  <li>The metrics <code>bembel_sync_run_duration_seconds</code> and <code>bembel_sync_runs_total{result="error"}</code> carry the label <code>source="os-prod"</code>.</li>
 </ol>
 <aside class="callout why">
 <p class="callout-title">Why poll first</p>
 <p>Neutron sends notifications through RabbitMQ (<code>port.create.end</code>, <code>floatingip.update.end</code>). A consumer needs access to the broker, and a notification is lost when no queue exists. Polling needs only the REST API. It lags by minutes, which is enough for a view. An optional notification consumer reduces the lag. The full list stays the source of truth.</p>
 </aside>
-<p>Tenant networks can overlap. Two projects can both use <code>192.168.1.0/24</code>. The database does not allow two equal prefixes in one VRF. A subnet with an address scope goes to the VRF of that scope. A subnet from a subnet pool without an address scope goes to one VRF per pool (<code>os-pool-&lt;first 8 hex of the pool id&gt;</code>). Any other tenant subnet goes to one VRF per network, for example <code>os-net-7d41c2e9</code> for a network of the project physics-lab. This is the VRF rule list in the config above; the first match wins. The worker or the driver creates a missing VRF with <code>POST /v1/vrfs</code> and the header <code>If-None-Match: *</code>; 412 means that it exists already. Every VRF and prefix that the driver or the sync creates carries the tag <code>os_cloud=os-prod</code>. A subnet that still overlaps inside one VRF is stored as a finding with the raw data. The finding list shows both owners.</p>
+
+<h3 id="sync-vrf">VRF of a subnet</h3>
+<p>Tenant networks can overlap. Two projects can both use <code>192.168.1.0/24</code>. The database does not allow two equal prefixes in one VRF.</p>
+<table class="compact">
+<thead><tr><th>Subnet</th><th>VRF</th></tr></thead>
+<tbody>
+<tr><td>A subnet with an address scope</td><td>The VRF of that scope.</td></tr>
+<tr><td>A subnet from a subnet pool without an address scope</td><td>One VRF per pool: <code>os-pool-&lt;first 8 hex of the pool id&gt;</code>.</td></tr>
+<tr><td>Any other tenant subnet</td><td>One VRF per network, for example <code>os-net-7d41c2e9</code> for a network of the project physics-lab.</td></tr>
+</tbody>
+</table>
+<ul>
+  <li>These are the VRF rules in the config above; the first match wins.</li>
+  <li>The worker or the driver creates a missing VRF with <code>POST /v1/vrfs</code> and the header <code>If-None-Match: *</code>. 412 means that the VRF exists already.</li>
+  <li>Every VRF and prefix that the driver or the sync creates carries the tag <code>os_cloud=os-prod</code>.</li>
+  <li>A subnet that still overlaps inside one VRF is stored as a finding with the raw data. The finding list shows both owners.</li>
+</ul>
+
+<h3 id="sync-findings">Findings</h3>
 <table class="compact">
 <thead><tr><th>Finding</th><th>Meaning</th><th>Typical fix</th></tr></thead>
 <tbody>
@@ -176,11 +202,11 @@ read_timeout = 5
 retries = 2</code></pre>
 
 <h3 id="driver-map">Interface and API calls</h3>
-<p>The driver implements three abstract classes. The table shows each method and the call it makes. <code>{pool}</code> is the bembel prefix pool that belongs to the Neutron subnet pool.</p>
+<p>The driver implements three abstract classes. <code>{pool}</code> is the bembel prefix pool that belongs to the Neutron subnet pool.</p>
 <table>
 <thead><tr><th>Class and method</th><th>bembel call</th><th>Note</th></tr></thead>
 <tbody>
-<tr><td><code>Pool.allocate_subnet(AnySubnetRequest)</code></td><td><code>POST /v1/prefixes/{pool}/prefixes:allocate</code> with <code>length</code>, <code>name</code>, <code>prefix_kind: subnet</code>, <code>status: active</code> and <code>external_ref: os-prod:subnet:&lt;SubnetRequest.subnet_id&gt;</code></td><td>The next free prefix of the pool. Neutron sets the subnet UUID before this call, so <code>get_subnet</code> works at once. No claim: see the note below.</td></tr>
+<tr><td><code>Pool.allocate_subnet(AnySubnetRequest)</code></td><td><code>POST /v1/prefixes/{pool}/prefixes:allocate</code> with <code>length</code>, <code>name</code>, <code>prefix_kind: subnet</code>, <code>status: active</code> and <code>external_ref: os-prod:subnet:&lt;SubnetRequest.subnet_id&gt;</code></td><td>The next free prefix of the pool. Neutron sets the subnet UUID before this call, so <code>get_subnet</code> works at once. No claim: a prefix is never a claim (see below).</td></tr>
 <tr><td><code>Pool.allocate_subnet(SpecificSubnetRequest)</code></td><td><code>POST /v1/prefixes</code> with <code>cidr</code>, <code>vrf</code>, <code>prefix_kind: subnet</code>, <code>status: active</code> and <code>external_ref</code></td><td>409 <code>prefix.overlap</code> when the CIDR overlaps. The driver raises <code>SubnetAllocationError</code>.</td></tr>
 <tr><td><code>Pool.get_subnet(id)</code></td><td><code>GET /v1/prefixes?external_ref=os-prod:subnet:{id}</code></td><td>Returns a <code>BembelSubnet</code> object. No state in Python.</td></tr>
 <tr><td><code>Pool.update_subnet(request)</code></td><td><code>PATCH /v1/prefixes/{id}</code>; the allocation pools through <code>/v1/ranges</code></td><td>The gateway is a prefix field. Each allocation pool is a range with purpose <code>static</code>, named <code>os-pool-&lt;n&gt;</code>.</td></tr>
@@ -197,7 +223,12 @@ retries = 2</code></pre>
 <tr><td><code>SubnetGroup.allocate(request)</code></td><td>the calls of <code>Subnet.allocate</code>, in order</td><td>Returns the first address that works, with its subnet id.</td></tr>
 </tbody>
 </table>
-<p>The server sets <code>source: openstack:os-prod</code> and <code>managed_by: openstack-driver</code> on every prefix and address that the driver creates. Neutron does not confirm a subnet, so a prefix is never a claim. On a save failure Neutron calls <code>remove_subnet</code> (best effort). The sync deletes a prefix with <code>managed_by=openstack-driver</code> whose Neutron subnet is missing from two full lists, with the audit reason <code>subnet-leaked</code>.</p>
+<ul>
+  <li>The server sets <code>source: openstack:os-prod</code> and <code>managed_by: openstack-driver</code> on every prefix and address that the driver creates.</li>
+  <li>Neutron does not confirm a subnet, so a prefix is never a claim.</li>
+  <li>On a save failure Neutron calls <code>remove_subnet</code> (best effort).</li>
+  <li>The sync deletes a prefix that a failed save left behind (<a href="#sync-loop">Poll, reconcile, conflicts</a>).</li>
+</ul>
 
 <h3 id="driver-key">Idempotency key</h3>
 <p>Neutron can call <code>allocate</code> more than once for one port. A database deadlock retries the whole request. The driver must give the same address for the same logical request. It derives the key like this:</p>
@@ -207,7 +238,12 @@ cloud       "os-prod"
 subnet_id   the Neutron subnet UUID
 request_id  context.request_id of the API request; a retry keeps it
 n           index of the allocate call inside this request (0, 1, ...)</code></pre>
-<p>The driver sends the key as the header <code>Idempotency-Key</code>. bembel stores it for 24 h with the result. The same key gives the same response (<a href="api.html#idempotency">API idempotency</a>), but only while the address that the first call created is live. A release or the reaper deletes the key row together with the address, so a later call with the same key runs as new (<a href="allocation.html#idempotency">Allocation</a>). The driver also sends <code>external_ref=os-prod:port-claim:&lt;key prefix&gt;</code>. The sync replaces it with the real port id.</p>
+<ul>
+  <li>The driver sends the key as the header <code>Idempotency-Key</code>.</li>
+  <li>bembel stores the key for 24 h with the result. The same key gives the same response (<a href="api.html#idempotency">API idempotency</a>), but only while the address that the first call created is live.</li>
+  <li>A release or the reaper deletes the key row together with the address, so a later call with the same key runs as new (<a href="allocation.html#idempotency">Allocation</a>).</li>
+  <li>The driver also sends <code>external_ref=os-prod:port-claim:&lt;key prefix&gt;</code>. The sync replaces it with the real port id.</li>
+</ul>
 <aside class="callout warn">
 <p class="callout-title">Not verified</p>
 <p>The request object does not carry the port id. This design assumes that the request id of the oslo context reaches the driver unchanged on a deadlock retry. A test against Neutron master must prove it. If it fails, the package carries a small patch that passes the port id in the request.</p>
@@ -274,7 +310,14 @@ n           index of the allocate call inside this request (0, 1, ...)</code></p
   <li>The retry decorator of Neutron runs the create again with the same <code>request_id</code>, so the driver sends the same key.</li>
   <li>The key row is gone, so the allocate runs as new. bembel makes a new claim.</li>
 </ol>
-<p>If the release was lost in step 2, the key row still exists, and bembel replays the address that is still claimed. In both cases the port gets a live claim. An integration test injects <code>DBDeadlock</code> into <code>_store_ip_allocation</code>; the final port address must be claimed or allocated in bembel.</p>
+<table class="compact">
+<thead><tr><th>Release in step 2</th><th>Key row</th><th>Result in step 4</th></tr></thead>
+<tbody>
+<tr><td>Arrives</td><td>Gone</td><td>The allocate runs as new. bembel makes a new claim.</td></tr>
+<tr><td>Lost</td><td>Still exists</td><td>bembel replays the address that is still claimed.</td></tr>
+</tbody>
+</table>
+<p>In both cases the port gets a live claim. An integration test injects <code>DBDeadlock</code> into <code>_store_ip_allocation</code>; the final port address must be claimed or allocated in bembel.</p>
 <figure class="diagram wide explainer">
 <svg viewBox="0 0 1000 380" role="img" aria-labelledby="os-leak-t"><title id="os-leak-t">A failed port create leaves a claim, and the reaper releases it</title>
 <text class="t-title" x="16" y="26" data-f="0">10:02:00 · allocate</text>
@@ -333,12 +376,20 @@ n           index of the allocate call inside this request (0, 1, ...)</code></p
 </figure>
 <p>These rules keep the state clean:</p>
 <ul>
-<li>A claim is an address whose status is <code>claimed</code>, with <code>expires_at</code>. The default TTL is 10 minutes, at least three poll intervals (3 × 2 min), so a healthy sync confirms a good claim first. If the sync is late or down, the reaper holds the expired claim until a successful poll that started after the expiry has not found the port. The source row of os-prod has <code>confirms_claims</code> set, so the reaper applies this rule (<a href="allocation.html#reaper">Allocation</a>). Use a <code>claim_ttl</code> of at least 3 × the source <code>interval</code>.</li>
-<li>The sync confirms a claim when it finds a port with that address in that subnet. The status becomes <code>allocated</code>. The key is replaced by the port id in <code>external_ref</code>.</li>
-<li>A <code>deallocate</code> call for an unknown address answers success. A repeated call does nothing.</li>
-<li>A retry with the same key gets the same claim while it is live. After a release or an expiry the key row is gone, and the retry gets a new claim.</li>
-<li>The sync also finds the opposite case: a port with an address that bembel does not know. It makes the address with <code>source=openstack:os-prod</code> and writes the finding <code>os.address-in-managed-subnet</code> if the subnet is managed.</li>
+<li>A claim is an address whose status is <code>claimed</code>, with <code>expires_at</code>. The default TTL is 10 minutes, at least three poll intervals (3 × 2 min), so a healthy sync confirms a good claim first.</li>
+<li>If the sync is late or down, the reaper holds the expired claim. It waits for a successful poll that started after the expiry and did not find the port.</li>
+<li>The source row of os-prod has <code>confirms_claims</code> set, so the reaper applies this rule (<a href="allocation.html#reaper">Allocation</a>). Use a <code>claim_ttl</code> of at least 3 × the source <code>interval</code>.</li>
 </ul>
+<table class="compact">
+<thead><tr><th>Event</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>The sync finds a port with the address of a claim in that subnet</td><td>The status becomes <code>allocated</code>. The key is replaced by the port id in <code>external_ref</code>.</td></tr>
+<tr><td>A <code>deallocate</code> call for an unknown address</td><td>Success. A repeated call does nothing.</td></tr>
+<tr><td>A retry with the same key while the claim is live</td><td>The same claim.</td></tr>
+<tr><td>A retry with the same key after a release or an expiry</td><td>The key row is gone, so the retry gets a new claim.</td></tr>
+<tr><td>The sync finds a port with an address that bembel does not know</td><td>The sync makes the address with <code>source=openstack:os-prod</code>. It writes the finding <code>os.address-in-managed-subnet</code> if the subnet is managed.</td></tr>
+</tbody>
+</table>
 
 <h3 id="driver-fail">Timeouts and fail-closed behaviour</h3>
 <p>The driver is on the API path of Neutron. Each call holds a Neutron worker and often a database lock. The driver must be fast and must stop early.</p>
@@ -367,20 +418,31 @@ n           index of the allocate call inside this request (0, 1, ...)</code></p
 <tr><td>Subnet pool <code>tenant-v4</code></td><td>Container prefix with the pool flag, in the VRF of its scope</td><td><code>10.200.0.0/16</code>, owner team <code>openstack</code>, <code>external_ref=os-prod:subnetpool:&lt;uuid&gt;</code></td></tr>
 <tr><td>Subnet from a pool</td><td>Child prefix, <code>prefix_kind</code> <code>subnet</code>, from <code>prefixes:allocate</code></td><td><code>10.200.14.0/24</code>, owner = team of the project</td></tr>
 <tr><td>External network, floating IPs</td><td>Subnet in VRF <code>global</code> below the container <code>10.30.0.0/16</code> "OpenStack"</td><td><code>10.30.128.0/20</code> for floating IPs</td></tr>
-<tr><td>Subnet without a pool</td><td>Prefix in the VRF per network (see <a href="#sync-loop">above</a>)</td><td><code>os-net-7d41c2e9: 192.168.1.0/24</code> (project physics-lab)</td></tr>
+<tr><td>Subnet without a pool</td><td>Prefix in the VRF per network (see <a href="#sync-vrf">VRF of a subnet</a>)</td><td><code>os-net-7d41c2e9: 192.168.1.0/24</code> (project physics-lab)</td></tr>
 </tbody>
 </table>
-<p>Neutron keeps its own copy of the pool prefixes in its database. The driver cannot hide it. The rule is: bembel owns the prefix tree and Neutron mirrors it. An operator changes the pool in bembel; the sync then updates the Neutron subnet pool through a small admin command (<code>bembel sync openstack push-pools os-prod</code>, with the driver). A change of the pool in Neutron by hand is a finding.</p>
+<aside class="callout rule">
+<p class="callout-title">Rule</p>
+<p>bembel owns the prefix tree and Neutron mirrors it. Neutron keeps its own copy of the pool prefixes in its database, and the driver cannot hide it.</p>
+<ul>
+  <li>An operator changes the pool in bembel.</li>
+  <li>The sync then updates the Neutron subnet pool through a small admin command: <code>bembel sync openstack push-pools os-prod</code> (with the driver).</li>
+  <li>A change of the pool in Neutron by hand is a finding.</li>
+</ul>
+</aside>
+
+<h3 id="driver-cutover">Cut-over</h3>
 <p>Neutron allows only one IPAM driver for the whole cloud. It is not a setting per subnet pool. To start without risk, the site first runs the driver on a test cloud <code>os-test</code>. A cut-over on <code>os-prod</code> needs the existing allocations in bembel. The sync already has them as observed objects. The switch is one step for the whole cloud:</p>
 <ol class="steps">
   <li>Adopt every os-prod subnet and fixed IP first, and check each one against Neutron while the internal driver runs.</li>
-  <li>In one maintenance window, with a freeze on port and subnet changes, set <code>managed_by=openstack-driver</code> on all of them in one bembel transaction.</li>
+  <li>In one maintenance window, freeze the port and subnet changes.</li>
+  <li>Set <code>managed_by=openstack-driver</code> on all of them in one bembel transaction.</li>
   <li>Set <code>ipam_driver = bembel</code> on all neutron-server nodes and restart them.</li>
 </ol>
 <p>Rollback: set <code>ipam_driver = internal</code> again, and run a script that rebuilds <code>ipamsubnets</code>, <code>ipamallocationpools</code> and <code>ipamallocations</code> from <code>subnets</code>, <code>ipallocationpools</code> and <code>ipallocations</code>.</p>
 
 <h2 id="keystone">Keystone and identity</h2>
-<p>Keystone and bembel are two clients of one IdP. Both trust the Keycloak realm <code>main</code> at <code>https://id.example.org/realms/main</code>. A user logs in once and has the same groups in both systems.</p>
+<p>Keystone and bembel are two clients of one IdP. Both trust the Keycloak realm <code>main</code> at <code>https://id.example.org/realms/main</code>. A user logs in once and has the same groups in both systems. The rules of roles and issuers are in <a href="access.html#issuers">Access control</a>.</p>
 <h3 id="keystone-fed">Federation</h3>
 <ul>
 <li>Keystone is a service provider with Apache <code>mod_auth_openidc</code>. The attribute <code>remote_id_attribute = HTTP_OIDC_ISS</code> names the IdP.</li>
@@ -402,18 +464,41 @@ n           index of the allocate call inside this request (0, 1, ...)</code></p
 <table>
 <thead><tr><th>Service</th><th>How it logs in</th><th>Binding in bembel</th></tr></thead>
 <tbody>
-<tr><td><code>kc:svc-neutron-os-prod</code> (driver; Keycloak client <code>svc-neutron-os-prod</code>)</td><td>OIDC client credentials at Keycloak. Short token, 5 min.</td><td>The custom role <code>neutron-ipam</code> (<a href="access.html#roles">Access control</a>): <code>vrf:read create</code>, <code>prefix:read create update delete allocate</code>, <code>range:read create update delete</code>, <code>address:read create update allocate release</code>, <code>claim:create release</code>. Three bindings, each with this role: <code>vrf=os-provider</code>; <code>prefix=10.30.0.0/16</code> (VRF <code>global</code>); <code>tag=os_cloud=os-prod</code>.</td></tr>
-<tr><td><code>system:sync-os-prod</code> (sync worker, runs in bembel under <code>job_lease</code> <code>sync:os-prod</code>)</td><td>Built-in subject, no login.</td><td>Fixed permission set <code>integration-sync</code>: <code>vrf:read create update</code>, <code>prefix:read create update delete</code>, <code>range:read create update delete</code>, <code>address:read create update delete release</code>, <code>claim:confirm release</code>, <code>host:read create update delete</code>, <code>interface:read create update delete</code>, <code>source:sync</code>. It is limited to <code>vrf=os-provider</code>, <code>prefix=10.30.0.0/16</code> (VRF <code>global</code>) and <code>tag=os_cloud=os-prod</code>.</td></tr>
+<tr><td><code>kc:svc-neutron-os-prod</code> (driver; Keycloak client <code>svc-neutron-os-prod</code>)</td><td>OIDC client credentials at Keycloak. Short token, 5 min.</td><td>The custom role <code>neutron-ipam</code> (<a href="access.html#roles">Access control</a>). Three bindings, each with this role, one for each scope below.</td></tr>
+<tr><td><code>system:sync-os-prod</code> (sync worker, runs in bembel under <code>job_lease</code> <code>sync:os-prod</code>)</td><td>Built-in subject, no login.</td><td>The fixed permission set <code>integration-sync</code>, limited to the same three scopes.</td></tr>
 <tr><td>sync worker to Keystone</td><td>An application credential with role <code>reader</code>. It is restricted and has an expiry date.</td><td>Not applicable.</td></tr>
 </tbody>
 </table>
 <pre><code class="language-bash">openstack application credential create bembel-sync \
   --role reader --expiration 2027-11-04T00:00:00 \
   --description "bembel read-only sync"</code></pre>
-<p>The source row <code>openstack:os-prod</code> names these two subjects: <code>kc:svc-neutron-os-prod</code> and <code>system:sync-os-prod</code>. The source guard (<a href="access.html#source-guard">Access control</a>) refuses a write to an object of this source by any other subject with 409 <code>resource.managed</code>. Inside the source, <code>managed_by</code> separates the objects of the driver (<code>openstack-driver</code>) from the objects of the sync (<code>openstack-sync</code>).</p>
+<p>The three scopes of both subjects:</p>
+<ul>
+  <li><code>vrf=os-provider</code></li>
+  <li><code>prefix=10.30.0.0/16</code> (VRF <code>global</code>)</li>
+  <li><code>tag=os_cloud=os-prod</code></li>
+</ul>
+<table class="compact">
+<thead><tr><th>Resource</th><th><code>neutron-ipam</code> (driver)</th><th><code>integration-sync</code> (sync worker)</th></tr></thead>
+<tbody>
+<tr><td><code>vrf</code></td><td>read create</td><td>read create update</td></tr>
+<tr><td><code>prefix</code></td><td>read create update delete allocate</td><td>read create update delete</td></tr>
+<tr><td><code>range</code></td><td>read create update delete</td><td>read create update delete</td></tr>
+<tr><td><code>address</code></td><td>read create update allocate release</td><td>read create update delete release</td></tr>
+<tr><td><code>claim</code></td><td>create release</td><td>confirm release</td></tr>
+<tr><td><code>host</code></td><td>none</td><td>read create update delete</td></tr>
+<tr><td><code>interface</code></td><td>none</td><td>read create update delete</td></tr>
+<tr><td><code>source</code></td><td>none</td><td>sync</td></tr>
+</tbody>
+</table>
+<pre><code class="language-ini"># /etc/neutron/neutron.conf on os-prod (required)
+[designate]
+allow_reverse_dns_lookup = False</code></pre>
+<p>The source row <code>openstack:os-prod</code> names two subjects: <code>kc:svc-neutron-os-prod</code> and <code>system:sync-os-prod</code>. The source guard (<a href="access.html#source-guard">Access control</a>) refuses a write to an object of this source by any other subject with 409 <code>resource.managed</code>. Inside the source, <code>managed_by</code> separates the objects of the driver (<code>openstack-driver</code>) from the objects of the sync (<code>openstack-sync</code>).</p>
 <aside class="callout warn">
 <p class="callout-title">Open point</p>
-<p>An application credential is scoped to one project. The default Neutron policy lists the ports of all projects only for an admin. The design needs a policy override that gives the role <code>reader</code> a read-only view on ports, subnets and floating IPs of all projects. The exact rule names are not verified. The operator checks them against the release in use.</p>
+<p>An application credential is scoped to one project. The default Neutron policy lists the ports of all projects only for an admin.</p>
+<p>The design needs a policy override that gives the role <code>reader</code> a read-only view on ports, subnets and floating IPs of all projects. The exact rule names are not verified. The operator checks them against the release in use.</p>
 </aside>
 <p>The audit event of an allocation through the driver has: the subject <code>kc:svc-neutron-os-prod</code>, the claim key, the asserted project and the Neutron request id. This is how a later question "who made 10.30.4.17" finds the Neutron request.</p>
 
@@ -439,13 +524,10 @@ n           index of the allocate call inside this request (0, 1, ...)</code></p
 <tr><td><code>tenant-a.os.example.org</code> and all zones below <code>os.example.org</code></td><td>Designate</td><td>The Designate name servers <code>ns-os1</code>, <code>ns-os2</code></td></tr>
 </tbody>
 </table>
-<pre><code class="language-ini"># /etc/neutron/neutron.conf on os-prod (required)
-[designate]
-allow_reverse_dns_lookup = False</code></pre>
 <ul>
 <li>Neutron publishes the A and AAAA record of a floating IP in the <code>dns_domain</code> of the tenant network (for example <code>tenant-a.os.example.org.</code>), which Designate owns. The external network has no <code>dns_domain</code>, so Neutron writes no forward record into a campus zone.</li>
 <li>Reverse records are switched off on the Neutron side. A tenant who needs a PTR for a floating IP sets the name in bembel. A Designate zone that covers a managed prefix is the finding <code>os.reverse-zone-overlap</code>.</li>
-<li>A floating IP gets its campus name from bembel: the address in the external subnet has the FQDN <code>fip-0c41.os.example.org</code> or the name that a user sets in the UI. The sync never writes DNS.</li>
+<li>A floating IP gets its campus name from bembel. The address in the external subnet has the FQDN <code>fip-0c41.os.example.org</code> or the name that a user sets in the UI. The sync never writes DNS.</li>
 <li>Each zone has the field <code>managed_by</code>. A zone below <code>os.example.org</code> that the sync finds in Designate is stored as a read-only zone with <code>managed_by=openstack-sync</code>. A user cannot add a record to it in bembel.</li>
 <li>bembel refuses to make a zone with the same name as a Designate zone that it knows. This is the rule "no two writers per zone".</li>
 </ul>
@@ -462,7 +544,7 @@ allow_reverse_dns_lookup = False</code></pre>
   <li><strong>Pre-reserved addresses.</strong> bembel can set <code>fixed_ips</code> on the Neutron port for a given MAC. The result: a node always gets the same address in the provisioning network. This is optional.</li>
 </ol>
 <p>The node field <code>driver_info.redfish_address</code> (or <code>ipmi_address</code>) names the BMC. The worker looks it up in the VRF <code>oob</code>. If the address is <code>172.16.4.44</code> and the host <code>cn-004</code> has the interface <code>bmc</code> with that address, the worker links node and host. If the address is not in a managed subnet, it writes a finding.</p>
-<p>An Ironic port with <code>local_link_connection</code> data (switch id and port id from LLDP) feeds the asset link between the interface and the switch port from FNT Command. The match order stays: serial, asset tag, MAC, host name. A conflict goes to the review list.</p>
+<p>An Ironic port with <code>local_link_connection</code> data (switch id and port id from LLDP) feeds the asset link between the interface and the switch port. The asset data comes from FNT Command. The match order stays: serial, asset tag, MAC, host name. A conflict goes to the review list.</p>
 <p>Standalone Ironic (no Neutron, external DHCP) is a special case. There bembel is the DHCP source: the dhcpd export has a reservation for each Ironic MAC that has an address (<a href="dhcp.html#export">ISC dhcpd export</a>).</p>
 
 <h2 id="parts">Parts and dependencies</h2>
@@ -472,7 +554,7 @@ allow_reverse_dns_lookup = False</code></pre>
 <tr><td>Model</td><td>External refs, observed objects, <code>managed_by</code>, VM host kind, claims with TTL, idempotency keys, multi-issuer OIDC</td><td>Core API (<a href="api.html">REST API</a>)</td><td>Low</td></tr>
 <tr><td>Sync</td><td>Poll Neutron, Ironic and Keystone. Observed subnets, ports, floating IPs, VM hosts. Findings for overlaps</td><td>The model, the source worker</td><td>Low. Read-only.</td></tr>
 <tr><td>Driver on a test cloud</td><td><code>networking-bembel</code> on <code>os-test</code>. Test with Tempest and a load test</td><td>A stable sync, the reaper</td><td>Medium. Fail closed.</td></tr>
-<tr><td>Driver on <code>os-prod</code></td><td>One cut-over per cloud in a maintenance window (<a href="#driver-pools">above</a>). Subnet pools mirror bembel pools. <code>[designate] allow_reverse_dns_lookup = False</code> in neutron.conf</td><td>The driver passes on the test cloud, HA bembel</td><td>High. On the API path.</td></tr>
+<tr><td>Driver on <code>os-prod</code></td><td>One cut-over per cloud in a maintenance window (<a href="#driver-cutover">Cut-over</a>). Subnet pools mirror bembel pools. <code>[designate] allow_reverse_dns_lookup = False</code> in neutron.conf</td><td>The driver passes on the test cloud, HA bembel</td><td>High. On the API path.</td></tr>
 <tr><td>Optional parts</td><td>Notification consumer, Designate read, Ironic reservations, Keystone dynamic mapping</td><td>The sync; the driver for Ironic reservations</td><td>Low</td></tr>
 </tbody>
 </table>
