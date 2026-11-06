@@ -7,10 +7,45 @@
 </head>
 <body>
 <h1>Exports and delivery</h1>
-<p class="lede">bembel builds a signed bundle for each server. bembel-agent on the server pulls it, checks it and installs it. This chapter specifies the delivery for the BIND, dhcpd and OpenSM exports.</p>
+<p class="lede">bembel builds a signed bundle for each server. bembel-agent on the server pulls it, checks it and installs it. This chapter specifies the delivery for the BIND, dhcpd and OpenSM exports, with BIND as the worked example.</p>
 
 <h2 id="delivery">Delivery</h2>
-<p>A DNS server pulls its bundle. The pull works through firewalls, and the server keeps its last good state when bembel is down. A bundle has three parts: <code>bundle.tar</code>, <code>manifest.json</code> and a detached signature <code>manifest.json.sig</code> (Ed25519 over <code>manifest.json</code>). The manifest holds the sha256 of <code>bundle.tar</code> and of every file, so the signature covers all parts. The key pair belongs to the installation. The server config names the signing key (<code>exports.signing: {key_id: bembel-2026-1, key_file: /run/secrets/export-signing-key}</code>). The agent config lists the trusted public keys (<code>trust.keys: [{id: bembel-2026-1, public_key_file: /etc/bembel/keys/bembel-2026-1.pub}]</code>), up to two during a key rotation (<a href="operations.html#security">operations.html#security</a>).</p>
+<p>A server pulls its bundle. The pull works through firewalls, and the server keeps its last good state when bembel is down.</p>
+
+<h3 id="bundle">Bundle and trust</h3>
+<table class="compact">
+<thead><tr><th>Part</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td><code>bundle.tar</code></td><td>The files for the server (<a href="dns.html#files">files in a BIND bundle</a>).</td></tr>
+<tr><td><code>manifest.json</code></td><td>The kind, the server, the snapshot, the <code>key_id</code>, and the sha256 of <code>bundle.tar</code> and of every file (<a href="dns.html#manifest">BIND manifest</a>).</td></tr>
+<tr><td><code>manifest.json.sig</code></td><td>A detached signature, Ed25519 over <code>manifest.json</code>.</td></tr>
+</tbody>
+</table>
+<p>The manifest holds the hashes, so the signature covers all parts. The agent trusts only the signed manifest. The key pair belongs to the installation.</p>
+<table class="compact">
+<thead><tr><th>Side</th><th>Setting</th></tr></thead>
+<tbody>
+<tr><td>bembel server</td><td><code>exports.signing: {key_id: bembel-2026-1, key_file: /run/secrets/export-signing-key}</code></td></tr>
+<tr><td>Agent</td><td><code>trust.keys: [{id: bembel-2026-1, public_key_file: /etc/bembel/keys/bembel-2026-1.pub}]</code></td></tr>
+</tbody>
+</table>
+<aside class="callout rule">
+<p class="callout-title">Trusted keys</p>
+<p>The agent config lists the trusted public keys: up to two during a key rotation (<a href="operations.html#security">operations.html#security</a>).</p>
+</aside>
+<p>The signature protects the transport and the ingress path. It does not protect against a compromised bembel pod that holds the signing key.</p>
+
+<h3 id="kinds">Agents and kinds</h3>
+<p>The BIND, dhcpd and OpenSM agents use the same pipeline. They differ in the identity, the pull path and the action after the swap.</p>
+<table class="compact">
+<thead><tr><th>Kind</th><th>Pull path or target</th><th>Identity in the manifest</th><th>After the swap</th></tr></thead>
+<tbody>
+<tr><td><code>bind</code></td><td><code>GET /v1/dns-servers/ns1.example.org/bundle</code></td><td><code>kind</code> <code>bind</code>, <code>server</code> <code>ns1.example.org</code></td><td><code>rndc reconfig</code> and <code>rndc reload</code> (<a href="#bind">BIND on the server</a>)</td></tr>
+<tr><td><code>dhcpd</code></td><td><code>GET /v1/dhcp-servers/dhcp1.example.org/bundle</code></td><td><code>kind</code> <code>dhcpd</code>, <code>server</code> <code>dhcp1.example.org</code></td><td>A restart, after a restart ticket (<a href="dhcp.html#delivery">dhcp.html#delivery</a>)</td></tr>
+<tr><td><code>opensm</code></td><td>The subnet manager object of the fabric, <code>/v1/fabrics/kestrel-ib/subnet-managers</code></td><td><code>kind</code> <code>opensm</code>, <code>server</code> the name of its subnet manager</td><td>A hang-up signal to OpenSM, which reads the file again (<a href="fabrics.html#opensm">fabrics.html#opensm</a>)</td></tr>
+</tbody>
+</table>
+<p>The agent never pulls <code>/v1/exports/{id}/artifact</code>. That path is for human download and preview.</p>
 
 <figure class="diagram wide">
 <svg viewBox="0 0 960 520" role="img" aria-labelledby="fig-seq-t">
@@ -50,25 +85,46 @@
 <figcaption>The agent pulls, verifies, checks, installs, swaps and reloads. If a step fails, the symlink stays, the agent reports the error, and named keeps its zones.</figcaption>
 </figure>
 
-<p>The agent works in these steps.</p>
+<h3 id="steps">Agent steps</h3>
+<p>The agent works in these steps. The example values are those of ns1.</p>
 <ol>
-  <li>Every 60 seconds (with jitter) the agent calls <code>GET /v1/dns-servers/ns1.example.org/bundle</code> with the header <code>If-None-Match</code> and its bearer token. bembel answers <code>304</code> when the ETag is the same.</li>
-  <li>On <code>200</code> the agent saves the three parts and makes these checks, in this order:
-    <ol>
-      <li>The signature of <code>manifest.json</code> is valid with the trusted key that <code>key_id</code> names.</li>
-      <li><code>kind</code> and <code>server</code> are equal to the identity in the agent config (<code>bind</code>, <code>ns1.example.org</code>). A bundle for another server is refused.</li>
-      <li><code>snapshot</code> is not lower than the snapshot of the current release. An older bundle is refused. A pin is a newer bundle (see below), so this rule has no exception. Only the local command <code>bembel-agent rollback</code> overrides it.</li>
-      <li>The sha256 of <code>bundle.tar</code> and of each file is equal to the manifest.</li>
-    </ol>
-    A refused bundle changes nothing: the current release stays. The agent reports <code>deploy.bundle-rejected</code> and counts it in <code>bembel_agent_bundle_rejected_total{reason}</code> (<code>signature</code>, <code>identity</code>, <code>rollback</code>, <code>hash</code>).</li>
-  <li>The agent unpacks the bundle to <code>/var/lib/bembel-agent/bind/releases/b-9e2d41/</code>. It writes a check copy to <code>releases/b-9e2d41/.check/</code>. In the check copy, the path prefix <code>/var/lib/bembel-agent/bind/current/</code> becomes <code>/var/lib/bembel-agent/bind/releases/b-9e2d41/</code>, and <code>/var/lib/bind/bembel/</code> becomes <code>/var/lib/bembel-agent/bind/releases/b-9e2d41/zones/</code>. The agent verifies that each rewritten file differs only in these prefixes. Then it runs <code>named-checkconf -z</code> on a copy of <code>/etc/bind/named.conf</code> whose bembel include points at <code>releases/b-9e2d41/.check/named.conf.bembel</code>, and <code>named-checkzone</code> with the flags of step 2 of the checks on <code>releases/b-9e2d41/zones/&lt;view&gt;/&lt;zone&gt;.zone</code> for each changed zone. So the checks read the new release, not the release behind <code>current</code>. The sandbox on the bembel side does the same with its unpack directory.</li>
-  <li>If the checks pass, the agent installs each changed zone file into <code>/var/lib/bind/bembel/&lt;view&gt;/</code>: it writes a temporary file in the same directory, calls fsync and renames it with <code>rename(2)</code>. Then it replaces the symlink <code>current</code> with a new symlink through <code>rename(2)</code>. Both steps are atomic.</li>
-  <li>The agent compares the manifest with the one of the last release. If <code>config_changed</code> is true, it runs <code>rndc reconfig</code>. For each zone with <code>changed: true</code> it runs <code>rndc reload ZONE in VIEW</code>.</li>
-  <li>The agent sends the status to <code>POST /v1/dns-servers/ns1.example.org/deployments</code>: the bundle id, the time, the result per zone and the serial that <code>named</code> answers.</li>
-  <li>The agent keeps the last 5 releases and the release <code>ona-final</code>, and removes older ones.</li>
+  <li><strong>Pull.</strong> Every 60 seconds (with jitter) the agent calls <code>GET /v1/dns-servers/ns1.example.org/bundle</code>. The request has the header <code>If-None-Match</code> and the bearer token of the agent. bembel answers <code>304</code> when the ETag is the same (<a href="api.html#concurrency">api.html#concurrency</a>).</li>
+  <li><strong>Verify.</strong> On <code>200</code> the agent saves the three parts and makes the checks of the <a href="#verify">verify table</a>, in this order.</li>
+  <li><strong>Unpack and check.</strong> The agent unpacks the bundle to <code>/var/lib/bembel-agent/bind/releases/b-9e2d41/</code> and runs the checks of the kind on a check copy (<a href="#bind">BIND</a>).</li>
+  <li><strong>Install and swap.</strong> If the checks pass, the agent installs the changed files. Then it replaces the symlink <code>current</code> with a new symlink through <code>rename(2)</code>. Both steps are atomic.</li>
+  <li><strong>Reload.</strong> The agent makes the service read the new files (the last column of the <a href="#kinds">kinds table</a>).</li>
+  <li><strong>Report.</strong> The agent sends the status to <code>POST /v1/dns-servers/ns1.example.org/deployments</code>: the bundle id, the time and the result.</li>
+  <li><strong>Prune.</strong> The agent keeps the last 5 releases and the release <code>ona-final</code>, and removes older ones.</li>
 </ol>
 
-<p>The signature protects the transport and the ingress path. It does not protect against a compromised bembel pod that holds the signing key. The same checks apply to the dhcpd and OpenSM bundles (<a href="dhcp.html#delivery">dhcp.html#delivery</a>, <a href="fabrics.html#opensm">fabrics.html#opensm</a>).</p>
+<h3 id="verify">Checks of the agent</h3>
+<p>The agent makes these checks in this order. They are the same for the BIND, dhcpd and OpenSM kinds. A refused bundle changes nothing: the current release stays. The agent reports <code>deploy.bundle-rejected</code> and counts it in <code>bembel_agent_bundle_rejected_total{reason}</code>.</p>
+<table class="compact">
+<thead><tr><th>Order</th><th>Check</th><th>Reason label</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>The signature of <code>manifest.json</code> is valid with the trusted key that <code>key_id</code> names.</td><td><code>signature</code></td></tr>
+<tr><td>2</td><td><code>kind</code> and <code>server</code> are equal to the identity in the agent config (<code>bind</code>, <code>ns1.example.org</code>). A bundle for another server is refused.</td><td><code>identity</code></td></tr>
+<tr><td>3</td><td><code>snapshot</code> is not lower than the snapshot of the current release. An older bundle is refused.</td><td><code>rollback</code></td></tr>
+<tr><td>4</td><td>The sha256 of <code>bundle.tar</code> and of each file is equal to the manifest.</td><td><code>hash</code></td></tr>
+</tbody>
+</table>
+<p>A pin is a newer bundle (<a href="#rollback">rollback and pin</a>), so check 3 has no exception. Only the local command <code>bembel-agent rollback</code> overrides it.</p>
+
+<h3 id="bind">BIND on the server</h3>
+<p>For the BIND kind, the agent does these things in steps 3 to 6.</p>
+<table class="compact">
+<thead><tr><th>Step</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td>3 Check copy</td><td>The agent writes a check copy to <code>releases/b-9e2d41/.check/</code>. In the copy, the prefix <code>/var/lib/bembel-agent/bind/current/</code> becomes <code>/var/lib/bembel-agent/bind/releases/b-9e2d41/</code>.</td></tr>
+<tr><td>3 Check copy</td><td>The prefix <code>/var/lib/bind/bembel/</code> becomes <code>/var/lib/bembel-agent/bind/releases/b-9e2d41/zones/</code>. The agent verifies that each rewritten file differs only in these prefixes.</td></tr>
+<tr><td>3 Config</td><td><code>named-checkconf -z</code> runs on a copy of <code>/etc/bind/named.conf</code>. The bembel include of the copy points at <code>releases/b-9e2d41/.check/named.conf.bembel</code>.</td></tr>
+<tr><td>3 Zones</td><td><code>named-checkzone</code> runs with the flags of step 2 of the <a href="dns.html#checks">export checks</a> on <code>releases/b-9e2d41/zones/&lt;view&gt;/&lt;zone&gt;.zone</code> for each changed zone.</td></tr>
+<tr><td>3 Result</td><td>The checks read the new release, not the release behind <code>current</code>. The sandbox on the bembel side does the same with its unpack directory.</td></tr>
+<tr><td>4 Zone files</td><td>For each changed zone, the agent writes a temporary file in <code>/var/lib/bind/bembel/&lt;view&gt;/</code>, calls fsync and renames it with <code>rename(2)</code>. This is atomic.</td></tr>
+<tr><td>5 Reload</td><td>The agent compares the manifest with the one of the last release. If <code>config_changed</code> is true, it runs <code>rndc reconfig</code>. For each zone with <code>changed: true</code> it runs <code>rndc reload ZONE in VIEW</code>.</td></tr>
+<tr><td>6 Report</td><td>The status holds the result per zone and the serial that <code>named</code> answers.</td></tr>
+</tbody>
+</table>
 
 <h3 id="paths">Paths on the server</h3>
 <table class="compact">
@@ -81,18 +137,45 @@
 <tr><td><code>/etc/bind/bembel-tsig.conf</code></td><td>The administrator. The TSIG keys of the views.</td></tr>
 </tbody>
 </table>
-<p>named never needs write access to <code>/var/lib/bembel-agent</code>. On Debian and Ubuntu the AppArmor profile of named allows <code>/var/lib/bind/**</code> already. The agent adds the line <code>/var/lib/bembel-agent/bind/** r,</code> to <code>/etc/apparmor.d/local/usr.sbin.named</code>. With SELinux the config tree has the type <code>named_conf_t</code> and the zone directory <code>named_cache_t</code>. A pre-flight check at agent start makes sure that the user <code>bind</code> can write <code>/var/lib/bind/bembel/</code> and read the config tree. A failure is a deployment error.</p>
+<ul>
+  <li>named never needs write access to <code>/var/lib/bembel-agent</code>.</li>
+  <li>On Debian and Ubuntu the AppArmor profile of named allows <code>/var/lib/bind/**</code> already. The agent adds the line <code>/var/lib/bembel-agent/bind/** r,</code> to <code>/etc/apparmor.d/local/usr.sbin.named</code>.</li>
+  <li>With SELinux the config tree has the type <code>named_conf_t</code> and the zone directory <code>named_cache_t</code>.</li>
+  <li>A pre-flight check at agent start makes sure that the user <code>bind</code> can write <code>/var/lib/bind/bembel/</code> and read the config tree. A failure is a deployment error.</li>
+</ul>
 
 <h3 id="rollback">Rollback and pin</h3>
 <p>If a step from 3 to 5 fails, the agent keeps the old symlink (or swaps back to the previous release) and reports the error. This swap back during a failed apply, before any reload, needs no new serial, because no server saw the new serial.</p>
-<p>All other rollbacks bring the content back and move the serial up. An older release holds lower serials. If ns1 loaded them, ns2 and ns3 would keep the newer, bad data with no time limit: the zone does not expire, because ns1 still answers their SOA queries.</p>
+<aside class="callout why">
+<p class="callout-title">Why other rollbacks move the serial up</p>
+<p>An older release holds lower serials. If ns1 loaded them, ns2 and ns3 would keep the newer, bad data with no time limit. The zone does not expire, because ns1 still answers their SOA queries. So all other rollbacks bring the content back and move the serial up.</p>
+</aside>
+<table class="compact">
+<thead><tr><th>Case</th><th>Command</th><th>What happens</th></tr></thead>
+<tbody>
+<tr><td>Pin</td><td><code>PUT /v1/dns-servers/ns1.example.org/pin</code> with <code>{"bundle": "b-5e08c3", "reason": "…"}</code>. Needs <code>export:build</code>.</td><td>bembel builds a new bundle (new id, new snapshot, new ETag) with the zone bodies of the named bundle. See the pin rules below.</td></tr>
+<tr><td>Lift the pin</td><td><code>DELETE /v1/dns-servers/ns1.example.org/pin</code></td><td>The answer is <code>204</code>. The next export uses a serial above the stamped one.</td></tr>
+<tr><td>Local emergency rollback</td><td><code>bembel-agent rollback --to b-5e08c3</code></td><td>Works without bembel, from the local releases. The agent installs the zone content of that release and rewrites the SOA serial of each changed zone to the served serial plus one. It runs <code>named-checkzone</code>, swaps and reloads.</td></tr>
+<tr><td>Report of a local rollback</td><td><code>POST /v1/dns-servers/ns1.example.org/deployments</code></td><td>The agent reports the new serials. bembel raises its stored serial.</td></tr>
+<tr><td>Rollback to ONA</td><td><code>bembel-agent rollback --to ona-final</code></td><td>Each ONA zone gets the serial <code>max(ONA serial, served serial + 1)</code>. While the source of the agent is <code>ona</code>, it re-stamps every later ONA build in the same way. No RFC 1982 reset is needed.</td></tr>
+</tbody>
+</table>
+<p>The pin rules:</p>
 <ul>
-  <li><strong>Pin.</strong> <code>PUT /v1/dns-servers/ns1.example.org/pin</code> with <code>{"bundle": "b-5e08c3", "reason": "…"}</code> needs <code>export:build</code>. bembel builds a new bundle (new id, new snapshot, new ETag) with the zone bodies of the named bundle. Each zone whose body differs gets the serial <code>max(highest serial that bembel published for this zone and view, highest served serial) + 1</code>. The bundle goes through the normal checks, step 4 too. While the pin is set, data changes do not change the bundle of this server. <code>DELETE /v1/dns-servers/ns1.example.org/pin</code> lifts it (204). The next export uses a serial above the stamped one. This is the way to hold a server on known good content while a fix is made.</li>
-  <li><strong>Local emergency rollback.</strong> <code>bembel-agent rollback --to b-5e08c3</code> works without bembel, from the local releases. The agent installs the zone content of that release and rewrites the SOA serial of each changed zone to the served serial plus one. It runs <code>named-checkzone</code>, swaps and reloads. Then it reports the new serials in <code>POST /v1/dns-servers/ns1.example.org/deployments</code>, and bembel raises its stored serial.</li>
-  <li><strong>Rollback to ONA.</strong> <code>bembel-agent rollback --to ona-final</code> gives each ONA zone the serial <code>max(ONA serial, served serial + 1)</code>. While the source of the agent is <code>ona</code>, it re-stamps every later ONA build in the same way. No RFC 1982 reset is needed.</li>
+  <li>Each zone whose body differs gets the serial <code>max(highest serial that bembel published for this zone and view, highest served serial) + 1</code>.</li>
+  <li>The bundle goes through the normal checks (<a href="dns.html#checks">export checks</a>), step 4 too.</li>
+  <li>While the pin is set, data changes do not change the bundle of this server.</li>
+  <li>A pin holds a server on known good content while a fix is made.</li>
 </ul>
 
-<p>The deployment status gives a drift view. The server page in the UI shows the bundle id of each server, the age of the last pull, and the serial per zone that the server answers against the serial that bembel expects. The metric <code>bembel_export_last_pull_timestamp_seconds</code> has the alert rule <code>BembelExportNotPulled</code> (<a href="operations.html#alerts">operations.html#alerts</a>).</p>
+<h3 id="drift">Deployment report and drift view</h3>
+<p>The deployment status gives a drift view. The server page in the UI shows these values for each server:</p>
+<ul>
+  <li>the bundle id;</li>
+  <li>the age of the last pull;</li>
+  <li>the serial per zone that the server answers, against the serial that bembel expects.</li>
+</ul>
+<p>The metric <code>bembel_export_last_pull_timestamp_seconds</code> has the alert rule <code>BembelExportNotPulled</code> (<a href="operations.html#alerts">operations.html#alerts</a>).</p>
 
 <aside class="callout why">
 <p class="callout-title">Why pull and not push</p>

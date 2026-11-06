@@ -7,7 +7,7 @@
 </head>
 <body>
 <h1>DNS and BIND export</h1>
-<p class="lede">bembel owns the data of the zones. BIND answers the queries. This chapter describes the zone and view model, the records that bembel derives from addresses, the reverse zones that it computes from subnets, and the BIND export that carries all of it to ns1.example.org, ns2.example.org and ns3.example.org.</p>
+<p class="lede">bembel owns the data of the zones. BIND answers the queries. This chapter covers the zone and view model, the derived records, the reverse zones and the BIND export to ns1.example.org, ns2.example.org and ns3.example.org.</p>
 <ul class="keypoints">
   <li>A zone belongs to one or more views. A record belongs to all views of its zone, or to a list of them.</li>
   <li>An address with a name makes the A or AAAA record and the PTR record. Nobody edits these derived records. They change only when the address changes.</li>
@@ -19,7 +19,7 @@
 
 <aside class="callout note">
 <p class="callout-title">Delivery kinds</p>
-<p>The default delivery is BIND zone files and <code>named.conf</code> fragments by pull. Catalog zones, RFC 2136 updates, a PowerDNS driver and DNSSEC signing support are further delivery kinds (<a href="#delivery-kinds">delivery kinds</a>). The requester requires the BIND export. The Kea chapter is <a href="dhcp.html#kea">DHCP and ISC dhcpd export</a>.</p>
+<p>The default delivery is BIND zone files and <code>named.conf</code> fragments by pull. The requester requires the BIND export. Further kinds are in <a href="#delivery-kinds">delivery kinds</a>. The Kea chapter is <a href="dhcp.html#kea">DHCP and ISC dhcpd export</a>.</p>
 </aside>
 
 <h2 id="zones">Zones</h2>
@@ -114,9 +114,22 @@
   "revision": "W/\"41\""
 }</code></pre>
 
-<p>A zone is a normal object. It has an owner, tags, a revision and an audit trail. A user needs <code>zone:update</code> in the scope of the zone to change it, and <code>zone:create</code> or <code>zone:delete</code> to create or delete it. Manual records need <code>record:create</code>, <code>record:update</code> or <code>record:delete</code> in the scope of their zone. The scope type <code>zone</code> covers the zone and all zones below it by name, so a role can end at <code>kestrel.example.org</code>.</p>
+<p>A zone is a normal object. It has an owner, tags, a revision and an audit trail. A user needs these permissions in the scope of the zone:</p>
+<table class="compact">
+<thead><tr><th>Action</th><th>Permission</th></tr></thead>
+<tbody>
+<tr><td>Change a zone</td><td><code>zone:update</code></td></tr>
+<tr><td>Create or delete a zone</td><td><code>zone:create</code> or <code>zone:delete</code></td></tr>
+<tr><td>Change a manual record</td><td><code>record:create</code>, <code>record:update</code> or <code>record:delete</code>, in the scope of its zone</td></tr>
+</tbody>
+</table>
+<p>The scope type <code>zone</code> covers the zone and all zones below it by name, so a role can end at <code>kestrel.example.org</code>.</p>
 
-<p>A zone has a parent by name. The parent holds the delegation. If <code>kestrel.example.org</code> and <code>example.org</code> are zones on the same servers, bembel writes no NS delegation for the child into the parent. If the child lives on other servers, the user gives the child a <code>delegation</code> list. bembel then writes NS records and glue for the child into the parent.</p>
+<p>A zone has a parent by name, and the parent holds the delegation.</p>
+<ul>
+  <li>The child and the parent (<code>kestrel.example.org</code> and <code>example.org</code>) are zones on the same servers: bembel writes no NS delegation for the child into the parent.</li>
+  <li>The child lives on other servers: the user gives the child a <code>delegation</code> list. bembel then writes NS records and glue for the child into the parent.</li>
+</ul>
 
 <h2 id="views">Views</h2>
 <p>A DNS view gives different answers to different clients. The name <code>internal</code> serves the campus and the cluster. The name <code>external</code> serves the rest of the world. ONA has a <code>dns_views</code> table, but <code>build_bind</code> ignores it. In bembel the view is a real part of the output.</p>
@@ -127,11 +140,17 @@
 <tr><td><code>ordinal</code></td><td>The order in <code>named.conf</code>. BIND uses the first view whose <code>match-clients</code> matches. bembel stores the order and refuses duplicates.</td></tr>
 <tr><td><code>match_clients</code></td><td>A list of prefixes, address groups or TSIG key names. bembel writes it as an <code>acl</code>. An address group makes the ACL follow the data.</td></tr>
 <tr><td><code>match_destinations</code></td><td>Optional. For servers with one address per view.</td></tr>
-<tr><td><code>recursion</code></td><td><code>yes</code> or <code>no</code>. Default <code>no</code>. The story's <code>internal</code> view sets <code>yes</code> for its address ACL, so DHCP and VM clients can use ns1 and ns2 as resolvers (10.20.2.53, 10.20.2.54). The <code>external</code> view keeps <code>no</code>.</td></tr>
-<tr><td><code>publish_nat_outside</code></td><td><code>true</code> or <code>false</code>. Default <code>false</code>. When <code>true</code>, an address with a NAT link gets its derived A or AAAA record in this view with the outside address, not the inside address. The story's <code>external</code> view sets it, so <code>www.example.org</code> answers 192.0.2.80 outside and 10.20.2.80 inside.</td></tr>
+<tr><td><code>recursion</code></td><td><code>yes</code> or <code>no</code>. Default <code>no</code>.</td></tr>
+<tr><td><code>publish_nat_outside</code></td><td><code>true</code> or <code>false</code>. Default <code>false</code>. When <code>true</code>, an address with a NAT link has the outside address in its derived A or AAAA record in this view.</td></tr>
 <tr><td><code>transfer_key</code></td><td>The name of the TSIG key that selects this view for zone transfers and NOTIFY. Default <code>xfer-</code> and the view name, for example <code>xfer-internal</code>. The bundle names the key. The secret is in a file on each server.</td></tr>
 </tbody>
 </table>
+
+<p>The story sets two values:</p>
+<ul>
+  <li>The <code>internal</code> view sets <code>recursion: yes</code> for its address ACL, so DHCP and VM clients can use ns1 and ns2 as resolvers (10.20.2.53, 10.20.2.54). The <code>external</code> view keeps <code>no</code>.</li>
+  <li>The <code>external</code> view sets <code>publish_nat_outside</code>, so <code>www.example.org</code> answers 192.0.2.80 outside and 10.20.2.80 inside.</li>
+</ul>
 
 <p>A zone has one copy in each of its views. Two copies of <code>example.org</code> are two files: one for <code>internal</code> and one for <code>external</code>. A record has the field <code>view</code>. The value <code>null</code> means "all views of the zone". A list, for example <code>["internal"]</code>, limits the record to these views. This is how the name <code>ib-leaf-a01.example.org</code> stays inside the campus.</p>
 
@@ -140,10 +159,12 @@
   <li>When one view exists, every zone must be inside a view.</li>
   <li>A zone name can appear once in a view.</li>
   <li>A zone that must be the same in two views can use <code>in-view</code>. bembel uses it only when the user sets <code>share_view</code> on the zone. Then both views serve one file.</li>
-  <li>Each view has its own transfer key (field <code>transfer_key</code>). On every server the key is the first element of the view's <code>match-clients</code>, and the other views exclude it with <code>!key</code>. Zone stanzas use the view's key in <code>allow-transfer</code>, <code>also-notify</code> and <code>primaries</code>. Then a secondary gets each copy of a zone from the right view, although its address matches the internal ACL.</li>
+  <li>Each view has its own transfer key (field <code>transfer_key</code>). On every server the key is the first element of the view's <code>match-clients</code>, and the other views exclude it with <code>!key</code>.</li>
+  <li>Zone stanzas use the view's key in <code>allow-transfer</code>, <code>also-notify</code> and <code>primaries</code>. Then a secondary gets each copy of a zone from the right view, although its address matches the internal ACL.</li>
   <li>An <code>rndc</code> command for a zone needs the view name: <code>rndc reload kestrel.example.org in internal</code>.</li>
 </ul>
-<p>A test proves the split for the secondaries. It transfers the copy of <code>example.org</code> of each view from ns2 with the key of the view (<code>dig @10.20.2.54 example.org AXFR -y hmac-sha256:xfer-external:…</code>) and compares it with <code>zones/&lt;view&gt;/example.org.zone</code> of the bundle. The name <code>ib-leaf-a01</code> must be absent from the copy of <code>external</code>. The test runs in the export tests and in the cutover checks (<a href="migration.html#cutover">migration.html#cutover</a>).</p>
+<p>A test proves the split for the secondaries. It transfers the copy of <code>example.org</code> of each view from ns2 with the key of the view. It compares each copy with <code>zones/&lt;view&gt;/example.org.zone</code> of the bundle. The name <code>ib-leaf-a01</code> must be absent from the copy of <code>external</code>. The test runs in the export tests and in the cutover checks (<a href="migration.html#cutover">migration.html#cutover</a>).</p>
+<pre><code class="language-bash">dig @10.20.2.54 example.org AXFR -y hmac-sha256:xfer-external:…</code></pre>
 
 <aside class="callout why">
 <p class="callout-title">Why one view means no view block</p>
@@ -171,7 +192,8 @@
   <li><strong>CNAME exclusivity.</strong> A name that has a CNAME has no other record of any type. The check covers derived records, so allocating an address for a name that is a CNAME fails with <code>409 cname.conflict</code>.</li>
   <li><strong>No CNAME at the apex.</strong> The apex holds SOA and NS.</li>
   <li><strong>Targets.</strong> The target of MX, NS and SRV is a name with an A or AAAA record, never a CNAME. A missing target is a warning when it is outside bembel, and an error when it is inside a zone of bembel.</li>
-  <li><strong>Name syntax.</strong> A label has 1–63 bytes. A name has at most 253 bytes. The letters are a–z, digits and the hyphen. A label does not start or end with a hyphen. bembel stores names in lower case. The underscore is valid in the owner of SRV, TXT and TLSA records only. The wildcard <code>*</code> is valid only as the first label.</li>
+  <li><strong>Name syntax.</strong> A label has 1–63 bytes. A name has at most 253 bytes. The letters are a–z, digits and the hyphen, and a label does not start or end with a hyphen.</li>
+  <li><strong>Special labels.</strong> bembel stores names in lower case. The underscore is valid in the owner of SRV, TXT and TLSA records only. The wildcard <code>*</code> is valid only as the first label.</li>
   <li><strong>TTL.</strong> Allowed values are 60 to 604800 seconds. The TTL of a record comes from, in this order: the record, the address or host field <code>dns_ttl</code>, the <code>default_ttl</code> of the zone.</li>
   <li><strong>Duplicates.</strong> The same name, type and data twice in one view is an error. A record set (same name and type) shares one TTL. A write that sets a different TTL for one member changes the whole set.</li>
 </ul>
@@ -203,10 +225,10 @@
 <p>The rules are short.</p>
 <ol>
   <li>A forward record exists for each address in status <code>allocated</code> or <code>reserved</code> that has an FQDN. An address can have more than one FQDN. Each name makes its own A or AAAA record.</li>
-  <li>The PTR target of an address is the field <code>ptr_name</code>. It defaults to the host primary FQDN when the address is the primary address of the host, and to the first FQDN of the address otherwise. The value <code>none</code> switches the PTR off.</li>
+  <li>The PTR target of an address is the field <code>ptr_name</code>. It defaults to the host primary FQDN for the primary address of the host. For other addresses it defaults to the first FQDN of the address. The value <code>none</code> switches the PTR off.</li>
   <li>The host primary FQDN is one name per host (ONA <code>primary_dns_id</code>). The user sets it on the host. One of the host addresses gets the flag <code>primary</code>.</li>
   <li>A shared address (VIP, anycast) makes one A record for each name and one PTR with the field <code>ptr_name</code>.</li>
-  <li>An address in status <code>claimed</code> makes no record, unless the claim was made with <code>publish: true</code> (<code>bembel vm prepare</code> sets it). When the claim expires, the reaper deletes the address and the next export drops the records.</li>
+  <li>An address in status <code>claimed</code> makes no record, unless the claim has <code>publish: true</code>. <code>bembel vm prepare</code> sets it. When the claim expires, the reaper deletes the address and the next export drops the records.</li>
   <li>An address in status <code>deprecated</code> makes no record. The setting <code>dns.publish_deprecated</code> changes this. The default is <code>false</code>.</li>
 </ol>
 
@@ -252,11 +274,12 @@ reversed, one nibble per label:
 
 zone: 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.</code></pre>
 
-<p>Each reverse zone follows the same rules as a forward zone: SOA, NS, servers, views and an owner. The zone name is the key. If the user creates a reverse zone by hand with the same name, it replaces the computed one and keeps the settings. The difference is that bembel adds and removes a computed zone when subnets come and go. bembel never removes a zone that holds a manual record. It reports a finding instead.</p>
+<p>Each reverse zone follows the rules of a forward zone: SOA, NS, servers, views and an owner. The zone name is the key. A reverse zone that the user creates by hand with the same name replaces the computed one and keeps the settings.</p>
+<p>A computed zone differs in one way: bembel adds and removes it when subnets come and go. bembel never removes a zone that holds a manual record. It reports a finding instead.</p>
 
 <aside class="callout warn">
 <p class="callout-title">Two subnets, one PTR name</p>
-<p>The PTR owner of an address is unique per view. When two addresses in two VRFs have the same IP (for example 10.100.4.44 in <code>hpc-fabric</code> and in another VRF), only one VRF can publish PTR records for the zone. The zone has a field <code>vrf</code>. The reverse computation uses the addresses of that VRF only. The default is <code>global</code>.</p>
+<p>The PTR owner of an address is unique per view. Two addresses in two VRFs can have the same IP, for example 10.100.4.44 in <code>hpc-fabric</code> and in another VRF. Only one VRF can publish PTR records for the zone. The zone has a field <code>vrf</code>. The reverse computation uses the addresses of that VRF only. The default is <code>global</code>.</p>
 </aside>
 
 <h2 id="classless">Classless delegation (RFC 2317)</h2>
@@ -436,7 +459,14 @@ zone "20.10.in-addr.arpa" {
 
 <p>The file <code>/etc/bind/bembel-tsig.conf</code> holds <code>key "xfer-internal" { algorithm hmac-sha256; secret "…"; };</code> and the same for <code>xfer-external</code>. The view <code>external</code> uses <code>xfer-external</code> in its zone stanzas.</p>
 
-<p>On ns2 and ns3 the same export gives the same <code>match-clients</code> in both views, and stanzas of <code>type secondary</code> with <code>primaries { 10.20.2.53 key "xfer-&lt;view&gt;"; };</code>, for example <code>primaries { 10.20.2.53 key "xfer-internal"; };</code> in the view internal. The SOA queries, the transfers and the NOTIFY messages are signed with the key of the view, so each lands in the right view on both sides. A secondary has its zone file in a local directory that BIND owns. ns2 needs no bundle pull for zone content. It still pulls the bundle, because the bundle holds its config. In a hidden-primary setup, only the primary has the zone files.</p>
+<p>On ns2 and ns3 the same export gives these results:</p>
+<ul>
+  <li>The same <code>match-clients</code> in both views.</li>
+  <li>Stanzas of <code>type secondary</code> with <code>primaries { 10.20.2.53 key "xfer-&lt;view&gt;"; };</code>, for example <code>primaries { 10.20.2.53 key "xfer-internal"; };</code> in the view internal.</li>
+  <li>The SOA queries, the transfers and the NOTIFY messages are signed with the key of the view. So each lands in the right view on both sides.</li>
+  <li>A secondary has its zone file in a local directory that BIND owns. ns2 needs no bundle pull for zone content. It still pulls the bundle, because the bundle holds its config.</li>
+  <li>In a hidden-primary setup, only the primary has the zone files.</li>
+</ul>
 
 <p>A zone file for <code>kestrel.example.org</code> in the view <code>internal</code> looks like this.</p>
 <pre><code class="language-plaintext">; kestrel.example.org, view internal. Generated by bembel. Do not edit.
@@ -531,7 +561,7 @@ $ORIGIN 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.
 </figure>
 
 <h3 id="manifest">The manifest</h3>
-<p>The manifest names the kind and the server of the bundle, the snapshot, the signing key, the sha256 of <code>bundle.tar</code> and of every file, and the zone serials. bembel signs the manifest. The agent trusts only the signed manifest. It uses the manifest to check the bundle and to decide which zones to reload.</p>
+<p>The manifest names the kind, the server, the snapshot and the signing key. It holds the sha256 of <code>bundle.tar</code> and of every file, and the zone serials. bembel signs the manifest. The agent trusts only the signed manifest (<a href="delivery.html#bundle">bundle and trust</a>). It uses the manifest to check the bundle and to decide which zones to reload.</p>
 <pre><code class="language-json">{
   "format": 1,
   "kind": "bind",
@@ -569,7 +599,14 @@ $ORIGIN 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.
 <p>These rules apply in native mode. In <code>compat-ona</code> mode the serial is the Unix time of the build, as ONA writes it (<a href="#compat">compat mode</a>). For example, the build <code>b-7c41e0</code> of 2026-11-04 17:57:41 UTC gives the serial 1793815061.</p>
 
 <h3 id="serial-cutover">Cutover from the ONA serial</h3>
-<p>ONA writes the Unix time as the serial. On 2026-11-04 this is about 1 793 700 000. The date-based form of the same day, 2026110401, is a larger number (2 026 110 401). The difference is about 232 million. This is less than 2<sup>31</sup>, so a secondary treats the new serial as higher. No manual step is needed on the secondary.</p>
+<table class="compact">
+<thead><tr><th>Scheme</th><th>Serial on 2026-11-04</th></tr></thead>
+<tbody>
+<tr><td>ONA, Unix time</td><td>about 1 793 700 000</td></tr>
+<tr><td>Native, date based</td><td>2026110401 (2 026 110 401), a larger number</td></tr>
+</tbody>
+</table>
+<p>The difference is about 232 million. This is less than 2<sup>31</sup>, so a secondary treats the new serial as higher. No manual step is needed on the secondary.</p>
 <ul>
   <li>At import, bembel reads the highest serial it sees in the ONA zone files and stores it as the floor of the zone. The floor is the highest of the ONA-file serial and the serial that the servers answer.</li>
   <li>The first native serial is <code>max(YYYYMMDD01, floor + 1)</code>. After that the serial follows the rules above: date based, bumped only on a change, never below the current serial.</li>
@@ -578,7 +615,8 @@ $ORIGIN 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.
 </ul>
 <aside class="callout warn">
 <p class="callout-title">Do not change to a smaller scheme</p>
-<p>A serial that goes down makes secondaries ignore the primary. A counter that starts at 1 is lower than the Unix time by a factor of a billion. bembel never produces such a serial. The migration chapter gives the steps of the switch from the ONA serial and of a rollback (<a href="migration.html#serial">migration.html#serial</a>). The administrator keeps the date-based scheme for the lifetime of the zone.</p>
+<p>A serial that goes down makes secondaries ignore the primary. A counter that starts at 1 is lower than the Unix time by a factor of a billion. bembel never produces such a serial.</p>
+<p>The administrator keeps the date-based scheme for the lifetime of the zone. The migration chapter gives the steps of the switch from the ONA serial and of a rollback (<a href="migration.html#serial">migration.html#serial</a>).</p>
 </aside>
 
 <h2 id="checks">Checks</h2>
@@ -586,14 +624,28 @@ $ORIGIN 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.
 <table class="compact">
 <thead><tr><th>Step</th><th>Tool or rule</th><th>What it catches</th></tr></thead>
 <tbody>
-<tr><td>1. Model</td><td>bembel checks</td><td>CNAME conflicts, a missing apex NS, names that are too long, TTL out of range, an address in two reverse zones, a view without a zone. With secondaries and more than one view: each view has its own transfer key, first in its own <code>match-clients</code> and negated in the other views, on the primary and on the secondaries.</td></tr>
-<tr><td>2. Each zone</td><td><code>named-checkzone -k fail -n fail -m fail -M fail -S fail -i full ORIGIN FILE</code></td><td>Syntax errors, CNAME and other data, illegal names (<code>-k</code>), NS or MX with an IP address as target (<code>-n</code>, <code>-m</code>), MX or SRV that point to a CNAME (<code>-M</code>, <code>-S</code>), NS, MX or SRV targets in the zone without an address record (<code>-i full</code>)</td></tr>
-<tr><td>3. The config</td><td><code>named-checkconf -z named.conf</code></td><td>Syntax of the fragment, and a load of every zone. The check runs on a check copy of the bundle, in which the paths through <code>current</code> and <code>/var/lib/bind/bembel/</code> point into the unpacked bundle (<a href="#delivery">delivery</a>, step 3). The sandbox <code>named.conf</code> is a copy of the real one with the include pointed at the check copy.</td></tr>
+<tr><td>1. Model</td><td>bembel checks</td><td>CNAME conflicts, missing apex NS, names that are too long, TTL out of range, an address in two reverse zones, a view without a zone</td></tr>
+<tr><td>1. Transfer keys</td><td>bembel checks, with secondaries and more than one view</td><td>Each view has its own transfer key, first in its own <code>match-clients</code> and negated in the other views, on the primary and on the secondaries</td></tr>
+<tr><td>2. Each zone</td><td><code>named-checkzone -k fail -n fail -m fail -M fail -S fail -i full ORIGIN FILE</code></td><td>Syntax errors, CNAME and other data</td></tr>
+<tr><td>2. Names</td><td>Flag <code>-k</code></td><td>Illegal names</td></tr>
+<tr><td>2. Targets</td><td>Flags <code>-n</code>, <code>-m</code></td><td>NS or MX with an IP address as target</td></tr>
+<tr><td>2. Targets</td><td>Flags <code>-M</code>, <code>-S</code></td><td>MX or SRV that point to a CNAME</td></tr>
+<tr><td>2. Targets</td><td>Flag <code>-i full</code></td><td>NS, MX or SRV targets in the zone without an address record</td></tr>
+<tr><td>3. The config</td><td><code>named-checkconf -z named.conf</code></td><td>Syntax of the fragment, and a load of every zone</td></tr>
+<tr><td>3. Check copy</td><td>Sandbox <code>named.conf</code></td><td>The check runs on a check copy of the bundle (<a href="delivery.html#bind">BIND on the server</a>, step 3). In the copy, the paths through <code>current</code> and <code>/var/lib/bind/bembel/</code> point into the unpacked bundle.</td></tr>
+<tr><td>3. Sandbox</td><td>Sandbox <code>named.conf</code></td><td>A copy of the real <code>named.conf</code> with the include pointed at the check copy</td></tr>
 <tr><td>4. Semantic</td><td>bembel checks</td><td>A zone with more than N % of its records removed. A zone without SOA change but with other changes. A serial that goes down.</td></tr>
 </tbody>
 </table>
 
-<p>The mass-delete guard is part of step 4. The setting is <code>export.guard.max_delete_percent</code>. The default is 10 %. It applies to a zone with at least 20 records. When one build removes more records than the limit, bembel does not publish. It creates a change request of the type <code>export-guard</code>. An approver in the scope of the zone, for example <code>m.huber</code>, looks at the diff and releases the bundle or rejects it. The state of the old bundle stays <code>latest</code> in the meantime.</p>
+<p>The mass-delete guard is part of step 4:</p>
+<ul>
+  <li>The setting is <code>export.guard.max_delete_percent</code>. The default is 10 %.</li>
+  <li>It applies to a zone with at least 20 records.</li>
+  <li>When one build removes more records than the limit, bembel does not publish. It creates a change request of the type <code>export-guard</code>.</li>
+  <li>An approver in the scope of the zone, for example <code>m.huber</code>, looks at the diff and releases the bundle or rejects it.</li>
+  <li>The state of the old bundle stays <code>latest</code> in the meantime.</li>
+</ul>
 
 <p>Every failed check gives a finding on the export page (<a href="ui-dns.html#exports">ui-dns.html#exports</a>) and an alert in the metric <code>bembel_export_last_success_timestamp_seconds</code>. The diff view shows the unified diff of the new bundle against the latest bundle. A user reads it before the next build or from the list of bundles.</p>
 
@@ -601,7 +653,8 @@ $ORIGIN 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.
 <p>bembel-agent pulls the bundle, verifies it, installs it and reloads named. <a href="delivery.html">Exports and delivery</a> specifies these steps, the paths on the server, the rollback and the pin.</p>
 
 <h2 id="compat">Compat mode</h2>
-<p>The compat mode writes the same bytes as ONA <code>build_bind</code> (v1.6, <code>build_bind_conf</code> and <code>build_bind_domain</code> v1.51). The parallel run compares the two outputs every night. When the diff is empty or explained, the cutover can start (<a href="migration.html#parallel">migration.html#parallel</a>). The export setting <code>mode</code> is <code>compat-ona</code> or <code>native</code>, per DNS server. Until the cutover, ns1 to ns3 are in <code>compat-ona</code>, and their agents run in shadow mode: they pull and check each bundle but do not activate it (<a href="migration.html#agent">migration.html#agent</a>). ONA still writes the live files.</p>
+<p>The compat mode writes the same bytes as ONA <code>build_bind</code> (v1.6, <code>build_bind_conf</code> and <code>build_bind_domain</code> v1.51). The parallel run compares the two outputs every night. When the diff is empty or explained, the cutover can start (<a href="migration.html#parallel">migration.html#parallel</a>). The export setting <code>mode</code> is <code>compat-ona</code> or <code>native</code>, per DNS server.</p>
+<p>Until the cutover, ns1 to ns3 are in <code>compat-ona</code>. Their agents run in shadow mode: they pull and check each bundle but do not activate it (<a href="migration.html#agent">migration.html#agent</a>). ONA still writes the live files.</p>
 
 <table class="compact">
 <thead><tr><th>Item</th><th>ONA build_bind</th><th>compat mode</th><th>native mode</th></tr></thead>
@@ -623,7 +676,14 @@ $ORIGIN 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.
 </tbody>
 </table>
 
-<p>The nightly diff normalises three things on both sides: the date in line 1, the SOA serial, and the order of the record lines. It keeps <code>TOTAL RECORDS (count=N)</code> as an assertion. The list of known differences is a file in the repository (<a href="migration.html#known">migration.html#known</a>). It names each difference with a reason. A diff that is not in the list fails the run. The level 2 diff compares the zones as records: <code>named-compilezone -f text -F text -s full -o - ORIGIN FILE | sort</code> runs on both trees, and the diff compares the sorted RRsets. The style <code>-s full</code> writes an absolute owner name on every line. This finds a difference that survives the byte normalisation.</p>
+<p>The nightly diff normalises three things on both sides:</p>
+<ul>
+  <li>the date in line 1;</li>
+  <li>the SOA serial;</li>
+  <li>the order of the record lines.</li>
+</ul>
+<p>It keeps <code>TOTAL RECORDS (count=N)</code> as an assertion (<a href="migration.html#normalise">normalisation</a>). The list of known differences is a file in the repository (<a href="migration.html#known">migration.html#known</a>). It names each difference with a reason. A diff that is not in the list fails the run.</p>
+<p>The level 2 diff compares the zones as records. <code>named-compilezone -f text -F text -s full -o - ORIGIN FILE | sort</code> runs on both trees, and the diff compares the sorted RRsets. The style <code>-s full</code> writes an absolute owner name on every line. This finds a difference that survives the byte normalisation (<a href="migration.html#levels">diff levels</a>).</p>
 
 <aside class="callout tip">
 <p class="callout-title">When compat mode ends</p>
@@ -638,7 +698,7 @@ $ORIGIN 4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa.
 <tr><td>Catalog zones (RFC 9432)</td><td>bembel makes one catalog zone per view. A secondary adds and removes zones itself when the catalog changes.</td><td>BIND 9.18 or newer has catalog zone support. The catalog only lists zones. The data still moves by IXFR. Not verified in this sandbox.</td></tr>
 <tr><td>RFC 2136 update with TSIG</td><td>Fast incremental updates instead of a reload. bembel reconciles: it reads the zone by AXFR, computes the difference and sends an UPDATE.</td><td>A dynamic zone cannot be edited by hand without <code>rndc freeze</code>. The update has no atomic multi-zone change. This is why the file export is the default.</td></tr>
 <tr><td>PowerDNS API driver</td><td>A DNS server of kind <code>powerdns</code>. bembel patches RRsets through the API.</td><td>The model does not change. Views need PowerDNS Authoritative 5.0 or newer. Not verified.</td></tr>
-<tr><td>DNSSEC</td><td>bembel does not sign zones. The generated zone stanza names a <code>dnssec-policy</code> and sets <code>inline-signing yes</code>. BIND keeps and rolls the keys.</td><td>The serial of the unsigned file must still go up. BIND keeps its own serial for the signed zone. The files <code>.signed</code> and <code>.signed.jnl</code> stay over bundles, because the <code>file</code> path is stable (<a href="delivery.html#paths">paths</a>). bembel may record DS records as data for the parent zone, but does not publish them.</td></tr>
+<tr><td>DNSSEC</td><td>bembel does not sign zones. The generated zone stanza names a <code>dnssec-policy</code> and sets <code>inline-signing yes</code>. BIND keeps and rolls the keys. bembel may record DS records as data for the parent zone, but does not publish them.</td><td>The serial of the unsigned file must still go up. BIND keeps its own serial for the signed zone. The files <code>.signed</code> and <code>.signed.jnl</code> stay over bundles, because the <code>file</code> path is stable (<a href="delivery.html#paths">paths</a>).</td></tr>
 </tbody>
 </table>
 
