@@ -7,18 +7,24 @@
 </head>
 <body>
 <h1>Routing and firewall</h1>
-<p class="lede">This chapter specifies how bembel serves the routing and firewall teams. bembel owns the <em>values</em>: AS numbers, route distinguishers, route targets, static routes, announced prefixes and groups of addresses. It does not own device config. It exports the values in formats that the existing tools read.</p>
+<p class="lede">bembel serves the routing and firewall teams with <em>values</em>: AS numbers, route distinguishers, route targets, static routes, announced prefixes and groups of addresses. It does not own device config. It exports the values in formats that the existing tools read.</p>
 <ul class="keypoints">
   <li>bembel stores ASNs with ranges, VRF route distinguishers and route targets, static routes, and the <code>announce</code> flag with tags on prefixes.</li>
   <li><code>bembel export prefix-list --format frr|bird|junos|eos</code> writes the prefix lists of the prefixes with the <code>announce</code> flag. The API gives a JSON routing intent for each VRF.</li>
   <li>An address group is a named, dynamic set of addresses and prefixes, defined by a filter. Examples: <code>login-nodes</code>, <code>ceph-public</code>.</li>
-  <li>An address group is served as a feed: an nftables set file, a firewalld ipset XML, a plain text list for Palo Alto, OPNsense and FortiGate, or JSON.</li>
+  <li>An address group is served as a feed: an nftables set file, a firewalld ipset XML, a plain text list or JSON. The text list serves Palo Alto, OPNsense and FortiGate.</li>
   <li>Feeds use HTTPS, a token or mutual TLS, and ETag. Safety guards stop an empty list or a large sudden change.</li>
   <li>Firewall policy, route maps and BGP sessions stay in Ansible, Nornir and the vendor tools.</li>
 </ul>
 
 <h2 id="scope">Scope: values, not config</h2>
-<p>Network teams already have a way to push config. They use Ansible, Nornir or vendor tools. These tools need numbers and lists that a person types today: the AS number of a cluster, the prefixes that a router announces, the addresses that a firewall rule allows. These values are already in the IPAM, or should be. bembel is the source of truth for them. A generator in the automation reads them and renders device config.</p>
+<p>Network teams already push config with Ansible, Nornir or vendor tools. These tools need values that a user types today:</p>
+<ul>
+  <li>the AS number of a cluster;</li>
+  <li>the prefixes that a router announces;</li>
+  <li>the addresses that a firewall rule allows.</li>
+</ul>
+<p>These values are already in the IPAM, or should be. bembel is the source of truth for them. A generator in the automation reads them and renders device config.</p>
 <table>
 <thead><tr><th>bembel owns</th><th>The network automation owns</th></tr></thead>
 <tbody>
@@ -83,7 +89,14 @@
 </svg>
 <figcaption>Objects on the left, exports in the middle, consumers on the right. Routers get their values through the automation. Firewalls and hosts pull the feeds themselves. Nothing writes back into bembel.</figcaption>
 </figure>
-<p>The consumers have different needs. A router change needs a review by a user, so the automation pulls the export, shows a diff and applies it with a commit-confirm. A firewall address list changes often and by itself (a new login node), so the firewall pulls its feed on a timer. Both paths use the same safety rules (<a href="#feeds">feeds</a>).</p>
+<table class="compact">
+<thead><tr><th>Consumer</th><th>Why</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Router</td><td>A change needs a review by a user.</td><td>The automation pulls the export, shows a diff and applies it with a commit-confirm.</td></tr>
+<tr><td>Firewall address list</td><td>It changes often and by itself (a new login node).</td><td>The firewall pulls its feed on a timer.</td></tr>
+</tbody>
+</table>
+<p>Both paths use the same safety rules (<a href="#feeds">feeds</a>).</p>
 
 <h2 id="asn">AS numbers</h2>
 <p>An <dfn>ASN</dfn> object has the number, a name, a kind and an owner team. The kind is <code>private</code>, <code>public</code> or <code>peer</code>. An <dfn>ASN range</dfn> is a named span of numbers with a purpose and an owner. A range lets bembel allocate the next free number, like it does for addresses.</p>
@@ -110,10 +123,20 @@ ASN         NAME             OWNER    USED BY
   <dt>Prefix</dt><dd><code>origin_asn</code>: the AS that announces it. The default is the ASN of the VRF. RPKI or IRR exports use it.</dd>
   <dt>Fabric</dt><dd><code>asn</code>: the ASN of a fabric, for example <code>osprey-roce</code>.</dd>
 </dl>
-<p>The checks are simple. A number must lie in a range, or the user must say <code>--no-range</code>. A number is unique. A private number cannot be used for a prefix with the status <code>announce</code> in the VRF <code>global</code> without an ASN of the kind <code>public</code> in the path (a warning, not an error, because the border router may remove the private AS).</p>
+<p>The checks:</p>
+<ul>
+  <li>A number must lie in a range, or the user must say <code>--no-range</code>.</li>
+  <li>A number is unique.</li>
+  <li>A private number cannot serve a prefix with the status <code>announce</code> in VRF <code>global</code> without an ASN of kind <code>public</code> in the path.</li>
+</ul>
+<p>The last check gives a warning, not an error, because the border router may remove the private AS.</p>
 
 <h2 id="vrf-rt">VRF, route distinguisher and route targets</h2>
-<p>A VRF is an independent address space. For a router it is also a routing table. Two more values describe the VRF in MPLS or EVPN networks: the <dfn>route distinguisher</dfn> (RD), which makes the prefixes of different VRFs unique in BGP, and the <dfn>route targets</dfn> (RT), which say which VRFs import and export which routes.</p>
+<p>A VRF is an independent address space. For a router it is also a routing table. Two more values describe the VRF in MPLS or EVPN networks:</p>
+<ul>
+  <li>the <dfn>route distinguisher</dfn> (RD) makes the prefixes of different VRFs unique in BGP;</li>
+  <li>the <dfn>route targets</dfn> (RT) say which VRFs import and export which routes.</li>
+</ul>
 <table>
 <thead><tr><th>VRF</th><th>RD</th><th>Export RT</th><th>Import RT</th><th>Default ASN</th></tr></thead>
 <tbody>
@@ -126,16 +149,19 @@ ASN         NAME             OWNER    USED BY
 <ul>
 <li>An RD has the form <code>ASN:number</code> (2 byte ASN, 4 byte number), <code>IPv4:number</code> or <code>4byteASN:number</code> (4 byte ASN, 2 byte number). bembel checks the form and the range of the numbers.</li>
 <li>An RD is unique. A second VRF with the same RD is an error.</li>
-<li>A route target is an object with a value, a name and an owner. A VRF has a list of import RTs and a list of export RTs. One RT can belong to many VRFs. The RT <code>65010:1</code> is named <code>shared-services</code>. The border leak policy exports the shared-services prefixes of <code>global</code> with it, so bembel stores it on <code>global</code> as an export RT. The VRF <code>os-provider</code> imports it.</li>
+<li>A route target is an object with a value, a name and an owner. A VRF has a list of import RTs and a list of export RTs. One RT can belong to many VRFs.</li>
+<li>The RT <code>65010:1</code> is named <code>shared-services</code>. The border leak policy exports the shared-services prefixes of <code>global</code> with it, so bembel stores it on <code>global</code> as an export RT. The VRF <code>os-provider</code> imports it.</li>
 <li>The VRF <code>global</code> has no RD: it is the default table. A site that exports <code>global</code> routes in a VPN gives it one.</li>
 </ul>
 <aside class="callout warn">
 <p class="callout-title">Leaks and overlaps</p>
-<p>The database allows the same CIDR in two VRFs. A route target that leaks routes between the two VRFs makes the overlap a real conflict. bembel checks this: if VRF A imports an RT that VRF B exports, and both have an equal or overlapping prefix, the check gives the finding <code>vrf.leak-overlap</code> with both prefixes. The check runs on every change of an RT list or a prefix.</p>
+<p>The database allows the same CIDR in two VRFs. A route target that leaks routes between the two VRFs makes the overlap a real conflict.</p>
+<p>Assume VRF A imports an RT that VRF B exports, and both have an equal or overlapping prefix. Then the check gives the finding <code>vrf.leak-overlap</code> with both prefixes. The check runs on every change of an RT list or a prefix.</p>
 </aside>
 
 <h2 id="vni">VXLAN network identifiers</h2>
-<p>An EVPN overlay carries a layer 2 segment or a VRF over VXLAN. Each segment needs a <dfn>VNI</dfn>, a number from 1 to 16 777 215. A VNI must be unique in the overlay, and a duplicate joins two networks that must stay apart. bembel allocates VNIs from a <dfn>VNI range</dfn>, in the same way as ASNs from an ASN range.</p>
+<p>An EVPN overlay carries a layer 2 segment or a VRF over VXLAN. Each segment needs a <dfn>VNI</dfn>, a number from 1 to 16 777 215. A VNI must be unique in the overlay, and a duplicate joins two networks that must stay apart.</p>
+<p>bembel allocates VNIs from a <dfn>VNI range</dfn>, in the same way as ASNs from an ASN range.</p>
 <table>
 <thead><tr><th>Range</th><th>Span</th><th>Use</th><th>Owner</th></tr></thead>
 <tbody>
@@ -149,7 +175,8 @@ $ bembel vni allocate --range l3-vrf --vrf os-provider
 allocated VNI 50000  vrf os-provider  range l3-vrf</pre>
 <ul>
 <li>A VLAN has the field <code>vni</code>, a VRF has the field <code>l3_vni</code>. Both are nullable. A unique index on the two values together makes a VNI unique in the instance.</li>
-<li><code>--prefer</code> asks for one number. If it is taken or outside the range, the answer is <code>409 vni.unavailable</code>. Without <code>--prefer</code>, bembel takes the lowest free number. The allocation uses the same lock as an ASN allocation (<a href="allocation.html#concurrency">concurrency</a>).</li>
+<li><code>--prefer</code> asks for one number. If it is taken or outside the range, the answer is <code>409 vni.unavailable</code>. Without <code>--prefer</code>, bembel takes the lowest free number.</li>
+<li>The allocation uses the same lock as an ASN allocation (<a href="allocation.html#concurrency">concurrency</a>).</li>
 <li>A VNI outside all ranges needs <code>--no-range</code>, like an ASN.</li>
 <li>The routing intent of a VRF lists its <code>l3_vni</code> and the <code>vni</code> of each VLAN with a subnet in the VRF. The fabric intent lists the VNIs of its VLANs (<a href="fabrics.html#ethernet">fabrics.html#ethernet</a>).</li>
 <li>bembel does not hold EVPN device config: no VTEP addresses as config, no flood lists, no ESI. A VTEP loopback is a normal address with the role <code>loopback</code>.</li>
@@ -190,10 +217,16 @@ allocated VNI 50000  vrf os-provider  range l3-vrf</pre>
   destination: 0.0.0.0/0
   next_hop: 172.16.4.1
   owner: network</code></pre>
-<p>The checks: the next hop is reachable (inside a subnet of the VRF, and not a network or broadcast address), the next hop is not inside the destination (no loop), and no two routes with the same VRF and destination have the same metric (a warning). A static route with a next hop that is an address of a managed host shows the host name in the UI.</p>
+<p>The checks:</p>
+<ul>
+  <li>The next hop is reachable: inside a subnet of the VRF, and not a network or broadcast address.</li>
+  <li>The next hop is not inside the destination (no loop).</li>
+  <li>No two routes with the same VRF and destination have the same metric (a warning).</li>
+</ul>
+<p>A static route with a next hop that is an address of a managed host shows the host name in the UI.</p>
 
 <h3 id="routes-announce">Announce flag and tags</h3>
-<p>A prefix has the boolean <code>announce</code> and tags. The tag <code>announce=NAME</code> names the <em>announcement set</em>: the group of prefixes that go to the same BGP peers. The flag says "this prefix should leave the VRF". The tag says where.</p>
+<p>A prefix has the boolean <code>announce</code> and tags. The flag says "this prefix should leave the VRF". The tag <code>announce=NAME</code> says where: it names the <em>announcement set</em>, the group of prefixes that go to the same BGP peers.</p>
 <table>
 <thead><tr><th>Prefix (VRF global)</th><th><code>announce</code></th><th>Tag</th></tr></thead>
 <tbody>
@@ -206,7 +239,12 @@ allocated VNI 50000  vrf os-provider  range l3-vrf</pre>
 <tr><td><code>10.30.0.0/16</code> OpenStack (container)</td><td>false</td><td>none</td></tr>
 </tbody>
 </table>
-<p>A container prefix can be announced as an aggregate. A prefix with the status <code>planned</code> or <code>deprecated</code> is never in an export. A prefix with <code>announce=true</code> and no tag is a finding, so nobody announces something by mistake. A load-balancer pool that the Kubernetes manager reserves can carry the tag too (<a href="kubernetes.html#pools">load-balancer pools</a>).</p>
+<ul>
+  <li>A container prefix can be announced as an aggregate.</li>
+  <li>A prefix with the status <code>planned</code> or <code>deprecated</code> is never in an export.</li>
+  <li>A prefix with <code>announce=true</code> and no tag is a finding, so nobody announces something by mistake.</li>
+  <li>A load-balancer pool that the Kubernetes manager reserves can carry the tag too (<a href="kubernetes.html#pools">load-balancer pools</a>).</li>
+</ul>
 <p>The routing intent of a VRF collects all of this in one JSON document. The automation can use it as its only input:</p>
 <pre><code class="language-json">{
   "vrf": "hpc-fabric",
@@ -240,7 +278,8 @@ options:
   le: none
   seq_start: 10
   seq_step: 10</code></pre>
-<p>The export has a fixed order (family, then address, then length), so the same input always gives the same bytes. The API path is <code>GET /v1/exports/{id}/artifact?format=frr|bird|junos|eos&amp;family=4|6</code>, where <code>{id}</code> is the export id or its name, for example <code>GET /v1/exports/campus-bgp/artifact?format=frr&amp;family=4</code>. The CLI does the same and can show a diff against the last revision:</p>
+<p>The export has a fixed order (family, then address, then length), so the same input always gives the same bytes. The API path is <code>GET /v1/exports/{id}/artifact?format=frr|bird|junos|eos&amp;family=4|6</code>, where <code>{id}</code> is the export id or its name, for example <code>GET /v1/exports/campus-bgp/artifact?format=frr&amp;family=4</code>.</p>
+<p>The CLI does the same and can show a diff against the last revision:</p>
 <pre class="term">$ bembel export prefix-list campus-bgp --format frr --family 4 --diff
 revision 57 → 58   (etag "5b0e1c")
 + ip prefix-list BEMBEL-CAMPUS-BGP-V4 seq 40 permit 10.20.20.0/24
@@ -296,11 +335,17 @@ ipv6 prefix-list BEMBEL-CAMPUS-BGP-V6
 <tr><td><code>eos</code></td><td>The file starts with <code>no …</code>, inside a configuration session.</td><td><code>show session-config diffs</code>, then <code>commit timer</code>.</td></tr>
 </tbody>
 </table>
-<p>The syntax above is a short form. The vendor documents are the reference, and the format tests of bembel run each file through the check tool of its platform (<code>vtysh -C</code>, <code>bird -p</code>, <code>commit check</code> on a lab device, an EOS container). The ge and le options render as <code>ge 24 le 32</code> in FRR and EOS, and as <code>{24,32}</code> in BIRD. A Junos prefix list has no ranges, so the junos format writes a <code>route-filter-list</code> with <code>prefix-length-range</code> when ge or le is set. That list also carries <code>replace:</code> and is loaded with <code>load replace</code>. The Junos format test loads revision N, then revision N+1 with one prefix removed, on a lab vMX. The prefix must be gone from <code>show configuration policy-options</code>.</p>
+<ul>
+  <li>The syntax above is a short form. The vendor documents are the reference.</li>
+  <li>The format tests of bembel run each file through the check tool of its platform. The tools are <code>vtysh -C</code>, <code>bird -p</code>, <code>commit check</code> on a lab device and an EOS container.</li>
+  <li>The ge and le options render as <code>ge 24 le 32</code> in FRR and EOS, and as <code>{24,32}</code> in BIRD.</li>
+  <li>A Junos prefix list has no ranges. When ge or le is set, the junos format writes a <code>route-filter-list</code> with <code>prefix-length-range</code>. That list also carries <code>replace:</code> and is loaded with <code>load replace</code>.</li>
+  <li>The Junos format test loads revision N, then revision N+1 with one prefix removed, on a lab vMX. The prefix must be gone from <code>show configuration policy-options</code>.</li>
+</ul>
 <p>The lists carry no policy. A route map or a filter in the device config uses them by name. The names (<code>BEMBEL-CAMPUS-BGP-V4</code>) are stable, so the policy does not change when the content changes.</p>
 
 <h2 id="address-groups">Address groups</h2>
-<p>An <dfn>address group</dfn> is a named set of addresses and prefixes. A filter defines it. The set is not a list that a person edits. bembel computes it from the data, so it is always right: a new login node is in the group as soon as its host has the tag.</p>
+<p>An <dfn>address group</dfn> is a named set of addresses and prefixes. A filter defines it. A user does not edit the set: bembel computes it from the data, so it is always right. A new login node is in the group as soon as its host has the tag.</p>
 <pre><code class="language-yaml"># login-nodes: all addresses of hosts with the tag role=login in the VRF global
 name: login-nodes
 owner: hpc-ops
@@ -345,12 +390,15 @@ members:
 <ol class="steps">
   <li>All terms in one <code>where</code> must be true (AND). Several entries in <code>members</code> are joined (OR).</li>
   <li><code>take: addresses</code> collects the addresses of the interfaces of the hosts. <code>take: prefixes</code> takes the prefix of the object itself.</li>
-  <li><code>include</code> adds the members of another group. bembel refuses a cycle. If the included group has another VRF, bembel refuses it (<code>address-group.vrf-mismatch</code>) unless the group sets <code>cross_vrf: true</code>. A cross-VRF group gives the finding <code>address-group.cross-vrf-overlap</code> when two members overlap, and its JSON entries carry <code>"vrf"</code>.</li>
+  <li><code>include</code> adds the members of another group. bembel refuses a cycle.</li>
+  <li>An included group with another VRF gives <code>address-group.vrf-mismatch</code>, unless the group sets <code>cross_vrf: true</code>.</li>
+  <li>A cross-VRF group gives the finding <code>address-group.cross-vrf-overlap</code> when two members overlap. Its JSON entries carry <code>"vrf"</code>.</li>
   <li><code>exclude</code> removes addresses and prefixes.</li>
   <li>The result is sorted and without duplicates. With <code>aggregate: true</code> adjacent entries merge into larger CIDRs (default: off, because a firewall log should show the real addresses).</li>
   <li>SLAAC and other observed addresses are not members, unless <code>observed: true</code>.</li>
 </ol>
-<p>The result for <code>login-nodes</code> before the example below: <code>10.20.4.101</code>, <code>10.20.4.102</code>, <code>2001:db8:4200:204::101</code>, <code>2001:db8:4200:204::102</code> (hosts <code>login-01</code> and <code>login-02</code>). The permission to see the members is <code>address-group:read</code>. A user who can read the group but not a prefix still sees the members (the group has an owner and its own scope).</p>
+<p>The result for <code>login-nodes</code> before the <a href="#example">example</a>: <code>10.20.4.101</code>, <code>10.20.4.102</code>, <code>2001:db8:4200:204::101</code>, <code>2001:db8:4200:204::102</code> (hosts <code>login-01</code> and <code>login-02</code>).</p>
+<p>The permission to see the members is <code>address-group:read</code>. A user who can read the group but not a prefix still sees the members (the group has an owner and its own scope).</p>
 
 <h2 id="feeds">Feeds</h2>
 <p>A <dfn>feed</dfn> is a group, rendered in one format and served at a stable URL. The firewalls and hosts pull it. bembel makes a new <em>revision</em> only when the content changes.</p>
@@ -383,7 +431,13 @@ flush set inet filter login_nodes_v4
 add element inet filter login_nodes_v4 { 10.20.4.101, 10.20.4.102 }
 flush set inet filter login_nodes_v6
 add element inet filter login_nodes_v6 { 2001:db8:4200:204::101, 2001:db8:4200:204::102 }</code></pre>
-<p>The chain must declare <code>type filter hook input</code>, or no packet traverses it. The feed file only flushes and fills the sets. The firewall team keeps its own management access path ahead of the drop rule. <code>nft -c -f login-nodes.nft</code> checks the file. <code>nft -f login-nodes.nft</code> applies it. The kernel applies a file as one transaction, so a rule never sees a half-empty set. The package <code>bembel-feed</code> (a small shell script and a systemd timer) does fetch, check and apply.</p>
+<ul>
+  <li>The chain must declare <code>type filter hook input</code>, or no packet traverses it.</li>
+  <li>The feed file only flushes and fills the sets. The firewall team keeps its own management access path ahead of the drop rule.</li>
+  <li><code>nft -c -f login-nodes.nft</code> checks the file. <code>nft -f login-nodes.nft</code> applies it.</li>
+  <li>The kernel applies a file as one transaction, so a rule never sees a half-empty set.</li>
+  <li>The package <code>bembel-feed</code> (a small shell script and a systemd timer) does fetch, check and apply.</li>
+</ul>
 <h3 id="feeds-firewalld">firewalld</h3>
 <pre><code class="language-xml">&lt;?xml version="1.0" encoding="utf-8"?&gt;
 &lt;!-- bembel address-group login-nodes, revision 42, 2026-11-04T09:12:00Z --&gt;
@@ -401,7 +455,17 @@ add element inet filter login_nodes_v6 { 2001:db8:4200:204::101, 2001:db8:4200:2
 10.20.4.102
 2001:db8:4200:204::101
 2001:db8:4200:204::102</code></pre>
-<p>One entry in each line. An entry is an address or a CIDR. A line with <code>#</code> is a comment. With <code>family=4</code> the file has only IPv4 entries. This format fits the Palo Alto External Dynamic List (type IP list), the OPNsense and pfSense URL table alias and the FortiGate external IP address list. The limits (entries per list, refresh time) differ by product and version. The limit of the product is a setting of the group (<code>limits.max</code>) so bembel warns before the firewall refuses the list. These product facts are not verified here.</p>
+<ul>
+  <li>One entry in each line. An entry is an address or a CIDR. A line with <code>#</code> is a comment.</li>
+  <li>With <code>family=4</code> the file has only IPv4 entries.</li>
+</ul>
+<p>The format fits three products:</p>
+<ul>
+  <li>the Palo Alto External Dynamic List (type IP list);</li>
+  <li>the OPNsense and pfSense URL table alias;</li>
+  <li>the FortiGate external IP address list.</li>
+</ul>
+<p>The limits (entries per list, refresh time) differ by product and version. The limit of the product is a setting of the group (<code>limits.max</code>), so bembel warns before the firewall refuses the list. These product facts are not verified here.</p>
 <h3 id="feeds-json">JSON</h3>
 <pre><code class="language-json">{
   "name": "login-nodes",
@@ -423,7 +487,9 @@ add element inet filter login_nodes_v6 { 2001:db8:4200:204::101, 2001:db8:4200:2
 <thead><tr><th>Item</th><th>Rule</th></tr></thead>
 <tbody>
 <tr><td>Transport</td><td>HTTPS only. The server certificate comes from the site CA.</td></tr>
-<tr><td>Authentication</td><td>A feed token (bearer, in the header <code>Authorization</code>), or mutual TLS with a client certificate. The token is a personal access token of a local service subject (<code>svc:fw-pan-01</code>) with the permission <code>address-group:read</code>, bound through the tag of the group: the subject has a <code>feed-reader</code> binding on the scope term <code>tag=feed=fw-pan-01</code>, and the group <code>login-nodes</code> carries the tag <code>feed=fw-pan-01</code> (<a href="access.html#tokens">Access control</a>). It expires (default 1 year).</td></tr>
+<tr><td>Authentication</td><td>A feed token (bearer, in the header <code>Authorization</code>), or mutual TLS with a client certificate.</td></tr>
+<tr><td>Token</td><td>A personal access token of a local service subject (<code>svc:fw-pan-01</code>) with the permission <code>address-group:read</code>. It expires (default 1 year).</td></tr>
+<tr><td>Token binding</td><td>The subject has a <code>feed-reader</code> binding on the scope term <code>tag=feed=fw-pan-01</code>. The group <code>login-nodes</code> carries the tag <code>feed=fw-pan-01</code> (<a href="access.html#tokens">Access control</a>).</td></tr>
 <tr><td>Caching</td><td>The response has <code>ETag</code>, <code>Last-Modified</code>, <code>Cache-Control: max-age=60</code> and <code>X-Bembel-Revision</code>. A request with <code>If-None-Match</code> gets <code>304</code> when nothing changed.</td></tr>
 <tr><td>Token in a URL</td><td>Some products cannot send a header. For them an admin can enable a path token (<code>/v1/feeds/t/{token}/login-nodes?format=text</code>) for one group. It is off by default and it needs an IP allow list. Request logs hide the token.</td></tr>
 <tr><td>Audit</td><td>The audit log records token creation and changes of groups. It does not record each pull (the metric <code>bembel_feed_requests_total</code> counts them).</td></tr>
@@ -438,7 +504,14 @@ $ curl -sS -H "Authorization: Bearer $TOKEN" -H 'If-None-Match: "9f2c61"' \
 HTTP/2 304
 etag: "9f2c61"
 x-bembel-revision: 42</pre>
-<p>Palo Alto can use basic authentication or a client certificate for an EDL. FortiGate can use basic authentication for an external connector. OPNsense and pfSense URL tables are plain downloads (not verified). The path token exists for this last case.</p>
+<table class="compact">
+<thead><tr><th>Product</th><th>Authentication for the feed</th></tr></thead>
+<tbody>
+<tr><td>Palo Alto EDL</td><td>Basic authentication or a client certificate.</td></tr>
+<tr><td>FortiGate external connector</td><td>Basic authentication.</td></tr>
+<tr><td>OPNsense and pfSense URL table</td><td>Plain download (not verified). The path token exists for this case.</td></tr>
+</tbody>
+</table>
 
 <h3 id="feeds-flow">Update flow and safety</h3>
 <p>A feed is never built while the user waits. A worker builds it after a change.</p>
@@ -501,31 +574,34 @@ x-bembel-revision: 42</pre>
 <p>A held revision creates a change request. An approver (for example <code>m.huber</code>) reads the diff and approves or rejects. The four-eyes rule is the same as for other dangerous changes (<a href="access.html#changes">Access control</a>). An admin can undo a published revision with <code>bembel feed revert NAME --to 41</code>.</p>
 <aside class="callout why">
 <p class="callout-title">Why guards</p>
-<p>A firewall list is a high-impact object. A bug in a filter, a wrong tag edit, or a failed sync can make a group empty. A deny rule with an empty source list could cut all admins off. A rule with an allow list that is too large could open a service. The change limit and the empty-list guard cost one approval in rare cases. They give the firewall team a clear promise: a feed changes slowly, or a user sees it.</p>
+<p>A firewall list is a high-impact object. A bug in a filter, a wrong tag edit, or a failed sync can make a group empty. A deny rule with an empty source list could cut all admins off. A rule with an allow list that is too large could open a service.</p>
+<p>The change limit and the empty-list guard cost one approval in rare cases. They give the firewall team a clear promise: a feed changes slowly, or a user sees it.</p>
 </aside>
-<p>The metrics help to see problems early: <code>bembel_feed_revision</code>, <code>bembel_feed_entries</code>, <code>bembel_feed_held</code> and <code>bembel_feed_last_success_timestamp_seconds</code> for each group (<a href="operations.html#metrics">operations.html#metrics</a>). The alerts BembelFeedStale and BembelFeedHeld fire when a build is overdue for 15 minutes or a revision is held for an hour. A consumer should alarm on a feed that did not change for longer than expected (header <code>Last-Modified</code>).</p>
+<p>The metrics <code>bembel_feed_revision</code>, <code>bembel_feed_entries</code>, <code>bembel_feed_held</code> and <code>bembel_feed_last_success_timestamp_seconds</code> exist for each group, with the alerts BembelFeedStale and BembelFeedHeld (<a href="operations.html#metrics">operations.html#metrics</a>). A consumer should alarm on a feed that did not change for longer than expected (header <code>Last-Modified</code>).</p>
 
 <h2 id="example">Example</h2>
 <p>On 2026-11-04 the network admin <code>d.klein</code> brings a new subnet and a new login node online. This is the route that the values take.</p>
 <ol class="steps">
   <li><code>d.klein</code> sets <code>announce=true</code> with the tag <code>announce=campus-bgp</code> on the subnet <code>kestrel-services</code> (<code>10.20.20.0/24</code>, VLAN 220) in VRF <code>global</code>. These are routing values that only bembel holds, so d.klein can set them during the parallel run.</li>
-  <li>The outbox event reaches the feed builder. The prefix list <code>campus-bgp</code> gets revision 58. The diff has one new line.</li>
-  <li>The Nornir job of the network team pulls the export with its token, renders the FRR file of the border routers and shows the diff in the merge request.</li>
+  <li>The outbox event reaches the feed builder. The prefix list <code>campus-bgp</code> gets revision 58. The diff has one new line (the <code>--diff</code> frame in <a href="#prefix-lists">Prefix lists</a>).</li>
+  <li>The Nornir job of the network team pulls the export with its token. It renders the FRR file of the border routers and shows the diff in the merge request.</li>
   <li><code>a.berger</code> installs <code>login-03</code> and adds it in ONA with the addresses <code>10.20.4.103</code> and <code>2001:db8:4200:204::103</code> and the tag <code>role=login</code>. The import at 17:52 brings the host into bembel. ONA is the writer of hosts until the cutover (<a href="migration.html#plan">migration.html#plan</a>).</li>
   <li>The group <code>login-nodes</code> grows from 4 to 6 entries. The limit is max(ceil(0.25 × 4), 2) = 2, and the change is 2. No guard trips.</li>
   <li>The firewalls pull the new revision within their poll interval. The Palo Alto EDL has the new addresses after its next refresh.</li>
 </ol>
-<pre class="term">$ bembel export prefix-list campus-bgp --format frr --family 4 --diff
-revision 57 → 58   (etag "5b0e1c")
-+ ip prefix-list BEMBEL-CAMPUS-BGP-V4 seq 40 permit 10.20.20.0/24
-1 entry added, 0 removed, 3 unchanged
-
-$ bembel export address-group login-nodes --format text --diff
+<pre class="term">$ bembel export address-group login-nodes --format text --diff
 revision 42 → 43   (etag "c07a55")
 + 10.20.4.103
 + 2001:db8:4200:204::103
 2 entries added, 0 removed, 4 unchanged   within limits (min 2, max 200, max change 2), no guard tripped</pre>
 <p>If <code>d.klein</code> had set <code>announce=true</code> on the container <code>10.0.0.0/8</code> by mistake, the prefix-list export would add a line that announces all of RFC 1918. The container rule (<code>include_containers</code>) needs the tag, and a tag with an aggregate this large is a finding <code>routing.aggregate-private</code>. The export holds the revision for approval.</p>
-<p>The same objects answer the questions of the audit: who owns AS4200000001, which prefixes leave the campus, which hosts are in the SSH allow list of the login gateway, and when did a member join. Each answer is one API call, and the history of the objects (<a href="model.html#history">Core model</a>) gives the time.</p>
+<p>The same objects answer the questions of the audit:</p>
+<ul>
+  <li>who owns AS4200000001;</li>
+  <li>which prefixes leave the campus;</li>
+  <li>which hosts are in the SSH allow list of the login gateway;</li>
+  <li>when did a member join.</li>
+</ul>
+<p>Each answer is one API call, and the history of the objects (<a href="model.html#history">Core model</a>) gives the time.</p>
 </body>
 </html>
