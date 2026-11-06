@@ -7,7 +7,7 @@
 </head>
 <body>
 <h1>UI: access and migration</h1>
-<p class="lede">This chapter specifies the pages of the bembel web UI for access, change control and migration: Roles and bindings, tokens, the audit log, change requests, the ONA import with its parallel run, and Sources and syncs. Each page gets a screenshot, its purpose, layout, parts, states and its URL, API and CLI. The assistant and the help pane are shown at the end. <a href="assistant.html">Assistant and help</a> specifies them.</p>
+<p class="lede">This chapter specifies the web UI pages for access, change control and migration. The pages are Roles and bindings, tokens, the audit log, change requests, the ONA import with its parallel run, and Sources and syncs. The chapter ends with the screenshots of the assistant and help panes. <a href="assistant.html">Assistant and help</a> specifies those panes.</p>
 <ul class="keypoints">
   <li>The screenshots show one moment of the story: Wednesday 4 November 2026, about 18:02, user <code>d.klein</code> with the roles <code>network-admin</code> (global) and <code>approver</code> (prefix <code>10.20.0.0/16</code>).</li>
   <li>Access is allow only. A page shows the binding that allowed an action. A deny shows what was missing.</li>
@@ -19,18 +19,23 @@
 
 <h2 id="access">Roles and bindings</h2>
 <figure class="shot"><a href="mockups/ui/bindings.html"><img src="img/ui-bindings.webp" alt="Roles and bindings: tabs, a table of ten bindings with scope chips, the Explain access card with the result allowed via binding b-0007" loading="lazy"></a><figcaption>Roles and bindings. The row b-0007 is marked because the Explain access card used it.</figcaption></figure>
-<p>Purpose: the page shows who may do what, where. It also answers the question "why can this user do this?" without a guess. The model is in <a href="access.html">Access control</a>: a binding joins a subject, a role and a scope. A role is a set of permissions of the form <code>kind:verb</code>.</p>
+<p>Purpose: the page shows who may do what, where. It also answers "why can this user do this?" without a guess. A binding joins a subject, a role and a scope. A role is a set of permissions of the form <code>kind:verb</code> (<a href="access.html">Access control</a>).</p>
 
 <h3 id="access-layout">Layout</h3>
-<ul>
-  <li><b>Head.</b> One line of counts: 10 bindings, 6 subjects, 7 built-in roles, 4 trusted issuers. The text "Allow only. No binding means no access." states the rule once. The buttons are New binding… (the filled one), the assistant button "Explain my access" and the CLI toggle.</li>
-  <li><b>Tabs.</b> Bindings, Roles, Subjects and Issuers. The Bindings tab is the page of the screenshot.</li>
-  <li><b>Bindings table.</b> Columns: Subject, Role, Scope, Granted by, Expires, Source and id. A subject has a kind icon (user, group, service) and its issuer. A scope is one or more chips <code>kind value</code>. A binding with several terms shows the word AND between the chips. Both terms must be true.</li>
-  <li><b>Filter bar.</b> A text filter, the kind of subject, the role, the kind of scope and "Expires in 60 d".</li>
-  <li><b>Explain access.</b> A side card. The user picks a subject, an action and an object. The result is a pill (<code>allowed</code> or <code>denied</code>) and the binding that decided. A numbered path shows each step.</li>
-  <li><b>Built-in roles.</b> A table of the 7 roles, their permissions in short form and the count of bindings. The permissions are those of <a href="access.html#roles">Access control</a>.</li>
-  <li><b>Trusted issuers.</b> A short list. <a href="#integrations">Sources and syncs</a> has the full table.</li>
-</ul>
+<table>
+<thead><tr><th>Part</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td>Head</td><td>One line of counts: 10 bindings, 6 subjects, 7 built-in roles, 4 trusted issuers. The text "Allow only. No binding means no access." states the rule once.</td></tr>
+<tr><td>Head buttons</td><td>New binding… (filled), the assistant button "Explain my access" and the CLI toggle.</td></tr>
+<tr><td>Tabs</td><td>Bindings, Roles, Subjects and Issuers. The Bindings tab is the page of the screenshot.</td></tr>
+<tr><td>Bindings table</td><td>Columns: Subject, Role, Scope, Granted by, Expires, Source and id. A subject has a kind icon (user, group, service) and its issuer.</td></tr>
+<tr><td>Scope chips</td><td>A scope is one or more chips <code>kind value</code>. A binding with several terms shows the word AND between the chips. Both terms must be true.</td></tr>
+<tr><td>Filter bar</td><td>A text filter, the kind of subject, the role, the kind of scope and "Expires in 60 d".</td></tr>
+<tr><td>Explain access</td><td>A side card. The user picks a subject, an action and an object. The result is a pill (<code>allowed</code> or <code>denied</code>), the binding that decided and a numbered path of the steps.</td></tr>
+<tr><td>Built-in roles</td><td>A table of the 7 roles, their permissions in short form and the count of bindings. The permissions are those of <a href="access.html#roles">Access control</a>.</td></tr>
+<tr><td>Trusted issuers</td><td>A short list. <a href="#integrations">Sources and syncs</a> has the full table.</td></tr>
+</tbody>
+</table>
 
 <h3 id="access-story">The story data</h3>
 <table>
@@ -48,7 +53,13 @@
 <tr><td><code>b-0010</code></td><td>a.berger (user, <code>kc:a.berger</code>)</td><td>planner (custom)</td><td>prefix=10.20.16.0/22</td><td>d.klein</td><td>2027-03-31</td></tr>
 </tbody>
 </table>
-<p>This is the same table as in <a href="access.html#examples">Access control</a>. Only a binding from <code>bembel.yaml</code> (config) gives approver in global scope. d.klein holds approver only in <code>10.20.0.0/16</code>, so d.klein cannot approve a zone request. The role <code>planner</code> of b-0010 is a custom role (<a href="access.html#roles">Access control</a>). It gives a.berger <code>prefix:delete</code> in <code>10.20.16.0/22</code>, so a.berger can propose cr-0042. The group binding b-0002 has the scope <code>team=hpc-ops</code>, so a.berger cannot see <code>10.20.8.0/24</code> (osprey-gpu, owner gpu-ops).</p>
+<p>This is the table of <a href="access.html#examples">Access control</a>. It has these effects:</p>
+<ul>
+  <li>Only a binding from <code>bembel.yaml</code> (config) gives approver in global scope.</li>
+  <li>d.klein holds approver only in <code>10.20.0.0/16</code>, so d.klein cannot approve a zone request.</li>
+  <li>The custom role <code>planner</code> of b-0010 (<a href="access.html#roles">Access control</a>) gives a.berger <code>prefix:delete</code> in <code>10.20.16.0/22</code>, so a.berger can propose cr-0042.</li>
+  <li>The group binding b-0002 has the scope <code>team=hpc-ops</code>, so a.berger cannot see <code>10.20.8.0/24</code> (osprey-gpu, owner gpu-ops).</li>
+</ul>
 
 <figure class="diagram wide">
 <svg viewBox="0 0 900 250" role="img" aria-labelledby="chk-t">
@@ -89,7 +100,8 @@
 </figure>
 
 <h3 id="access-explain">Explain access</h3>
-<p>The card calls <code>POST /v1/me/permissions:check</code> with <code>{"explain": true, "subject": "kc:d.klein"}</code>. To name another subject, the caller needs <code>binding:read</code> in global scope. The call is read only. It writes no audit event and changes nothing. The result lists the bindings that name the subject, directly or through a group. For each binding it says why the binding does or does not give the action. The steps in the story:</p>
+<p>The card calls <code>POST /v1/me/permissions:check</code> with <code>{"explain": true, "subject": "kc:d.klein"}</code>. To name another subject, the caller needs <code>binding:read</code> in global scope. The call is read only. It writes no audit event and changes nothing (<a href="access.html#explain">Access control</a>).</p>
+<p>The result lists the bindings that name the subject, directly or through a group. For each binding it says why the binding does or does not give the action. The steps in the story:</p>
 <ol class="steps">
   <li>The subject is <code>d.klein</code>. The claim <code>groups</code> adds <code>netops</code> and <code>hpc-ops</code>.</li>
   <li>Four bindings name the subject or a group: b-0001, b-0002, b-0003 and b-0007.</li>
@@ -97,17 +109,21 @@
   <li>The scope <code>prefix=10.20.0.0/16</code> holds <code>10.20.16.0/22</code>, the object of cr-0042.</li>
   <li>The four-eyes rule passes. The requester is <code>a.berger</code>.</li>
 </ol>
-<aside class="callout why"><p class="callout-title">Why</p><p>A table of bindings does not answer "may this user do this?". A user has several bindings and groups, and scopes can be ANDed. The card runs the real check and shows the path. An admin finds a wrong binding in one step. The assistant uses the same call, together with <code>GET /v1/me/permissions</code>, for "Explain my access" (<a href="assistant.html">Assistant and help</a>). It lists the roles and scopes of the user and what the user cannot do. It says who else can do it only when the user has <code>binding:read</code> in global scope.</p></aside>
+<aside class="callout why"><p class="callout-title">Why</p><p>A table of bindings does not answer "may this user do this?". A user has several bindings and groups, and scopes can be ANDed. The card runs the real check and shows the path, so an admin finds a wrong binding in one step.</p></aside>
+<p>The assistant uses the same call, with <code>GET /v1/me/permissions</code>, for "Explain my access" (<a href="assistant.html">Assistant and help</a>). It lists the roles and scopes of the user and what the user cannot do. It says who else can do it only when the user has <code>binding:read</code> in global scope.</p>
 
 <h3 id="access-states">States</h3>
-<ul>
-  <li><b>Config bindings.</b> A binding from <code>bembel.yaml</code> has the source badge <span class="tag">config</span>. The UI shows it and does not edit it.</li>
-  <li><b>Expiry.</b> A binding that expires in less than 60 days has a warn pill ("in 41 d"). Extend… is in its ⋯ menu.</li>
-  <li><b>No permission.</b> A user without <code>binding:create</code> sees the table and the card. New binding… and the ⋯ menus are disabled, with the reason in the tooltip.</li>
-  <li><b>Self lock.</b> bembel refuses to delete the last active binding that gives <code>binding:create</code>, <code>binding:delete</code> and <code>role:update</code> in global scope. The error code is <code>binding.last-admin</code>.</li>
-  <li><b>Privileged role.</b> A new or deleted binding whose role holds a privileged permission (for example <code>binding:create</code> or <code>change-request:approve</code>) is held as a change request. New binding… then says "Needs a change request".</li>
-  <li><b>Suspended.</b> When a role changes, bembel tests each binding of that role again against the grants of the user who made it. A binding that fails gets the warn pill "suspended" and gives nothing.</li>
-</ul>
+<table>
+<thead><tr><th>State</th><th>Display</th></tr></thead>
+<tbody>
+<tr><td>Config binding</td><td>A binding from <code>bembel.yaml</code> has the source badge <span class="tag">config</span>. The UI shows it and does not edit it.</td></tr>
+<tr><td>Expiry</td><td>A binding that expires in less than 60 days has a warn pill ("in 41 d"). Extend… is in its ⋯ menu.</td></tr>
+<tr><td>No permission</td><td>A user without <code>binding:create</code> sees the table and the card. New binding… and the ⋯ menus are disabled, with the reason in the tooltip.</td></tr>
+<tr><td>Self lock</td><td>bembel refuses to delete the last active binding that gives <code>binding:create</code>, <code>binding:delete</code> and <code>role:update</code> in global scope. The error code is <code>binding.last-admin</code>.</td></tr>
+<tr><td>Privileged role</td><td>A new or deleted binding whose role holds a privileged permission (for example <code>binding:create</code> or <code>change-request:approve</code>) is held as a change request. New binding… then says "Needs a change request".</td></tr>
+<tr><td>Suspended</td><td>When a role changes, bembel tests each binding of that role again against the grants of the user who made it (<a href="access.html#delegation">Access control</a>). A binding that fails gets the warn pill "suspended" and gives nothing.</td></tr>
+</tbody>
+</table>
 <dl class="facts">
   <dt>URL</dt><dd><code>/access/bindings[?subject=&amp;role=&amp;scope=&amp;kind=]</code>; tabs <code>/access/roles</code>, <code>/access/subjects</code>, <code>/access/issuers</code></dd>
   <dt>API</dt><dd><code>GET /v1/bindings</code>, <code>POST /v1/bindings</code>, <code>DELETE /v1/bindings/{id}</code>, <code>GET /v1/roles</code>, <code>POST /v1/me/permissions:check</code> (with <code>"explain": true</code>)</dd>
@@ -116,16 +132,25 @@
 
 <h2 id="tokens">Personal access tokens</h2>
 <figure class="shot"><a href="mockups/ui/tokens.html"><img src="img/ui-tokens.webp" alt="Personal access tokens: a list of four tokens, the New token dialog with permissions from a role, scope and expiry, and the one-time secret" loading="lazy"></a><figcaption>Tokens of d.klein. Below the list: the New token dialog and the dialog that shows the secret once.</figcaption></figure>
-<p>Purpose: a token lets a script or a CLI call the API as the user. A token has a list of permissions and scope terms. A role can fill the list. A token can only narrow the access of its owner. It never adds access. A token never gets <code>token</code>, <code>binding</code>, <code>role</code>, <code>draft:apply</code> or <code>change-request:approve</code> permissions. A token is a stored hash. bembel shows the secret once. The format is <code>bem_pat_&lt;id&gt;_&lt;secret&gt;</code>: an id of 8 public characters and a secret of 32 random bytes (43 characters, base64url).</p>
+<p>Purpose: a token lets a script or a CLI call the API as the user. A token can only narrow the access of its owner, and it never gets the denied permissions. The format, storage and rules are in <a href="access.html#tokens">Access control</a>.</p>
+<p>The format is <code>bem_pat_&lt;id&gt;_&lt;secret&gt;</code>: an id of 8 public characters and a secret of 32 random bytes (43 characters, base64url). bembel shows the secret once.</p>
 <h3 id="tokens-layout">Layout and parts</h3>
-<ul>
-  <li><b>List.</b> Columns: Name, Token (<code>bem_pat_7f2aK9cE_…</code>: the prefix and the public id), Permissions and scope (narrowed), Expires, Last used (time and origin) and Created. A cell reads "allocator set · prefix 10.20.0.0/16 and team hpc-ops".</li>
-  <li><b>New token dialog.</b> Fields: name, permissions from a role (template), scope terms, expiry. The role chips show only roles that the user has, and never approver. A chip only fills the list of permissions. The API stores the list, not the role. A scope term can only make the scope smaller. The expiry is 7 days, 30 days, 90 days or 1 year. A token has always an expiry.</li>
-  <li><b>Effect line.</b> "This token can <code>prefix:allocate</code>, <code>address:create update allocate release</code>, <code>claim:create confirm release</code>, <code>host:create update</code>, <code>interface:create update</code> and read in 10.20.0.0/16 for team hpc-ops. It cannot change bindings, apply drafts or approve." bembel computes it with the same check as Explain access. The line shows the intersection of the token and the user. For a token, bembel reads the groups of the owner from the IdP at use time (cached at most 5 minutes), so a group change also applies to the token within 5 minutes.</li>
-  <li><b>CLI command.</b> As in each dialog of bembel, the dialog shows the command that does the same: <code>bembel token create runbook-bot --role allocator …</code>. The flag <code>--role</code> expands to <code>--permission</code> flags.</li>
-  <li><b>Foot.</b> "bembel shows a token once, at creation. It keeps only sha256(secret) and the public id."</li>
-  <li><b>Secret dialog.</b> A warn banner, the secret in a dark block with a Copy button and the key facts (name, permissions, expiry, the public id <code>8Hq2vNf0</code>). The button "I have copied it" closes the dialog. There is no way to show the secret again.</li>
-</ul>
+<table>
+<thead><tr><th>Part</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td>List</td><td>Columns: Name, Token (<code>bem_pat_7f2aK9cE_…</code>: the prefix and the public id), Permissions and scope (narrowed), Expires, Last used (time and origin) and Created. A cell reads "allocator set · prefix 10.20.0.0/16 and team hpc-ops".</td></tr>
+<tr><td>New token dialog</td><td>Fields: name, permissions from a role (template), scope terms, expiry.</td></tr>
+<tr><td>Role chips</td><td>They show only roles that the user has, and never approver. A chip only fills the list of permissions: the API stores the list, not the role.</td></tr>
+<tr><td>Scope and expiry</td><td>A scope term can only make the scope smaller. The expiry is 7 days, 30 days, 90 days or 1 year. A token always has an expiry.</td></tr>
+<tr><td>Effect line</td><td>bembel computes it with the same check as Explain access. The line shows the intersection of the token and the user.</td></tr>
+<tr><td>Effect line text</td><td>"This token can <code>prefix:allocate</code>, <code>address:create update allocate release</code>, <code>claim:create confirm release</code>, <code>host:create update</code>, <code>interface:create update</code> and read in 10.20.0.0/16 for team hpc-ops. It cannot change bindings, apply drafts or approve."</td></tr>
+<tr><td>CLI command</td><td>As in each dialog of bembel, the dialog shows the command that does the same: <code>bembel token create runbook-bot --role allocator …</code>. The flag <code>--role</code> expands to <code>--permission</code> flags.</td></tr>
+<tr><td>Foot</td><td>"bembel shows a token once, at creation. It keeps only sha256(secret) and the public id."</td></tr>
+<tr><td>Secret dialog</td><td>A warn banner, the secret in a dark block with a Copy button, and the key facts (name, permissions, expiry, the public id <code>8Hq2vNf0</code>).</td></tr>
+<tr><td>Secret dialog close</td><td>The button "I have copied it" closes the dialog. There is no way to show the secret again.</td></tr>
+</tbody>
+</table>
+<p>For a token, bembel reads the groups of the owner from the IdP at use time (cached at most 5 minutes). A group change therefore also applies to the token within 5 minutes.</p>
 <table>
 <thead><tr><th>State</th><th>Display</th></tr></thead>
 <tbody>
@@ -145,16 +170,21 @@
 
 <h2 id="audit">Audit log</h2>
 <figure class="shot"><a href="mockups/ui/audit.html"><img src="img/ui-audit.webp" alt="Audit log: filter bar, a dense table of events, an expanded allowed change with a before and after JSON diff, and an expanded deny" loading="lazy"></a><figcaption>Audit log of 4 November. The CNAME change by m.huber shows the diff. The deny of s.yildiz shows what was missing.</figcaption></figure>
-<p>Purpose: the log answers "who did what, when, from where, and was it allowed?". An audit event is append only. The database refuses an update or a delete of an event. Audit events are not logs: they stay in the database, with an optional stream to Loki or a SIEM.</p>
+<p>Purpose: the log answers "who did what, when, from where, and was it allowed?". An audit event is append only: the database refuses an update or a delete. Audit events are not logs. They stay in the database, with an optional stream to Loki or a SIEM (<a href="access.html#audit">Access control</a>).</p>
 <h3 id="audit-layout">Layout and parts</h3>
-<ul>
-  <li><b>Head.</b> "143 events today · 3 denied · 1 pending". The Export… button writes a JSON Lines file for the filter.</li>
-  <li><b>Filter bar.</b> Subject, action (with <code>*</code>, for example <code>prefix:*</code>), kind of object, time, decision (<code>allow</code>, <code>deny</code>, <code>pending</code>) and origin.</li>
-  <li><b>Table.</b> Dense rows: Time, Subject, Origin, Action, Object, Decision, Via binding. Origin is a small chip: <code>ui</code>, <code>cli</code>, <code>api</code>, <code>assistant</code>, <code>agent</code>, <code>sync</code> or <code>system</code>. The chip of the assistant has the spark mark. Via binding is a binding id, <code>self</code> for a right of a user on its own drafts, tokens and requests, or <code>system</code> for a built-in worker such as <code>system:ona-import</code>.</li>
-  <li><b>Pending row.</b> A held action has the decision <code>pending</code> and links to its change request (17:41, <code>prefix:delete</code> on 10.20.16.0/22 through b-0010, cr-0042).</li>
-  <li><b>Expanded row.</b> A click opens the event: id, request id, revision, the subject with the client, the decision and, for a change, the object before and after as a JSON diff in a log block. Red lines are removed, green lines are added.</li>
-  <li><b>Deny row.</b> The row has a red tint. The expanded part gives the code <code>permission.denied</code>, the missing permission and the bindings that bembel looked at.</li>
-</ul>
+<table>
+<thead><tr><th>Part</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td>Head</td><td>"143 events today · 3 denied · 1 pending". The Export… button writes a JSON Lines file for the filter.</td></tr>
+<tr><td>Filter bar</td><td>Subject, action (with <code>*</code>, for example <code>prefix:*</code>), kind of object, time, decision (<code>allow</code>, <code>deny</code>, <code>pending</code>) and origin.</td></tr>
+<tr><td>Table</td><td>Dense rows: Time, Subject, Origin, Action, Object, Decision, Via binding. Origin is a small chip. The chip of the assistant has the spark mark. Via binding is a binding id, <code>self</code> or <code>system</code>.</td></tr>
+<tr><td>Pending row</td><td>A held action has the decision <code>pending</code> and links to its change request (17:41, <code>prefix:delete</code> on 10.20.16.0/22 through b-0010, cr-0042).</td></tr>
+<tr><td>Expanded row</td><td>A click opens the event: id, request id, revision, the subject with the client and the decision.</td></tr>
+<tr><td>Expanded change</td><td>The object before and after as a JSON diff in a log block. Red lines are removed, green lines are added.</td></tr>
+<tr><td>Deny row</td><td>The row has a red tint. The expanded part gives the code <code>permission.denied</code>, the missing permission and the bindings that bembel looked at.</td></tr>
+</tbody>
+</table>
+<p>Via binding shows <code>self</code> for a right of a user on its own drafts, tokens and requests. It shows <code>system</code> for a built-in worker such as <code>system:ona-import</code>.</p>
 <table>
 <thead><tr><th>Origin</th><th>Meaning</th></tr></thead>
 <tbody>
@@ -167,7 +197,15 @@
 <tr><td><code>system</code></td><td>Another built-in worker (<code>system:reaper</code>, <code>system:export</code>, <code>system:subject-sync</code>).</td></tr>
 </tbody>
 </table>
-<p>The log has no row for a successful read. It has a row for a denied read. This keeps the log small and still shows probing. The full log, with deny rows and other subjects, needs <code>audit:read</code> in global scope. d.klein has it through network-admin. A user without it sees only <code>allow</code> and <code>pending</code> events of objects that the user can read (<a href="access.html#audit">Access control</a>). The dashboard and the history of an object use this filtered view. States: an empty filter result says "No event matches." and shows the active filters as chips.</p>
+<p>The log has no row for a successful read. It has a row for a denied read. This keeps the log small and still shows probing.</p>
+<table>
+<thead><tr><th>User</th><th>The page shows</th></tr></thead>
+<tbody>
+<tr><td>With <code>audit:read</code> in global scope (d.klein, through network-admin)</td><td>The full log, with deny rows and other subjects.</td></tr>
+<tr><td>Without it</td><td>Only <code>allow</code> and <code>pending</code> events of objects that the user can read (<a href="access.html#audit">Access control</a>). The dashboard and the history of an object use this filtered view.</td></tr>
+</tbody>
+</table>
+<p>An empty filter result says "No event matches." and shows the active filters as chips.</p>
 <dl class="facts">
   <dt>URL</dt><dd><code>/audit[?subject=&amp;action=&amp;kind=&amp;since=&amp;decision=&amp;origin=]</code>; one event <code>/audit/{id}</code></dd>
   <dt>API</dt><dd><code>GET /v1/audit-events</code> (cursor paging; filters <code>resource_kind</code> and <code>resource_id</code>), <code>GET /v1/audit-events/{id}</code>, <code>GET /v1/events/stream</code> (server-sent events) for new events</dd>
@@ -176,7 +214,8 @@
 
 <h2 id="changes">Change requests</h2>
 <figure class="shot"><a href="mockups/ui/changes.html"><img src="img/ui-changes.webp" alt="Change requests: pending list with cr-0042 and cr-0043, and a fold with closed requests" loading="lazy"></a><figcaption>Change requests at 18:02: cr-0042 can be approved by d.klein. cr-0043 is the request of d.klein.</figcaption></figure>
-<p>Purpose: a dangerous action does not run at once. bembel holds it as a change request. A rule decides which actions it holds: delete a prefix with children, delete a zone, a bulk change of more than <code>access.change_request.bulk_threshold</code> objects (default 50), a binding or a role with a privileged permission, and a DHCP restart override (<a href="access.html#changes">Access control</a>). A held call needs only the permission of the held action. A second user with <code>change-request:approve</code> in scope decides. This is the four-eyes rule. The approver must be a human user with a session or an OIDC user token, not the requester, not a token and not a draft apply.</p>
+<p>Purpose: a dangerous action does not run at once. bembel holds it as a change request, and a second user with <code>change-request:approve</code> in scope decides. This is the four-eyes rule. A held call needs only the permission of the held action.</p>
+<p>The triggers, the approver rules and the codes are in <a href="access.html#changes">Access control</a>. The triggers are: delete a prefix with children, delete a zone, a bulk change, a privileged binding or role, and a DHCP restart override.</p>
 <figure class="diagram wide">
 <svg viewBox="0 0 900 230" role="img" aria-labelledby="cr-t">
 <title id="cr-t">States of a change request: pending, then approved and executed or failed, rejected, or expired</title>
@@ -211,13 +250,34 @@
 <figcaption>States of a change request. A second user approves or rejects. An approved request is executed at once, or it fails when the data or the rights of the requester changed. After 7 days without a decision the request expires. The requester can withdraw it (state withdrawn).</figcaption>
 </figure>
 <h3 id="changes-layout">Layout and parts</h3>
+<table>
+<thead><tr><th>Part</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td>Head</td><td>"2 pending" and one sentence of the rule. The state filter is a segmented control: pending, approved, rejected, expired, failed, all, each with a count.</td></tr>
+<tr><td>Rows</td><td>Id (<code>cr-0042</code>), title, state pill, a tag ("you can approve" or "yours") and the reason of the requester.</td></tr>
+<tr><td>Row facts</td><td>The counts (4 prefixes, 0 addresses, 0 DNS records), the rule code, the time to expiry and the number of comments. cr-0042 is the first row and has a coloured left edge.</td></tr>
+<tr><td>Buttons</td><td>For a request that the user can approve: Review… (filled) and "Review with assistant". For a request of the user: Open and Withdraw….</td></tr>
+<tr><td>Closed requests</td><td>A fold with a table: id, title, requester, decision, who decided, time.</td></tr>
+<tr><td>Top bar chip</td><td>"1 to approve". It counts the requests that the user may approve.</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Closed request</th><th>Requester</th><th>Decision</th><th>Decided by</th></tr></thead>
+<tbody>
+<tr><td>cr-0041 (bulk)</td><td>s.yildiz</td><td>approved</td><td>m.huber</td></tr>
+<tr><td>cr-0040</td><td>d.klein</td><td>approved</td><td>m.huber</td></tr>
+<tr><td>cr-0039</td><td>d.klein</td><td>rejected</td><td>m.huber</td></tr>
+<tr><td>cr-0038</td><td>d.klein</td><td>expired</td><td>–</td></tr>
+</tbody>
+</table>
+<p>cr-0043 of d.klein waits for m.huber, the only approver in global scope.</p>
 <ul>
-  <li><b>Head.</b> "2 pending" and one sentence of the rule. The state filter is a segmented control: pending, approved, rejected, expired, failed, all, each with a count.</li>
-  <li><b>Rows.</b> id (<code>cr-0042</code>), title, state pill, a tag ("you can approve" or "yours"), the reason of the requester, the counts (4 prefixes, 0 addresses, 0 DNS records), the rule code, the time to expiry and the number of comments. cr-0042 is the first row and has a coloured left edge.</li>
-  <li><b>Buttons.</b> For a request that the user can approve: Review… (filled) and "Review with assistant". For a request of the user: Open and Withdraw….</li>
-  <li><b>Closed requests.</b> A fold with a table: id, title, requester, decision, who decided, time. The story has cr-0041 (bulk, by s.yildiz, approved by m.huber), cr-0040 (by d.klein, approved by m.huber), cr-0039 (by d.klein, rejected by m.huber) and cr-0038 (by d.klein, expired). cr-0043 of d.klein waits for m.huber, the only approver in global scope.</li>
+  <li>The title of the top bar chip says "1 change request waits for your approval. 1 more is yours and needs another approver."</li>
+  <li>The chip counts only the requests that the user may approve. The requests of the user do not count.</li>
+  <li>The chip links to this page. A user without <code>approver</code> in any scope does not see it.</li>
+  <li>With no pending request the card says "No change request waits."</li>
+  <li>The page of a user without approver rights shows the same list. The tag "you can approve" is absent, and Review… opens the read only page.</li>
 </ul>
-<p>The top bar has a chip "1 to approve". Its title says "1 change request waits for your approval. 1 more is yours and needs another approver." The chip counts only the requests that the user may approve. The requests of the user do not count. It links to this page. A user without <code>approver</code> in any scope does not see the chip. States: with no pending request the card says "No change request waits." The page of a user without approver rights shows the same list. The tag "you can approve" is absent, and Review… opens the read only page.</p>
 <dl class="facts">
   <dt>URL</dt><dd><code>/changes[?state=pending|approved|rejected|expired|failed]</code></dd>
   <dt>API</dt><dd><code>GET /v1/change-requests</code>, <code>GET /v1/change-requests/{id}</code>, <code>POST /v1/change-requests/{id}:withdraw</code> (the requester only)</dd>
@@ -227,16 +287,40 @@
 <h3 id="change-request">Review of cr-0042</h3>
 <figure class="shot"><a href="mockups/ui/change-request.html"><img src="img/ui-change-request.webp" alt="Review of cr-0042: four-eyes banner, tree diff of four removed prefixes, five impact checks, discussion, decision card and the assistant review" loading="lazy"></a><figcaption>cr-0042 "Delete 10.20.16.0/22 with 3 children" by a.berger. The decision card is on the right.</figcaption></figure>
 <p>Purpose: the page gives an approver all facts to decide. It does not ask the approver to trust the title. The page shows the exact change, the checks that bembel ran and the discussion.</p>
-<ul>
-  <li><b>Four-eyes banner.</b> "You are not the requester. You have approver in prefix 10.20.0.0/16 through binding b-0007, and the request is inside that scope." If the user is the requester, the banner is a warn banner and says "A second subject must decide." If the scope does not hold the object, it names the missing scope.</li>
-  <li><b>What will change.</b> A tree diff. Removed prefixes have a red edge, a minus and a struck-through name: <code>10.20.16.0/22</code> (container "Hall 2 row C") and the three children <code>10.20.16.0/24</code>, <code>10.20.17.0/24</code> and <code>10.20.18.0/23</code>. The head counts: 4 prefixes removed, 0 addresses, 0 DNS records. The foot names the held operation <code>DELETE /v1/prefixes/{id}?recursive=true</code>.</li>
-  <li><b>Impact checks.</b> Five checks, each with a green mark: no addresses, no DHCP scope, no DNS records (the reverse zones <code>16.20.10.in-addr.arpa</code> and <code>17.20.10.in-addr.arpa</code> have 0 records), no export changes (a dry run of the BIND and dhcpd exports), no references (VLAN, route, address group, static route). A failed check has a red mark and a sentence. It does not block the decision, but it says what will break.</li>
-  <li><b>Discussion.</b> Comments of the requester and of others, with time and role. A comment is an audit event.</li>
-  <li><b>Your decision.</b> A comment field, Approve… (filled) and Reject… (red outline). A reject needs a comment. A line says why Approve is on: "b-0007 gives <code>change-request:approve</code> in this scope." If the user cannot approve, the buttons are disabled and the line gives the reason.</li>
-  <li><b>Review with assistant.</b> A card with the result of the advisory "Review this change request": a verdict ("Low risk"), reasons, the model line and the tool calls in a fold. It is advice. The decision stays with the user.</li>
-  <li><b>Request.</b> The id, the rule that held the action (<code>prefix.delete-with-children</code>), the requester and the binding that gave the action (a.berger, b-0010), the subjects who can approve (d.klein, m.huber), the state and the API call.</li>
-</ul>
-<p>Approve runs the held operation at once, as the requester, after bembel re-checks the requester's rights. If they no longer give the action (a binding expired or was deleted, a group or the user was removed in the IdP), the approve fails with <code>409 change-request.proposer-forbidden</code>, the request moves to failed and nothing changes. If the data changed in the meantime (a new address in the subtree), the approve fails with <code>409 change-request.stale</code>, the request moves to failed and nothing changes. The requester submits it again. The audit event of the delete names <code>a.berger</code> as subject and <code>d.klein</code> as approver.</p>
+<table>
+<thead><tr><th>Part</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td>Four-eyes banner</td><td>"You are not the requester. You have approver in prefix 10.20.0.0/16 through binding b-0007, and the request is inside that scope."</td></tr>
+<tr><td>Banner variants</td><td>If the user is the requester, the banner is a warn banner and says "A second subject must decide." If the scope does not hold the object, it names the missing scope.</td></tr>
+<tr><td>What will change</td><td>A tree diff. Removed prefixes have a red edge, a minus and a struck-through name. The head counts: 4 prefixes removed, 0 addresses, 0 DNS records. The foot names the held operation <code>DELETE /v1/prefixes/{id}?recursive=true</code>.</td></tr>
+<tr><td>Impact checks</td><td>Five checks, each with a green mark. A failed check has a red mark and a sentence. It does not block the decision, but it says what will break.</td></tr>
+<tr><td>Discussion</td><td>Comments of the requester and of others, with time and role. A comment is an audit event.</td></tr>
+<tr><td>Your decision</td><td>A comment field, Approve… (filled) and Reject… (red outline). A reject needs a comment.</td></tr>
+<tr><td>Decision line</td><td>A line says why Approve is on: "b-0007 gives <code>change-request:approve</code> in this scope." If the user cannot approve, the buttons are disabled and the line gives the reason.</td></tr>
+<tr><td>Review with assistant</td><td>A card with the result of the advisory "Review this change request". It shows a verdict ("Low risk"), reasons, the model line and the tool calls in a fold. It is advice. The decision stays with the user.</td></tr>
+<tr><td>Request</td><td>The id, the state and the API call. The rule that held the action: <code>prefix.delete-with-children</code>.</td></tr>
+<tr><td>Request subjects</td><td>The requester and the binding that gave the action (a.berger, b-0010). The subjects who can approve (d.klein, m.huber).</td></tr>
+</tbody>
+</table>
+<p>The removed prefixes of the tree diff are <code>10.20.16.0/22</code> (container "Hall 2 row C") and the three children <code>10.20.16.0/24</code>, <code>10.20.17.0/24</code> and <code>10.20.18.0/23</code>.</p>
+<table>
+<thead><tr><th>Impact check</th><th>Result for cr-0042</th></tr></thead>
+<tbody>
+<tr><td>Addresses</td><td>None.</td></tr>
+<tr><td>DHCP scope</td><td>None.</td></tr>
+<tr><td>DNS records</td><td>None. The reverse zones <code>16.20.10.in-addr.arpa</code> and <code>17.20.10.in-addr.arpa</code> have 0 records.</td></tr>
+<tr><td>Export changes</td><td>None. A dry run of the BIND and dhcpd exports shows no change.</td></tr>
+<tr><td>References</td><td>None (VLAN, route, address group, static route).</td></tr>
+</tbody>
+</table>
+<p>Approve runs the held operation at once, as the requester, after bembel re-checks the requester's rights. The audit event of the delete names <code>a.berger</code> as subject and <code>d.klein</code> as approver. In two cases the approve fails, the request moves to failed and nothing changes. The requester then submits it again.</p>
+<table>
+<thead><tr><th>Case at Approve</th><th>Code</th></tr></thead>
+<tbody>
+<tr><td>The rights of the requester no longer give the action. A binding expired or was deleted, or a group or the user was removed in the IdP.</td><td><code>409 change-request.proposer-forbidden</code></td></tr>
+<tr><td>The data changed in the meantime (a new address in the subtree)</td><td><code>409 change-request.stale</code></td></tr>
+</tbody>
+</table>
 <aside class="callout why"><p class="callout-title">Why</p><p>An approver under time pressure clicks. The page therefore shows the result of the change, not the request text. The five checks are the questions that an experienced admin asks. The assistant card lowers the effort, but it does not replace the checks.</p></aside>
 <dl class="facts">
   <dt>URL</dt><dd><code>/changes/{id}</code></dd>
@@ -281,26 +365,50 @@
 <figcaption>The import maps ONA data and reports findings. A fix is made in ONA or in the map file, and the next run closes the finding. Each night the exports of bembel and ONA are diffed.</figcaption>
 </figure>
 <h3 id="import-layout">Layout and parts</h3>
-<ul>
-  <li><b>Head.</b> The run id, the start time and the trigger (the timer), the duration (3 min 19 s) and the source. Buttons: Run again… and Export diff (filled, links to the diff of the parallel run). The CLI toggle holds <code>bembel import ona --dry-run</code>.</li>
-  <li><b>What the run imported.</b> A bar with the finding counts (214 findings: 37 error, 110 warn, 67 info; new 1, closed 6, accepted 0), the counts per code, and a table per ONA table: rows read, objects imported, findings. The numbers in the story: 41 037 hosts, 47 612 interface rows, 1 904 subnet rows (1 899 imported), 62 318 DNS rows, 388 VLAN rows. The run imported 41 023 hosts, 41 426 interfaces and 47 597 addresses.</li>
-  <li><b>Findings.</b> A filter bar (state, code, severity) and a table: Code, Severity (<code>error</code>, <code>warn</code>, <code>info</code>), Object, Suggestion, State and the row actions. A suggestion is a change in ONA or an answer in the map file. The row actions are "Show ONA rows" (the refs <code>ona:TABLE:ID</code> with a link to ONA), "Copy map-file rule" (a <code>resolve:</code> snippet; bembel never writes the map file), "Accept with reason…" and "Explain this finding". A closed row shows "closed by run imp-…" and has no action. The page has no edit actions until <code>bembel import ona --release</code>.</li>
-  <li><b>Parallel run.</b> The side card. See <a href="#parallel">Parallel run</a>.</li>
-  <li><b>ONA today.</b> ONA is the writer until the freeze on 2026-11-09, and the number of nights left.</li>
-</ul>
 <table>
-<thead><tr><th>Code</th><th>Count</th><th>Meaning</th><th>Suggestion</th></tr></thead>
+<thead><tr><th>Part</th><th>Content</th></tr></thead>
 <tbody>
-<tr><td><code>ona.orphan-dns</code></td><td>37</td><td>A dns row points to a missing domain, interface or target row, or a host has no valid primary DNS row.</td><td>In ONA, delete the row or repair the link.</td></tr>
-<tr><td><code>ona.stale-subnet-id</code></td><td>29</td><td><code>interfaces.subnet_id</code> differs from the subnet that contains the IP.</td><td>None. The derived subnet wins.</td></tr>
-<tr><td><code>ona.dup-mac</code></td><td>21</td><td>One MAC on interfaces of different hosts, or two MACs in one interface group.</td><td>In ONA, correct the MAC, or add <code>resolve: {dup-mac: {ids: [...], keep: first}}</code> in the map file.</td></tr>
-<tr><td><code>ona.zero-date</code></td><td>18</td><td>A date <code>0000-00-00 00:00:00</code> in ONA. The import makes it null.</td><td>None, or set the date in ONA.</td></tr>
-<tr><td><code>ona.ptr-mismatch</code></td><td>16</td><td>A PTR target differs from the A name of the address.</td><td>In ONA, decide the right name.</td></tr>
-<tr><td><code>ona.overlap</code></td><td>4</td><td>A subnet starts, ends inside or encloses another subnet of the same VRF.</td><td>In ONA, delete or resize one subnet, or move it to another VRF in the map file.</td></tr>
-<tr><td><code>ona.ipv6-ambiguous</code></td><td>2</td><td>A small value fits IPv4 and an IPv6 subnet in <code>::/96</code>.</td><td>Imported as IPv4. For IPv6, set <code>family</code> for the row in the map file.</td></tr>
+<tr><td>Head</td><td>The run id, the start time and the trigger (the timer), the duration (3 min 19 s) and the source.</td></tr>
+<tr><td>Head buttons</td><td>Run again… and Export diff (filled, links to the diff of the parallel run). The CLI toggle holds <code>bembel import ona --dry-run</code>.</td></tr>
+<tr><td>What the run imported</td><td>A bar with the finding counts: 214 findings (37 error, 110 warn, 67 info), new 1, closed 6, accepted 0. Then the counts per code and a table per ONA table.</td></tr>
+<tr><td>Findings</td><td>A filter bar (state, code, severity) and a table: Code, Severity (<code>error</code>, <code>warn</code>, <code>info</code>), Object, Suggestion, State and the row actions. A suggestion is a change in ONA or an answer in the map file.</td></tr>
+<tr><td>Parallel run</td><td>The side card. See <a href="#parallel">Parallel run</a>.</td></tr>
+<tr><td>ONA today</td><td>ONA is the writer until the freeze on 2026-11-09, and the number of nights left.</td></tr>
 </tbody>
 </table>
-<p>Until the cutover ONA is the writer. Fixes are made in ONA or in the map file: fix the row in ONA or add a map-file rule, and the next import run closes the finding. The state of a finding is <code>open</code>, <code>accepted</code> or <code>closed</code>. An accept needs a reason and the permission <code>source:sync</code>. The audit log records it.</p>
+<table>
+<thead><tr><th>ONA table</th><th>Rows read</th><th>Imported</th></tr></thead>
+<tbody>
+<tr><td>Hosts</td><td>41 037</td><td>41 023 hosts</td></tr>
+<tr><td>Interface rows</td><td>47 612</td><td>41 426 interfaces</td></tr>
+<tr><td>Addresses</td><td>–</td><td>47 597 addresses</td></tr>
+<tr><td>Subnet rows</td><td>1 904</td><td>1 899</td></tr>
+<tr><td>DNS rows</td><td>62 318</td><td>–</td></tr>
+<tr><td>VLAN rows</td><td>388</td><td>–</td></tr>
+</tbody>
+</table>
+<p>The row actions of the findings table:</p>
+<ul>
+  <li>"Show ONA rows": the refs <code>ona:TABLE:ID</code> with a link to ONA.</li>
+  <li>"Copy map-file rule": a <code>resolve:</code> snippet. bembel never writes the map file.</li>
+  <li>"Accept with reason…".</li>
+  <li>"Explain this finding".</li>
+</ul>
+<p>A closed row shows "closed by run imp-…" and has no action. The page has no edit actions until <code>bembel import ona --release</code>.</p>
+<p>The codes of the run are in <a href="migration.html#findings">Migration</a>. The meaning and fix rule of each code are in <a href="map-ona.html#problems">Mapping from OpenNetAdmin</a>. The findings table of the screenshot shows these codes:</p>
+<table>
+<thead><tr><th>Code</th><th>Count</th><th>Suggestion on the page</th></tr></thead>
+<tbody>
+<tr><td><code>ona.orphan-dns</code></td><td>37</td><td>In ONA, delete the row or repair the link.</td></tr>
+<tr><td><code>ona.stale-subnet-id</code></td><td>29</td><td>None. The derived subnet wins.</td></tr>
+<tr><td><code>ona.dup-mac</code></td><td>21</td><td>In ONA, correct the MAC, or add <code>resolve: {dup-mac: {ids: [...], keep: first}}</code> in the map file.</td></tr>
+<tr><td><code>ona.zero-date</code></td><td>18</td><td>None, or set the date in ONA. The import makes the date <code>0000-00-00 00:00:00</code> null.</td></tr>
+<tr><td><code>ona.ptr-mismatch</code></td><td>16</td><td>In ONA, decide the right name.</td></tr>
+<tr><td><code>ona.overlap</code></td><td>4</td><td>In ONA, delete or resize one subnet, or move it to another VRF in the map file.</td></tr>
+<tr><td><code>ona.ipv6-ambiguous</code></td><td>2</td><td>Imported as IPv4. For IPv6, set <code>family</code> for the row in the map file.</td></tr>
+</tbody>
+</table>
+<p>Until the cutover ONA is the writer. A finding has the state <code>open</code>, <code>accepted</code> or <code>closed</code>. An accept needs a reason and the permission <code>source:sync</code>. The audit log records it.</p>
 <aside class="callout note"><p class="callout-title">Note</p><p>A finding never blocks the import. The import writes the best reading and flags it. The team can then work through the list while the parallel run proves the result. The advisory "Explain this finding" gives the reason for the code and the risk of each answer. It reads the finding, the objects around it and the ONA row.</p></aside>
 <dl class="facts">
   <dt>URL</dt><dd><code>/import[/{run}][?state=&amp;code=&amp;severity=]</code></dd>
@@ -309,13 +417,27 @@
 </dl>
 
 <h3 id="parallel">Parallel run</h3>
-<p>Purpose: ONA and bembel run side by side for 14 nights. ONA stays the system that feeds the DNS and DHCP servers. Each night bembel builds its own BIND and dhcpd exports and diffs them against the files that ONA makes. The run ends after 14 nights in a row with no unexplained line, on all five servers. A line that a known difference explains does not count. The counter is 12. Two nights remain (<a href="migration.html">Migration</a>).</p>
-<ul>
-  <li><b>Night strip.</b> 14 small squares, one per night. The colour shows the size of the diff: red for hundreds of lines, amber for a few, green for none or explained. The current night has a ring. Nights 13 and 14 are outlined and empty. A tooltip gives the number of lines.</li>
-  <li><b>Targets.</b> One row per delivery target. In the story ns1 BIND: 5 lines differ from ONA, all explained (KD-001, KD-002, KD-004). One of them is in <code>kestrel.example.org</code>: 1 TXT split at 255 bytes (KD-002). <code>ns2</code> and <code>ns3</code>: 1 line, KD-001. <code>dhcp1</code> and <code>dhcp2</code>: 1 line, KD-003.</li>
-  <li><b>Links.</b> "Show the diff of night 12" opens the export diff page (<a href="mockups/ui/export-diff.html">export-diff.html</a>). The button "Explain diff" starts the advisory with the same name.</li>
-</ul>
-<p>The TXT difference is the known difference KD-002: ONA writes a text longer than 255 bytes as one string, which BIND refuses; bembel splits it into strings of at most 255 bytes, also in compat mode. A known difference has a name in <code>parallel.known</code>. It does not count in the night colour. The Overview shows the same state as item 2 of "Needs you".</p>
+<p>Purpose: ONA and bembel run side by side for 14 nights. ONA stays the system that feeds the DNS and DHCP servers. Each night bembel builds its own BIND and dhcpd exports and diffs them against the files that ONA makes.</p>
+<p>The run ends after 14 nights in a row with no unexplained line, on all five servers. A line that a known difference explains does not count (<a href="migration.html#parallel">Migration</a>). The counter is 12. Two nights remain.</p>
+<table>
+<thead><tr><th>Part</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td>Night strip</td><td>14 small squares, one per night. The colour shows the size of the diff: red for hundreds of lines, amber for a few, green for none or explained.</td></tr>
+<tr><td>Night marks</td><td>The current night has a ring. Nights 13 and 14 are outlined and empty. A tooltip gives the number of lines.</td></tr>
+<tr><td>Targets</td><td>One row per delivery target.</td></tr>
+<tr><td>Links</td><td>"Show the diff of night 12" opens the export diff page (<a href="mockups/ui/export-diff.html">export-diff.html</a>). The button "Explain diff" starts the advisory with the same name.</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Target</th><th>Lines that differ from ONA</th><th>Known differences</th></tr></thead>
+<tbody>
+<tr><td>ns1 BIND</td><td>5, all explained. One is in <code>kestrel.example.org</code>: 1 TXT split at 255 bytes.</td><td>KD-001, KD-002, KD-004</td></tr>
+<tr><td><code>ns2</code>, <code>ns3</code></td><td>1</td><td>KD-001</td></tr>
+<tr><td><code>dhcp1</code>, <code>dhcp2</code></td><td>1</td><td>KD-003</td></tr>
+</tbody>
+</table>
+<p>The TXT difference is the known difference KD-002. ONA writes a text longer than 255 bytes as one string, which BIND refuses. bembel splits it into strings of at most 255 bytes, also in compat mode.</p>
+<p>A known difference has a name in <code>parallel.known</code>. It does not count in the night colour. The Overview shows the same state as item 2 of "Needs you".</p>
 <dl class="facts">
   <dt>URL</dt><dd>The card is part of <code>/import</code>. The diff is <code>/exports/diff?night=12</code>.</dd>
   <dt>API</dt><dd><code>GET /v1/parallel-runs</code>, <code>GET /v1/parallel-runs/{night}</code></dd>
@@ -361,15 +483,23 @@
 <figcaption>Five kinds of source write into bembel through the public API. Each object keeps its source. Targets and tools read from bembel.</figcaption>
 </figure>
 <h3 id="integrations-layout">Layout and parts</h3>
-<ul>
-  <li><b>Source card.</b> A dot (green: ok, amber: warning, grey: not active), the source badge, the name and Run now. Rows: Last run (time, state, duration), Objects, Errors, Schedule, and one row for access or identity.</li>
-  <li><b>fnt.</b> Delta at 17:45 (every 15 min), full reconcile at 03:00. 2 311 devices. 4 unmatched devices link to <a href="mockups/ui/sync-review.html">Sync review</a>.</li>
-  <li><b>openstack:os-prod.</b> Poll every 2 min. 38 networks, 61 subnets, 1 902 ports, 214 floating IPs, 0 conflicts. The sync is read only. The reaper holds an expired Neutron claim until a successful poll that started after the expiry has not found the port.</li>
-  <li><b>k8s:prod-1 and k8s:dev-2.</b> The Cluster API provider and the LB pool controller. Event driven, with a reconcile every 10 min. prod-1 has 36 addresses for IPAddressClaims and 4 LB pools. The provider allocates directly and makes no claims. The identity is the service account <code>k8s:prod-1:capi-system:capi-ipam</code>.</li>
-  <li><b>libvirt.</b> One card with a table: Hypervisor, Source, Agent version, Last report, VMs, Bridge and State. The story has 6 hypervisors (<code>hv-01</code> to <code>hv-06</code>), 117 VMs and the bridge <code>br204</code>. <code>hv-05</code> runs agent 0.0.9, so it has an "old" pill and the state "update the agent". Run now on all asks every agent to report at once.</li>
-  <li><b>ona-import.</b> Read only. The timer runs the import (nightly 01:31, and every 10 min from 07:02 to 19:52). Run now is disabled. Its tooltip says "The timer runs the import. ONA is the writer until the freeze on 2026-11-09." The card links to the ONA migration page.</li>
-  <li><b>Trusted issuers.</b> A table: issuer URL, what it is for, audience, subject claim and the count of bindings. The story has Keycloak (<code>https://id.example.org/realms/main</code>), the two clusters and the CI issuer <code>https://ci.example.org</code>. The CI issuer has no binding, so its jobs get no access. A warn pill says so.</li>
-</ul>
+<p>Each source card has a dot (green: ok, amber: warning, grey: not active), the source badge, the name and Run now. Its rows are Last run (time, state, duration), Objects, Errors, Schedule, and one row for access or identity.</p>
+<table>
+<thead><tr><th>Source</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td>fnt</td><td>Delta at 17:45 (every 15 min), full reconcile at 03:00. 2 311 devices. 4 unmatched devices link to <a href="mockups/ui/sync-review.html">Sync review</a>.</td></tr>
+<tr><td>openstack:os-prod</td><td>Poll every 2 min. 38 networks, 61 subnets, 1 902 ports, 214 floating IPs, 0 conflicts. The sync is read only.</td></tr>
+<tr><td>openstack:os-prod reaper</td><td>The reaper holds an expired Neutron claim until a successful poll that started after the expiry has not found the port.</td></tr>
+<tr><td>k8s:prod-1, k8s:dev-2</td><td>The Cluster API provider and the LB pool controller. Event driven, with a reconcile every 10 min. prod-1 has 36 addresses for IPAddressClaims and 4 LB pools.</td></tr>
+<tr><td>k8s identity</td><td>The provider allocates directly and makes no claims. The identity is the service account <code>k8s:prod-1:capi-system:capi-ipam</code>.</td></tr>
+<tr><td>libvirt</td><td>One card with a table: Hypervisor, Source, Agent version, Last report, VMs, Bridge and State. Run now on all asks every agent to report at once.</td></tr>
+<tr><td>libvirt story</td><td>6 hypervisors (<code>hv-01</code> to <code>hv-06</code>), 117 VMs and the bridge <code>br204</code>. <code>hv-05</code> runs agent 0.0.9, so it has an "old" pill and the state "update the agent".</td></tr>
+<tr><td>ona-import</td><td>Read only. The timer runs the import (nightly 01:31, and every 10 min from 07:02 to 19:52). The card links to the ONA migration page.</td></tr>
+<tr><td>ona-import Run now</td><td>Disabled. Its tooltip says "The timer runs the import. ONA is the writer until the freeze on 2026-11-09."</td></tr>
+<tr><td>Trusted issuers</td><td>A table: issuer URL, what it is for, audience, subject claim and the count of bindings.</td></tr>
+<tr><td>Issuers in the story</td><td>Keycloak (<code>https://id.example.org/realms/main</code>), the two clusters and the CI issuer <code>https://ci.example.org</code>. The CI issuer has no binding, so its jobs get no access. A warn pill says so.</td></tr>
+</tbody>
+</table>
 <table>
 <thead><tr><th>State</th><th>Display</th></tr></thead>
 <tbody>
@@ -385,16 +515,21 @@
 </dl>
 
 <h2 id="assistant-help">Assistant and help panes</h2>
-<p>The assistant and the help pane are on every page. <a href="assistant.html">Assistant and help</a> specifies them. This chapter shows the screenshots, because they use the same shell. Three more mockups exist: the assistant drawer with the advisory "Find stale addresses", the assistant chat, and the help pane.</p>
+<p>The assistant and the help pane are on every page. <a href="assistant.html">Assistant and help</a> specifies them. Three more mockups follow: the assistant drawer with the advisory "Find stale addresses", the assistant chat, and the help pane.</p>
 <figure class="shot"><a href="mockups/ui/assistant-panel.html"><img src="img/ui-assistant-panel.webp" alt="Overview with the assistant drawer open: verdict on 37 stale addresses, six candidates with evidence, a proposed draft Release 12 addresses" loading="lazy"></a><figcaption>Advisory "Find stale addresses" for 10.20.4.0/22. The drawer shows a verdict, 6 of 37 candidates, a draft and the model line.</figcaption></figure>
 <figure class="shot"><a href="mockups/ui/assistant-chat.html"><img src="img/ui-assistant-chat.webp" alt="Assistant chat: the question about a /24 for a GPU rail in Hall 2, an answer with citations, tool call chips and a draft card" loading="lazy"></a><figcaption>Free chat. The answer cites prefixes and help topics, lists its tool calls and offers a draft. The note says that answers use the permissions of d.klein.</figcaption></figure>
 <figure class="shot"><a href="mockups/ui/help-pane.html"><img src="img/ui-help-pane.webp" alt="Prefixes page with the help pane on the right: this page, words, how do I, keys, and a hint card on the word claimed" loading="lazy"></a><figcaption>The help pane (adopted from brig) and a hint card on the dotted word "claimed".</figcaption></figure>
-<ul>
-  <li><b>Drawer.</b> It reuses the agent drawer of the repoctl design: a head with the advisory name and the object, a verdict, the proposals, folds for tool calls and details, and a foot with the rule "Suggestions only". The model line names the model and the endpoint (<code>qwen3-coder-30b</code> on <code>llm.example.org</code>, local).</li>
-  <li><b>Draft.</b> The assistant cannot change data. "Open draft…" shows a change set. The user reviews it and applies it with the normal API call. A held action becomes a change request. The audit event has the origin <code>assistant</code>.</li>
-  <li><b>Permissions.</b> The tools run with the permissions of the user. The assistant is never a stronger subject. The chat says so in a note under the title.</li>
-  <li><b>Help pane.</b> "Help · this page", a search field, the title and summary of the page, "Words on this page" as chips, "How do I…" tasks, the keys, the Hints switch and the link "All topics". A dotted word opens a hint card on hover. The key <code>?</code> opens the pane for the element under the pointer, else for the page.</li>
-</ul>
+<table>
+<thead><tr><th>Part</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td>Drawer</td><td>It reuses the agent drawer of the repoctl design. Head: the advisory name and the object. Then a verdict, the proposals, and folds for tool calls and details. Foot: the rule "Suggestions only".</td></tr>
+<tr><td>Model line</td><td>It names the model and the endpoint (<code>qwen3-coder-30b</code> on <code>llm.example.org</code>, local).</td></tr>
+<tr><td>Draft</td><td>The assistant cannot change data. "Open draft…" shows a change set. The user reviews it and applies it with the normal API call. A held action becomes a change request. The audit event has the origin <code>assistant</code>.</td></tr>
+<tr><td>Permissions</td><td>The tools run with the permissions of the user. The assistant is never a stronger subject. The chat says so in a note under the title.</td></tr>
+<tr><td>Help pane</td><td>"Help · this page", a search field, and the title and summary of the page. Then "Words on this page" as chips and "How do I…" tasks. Last: the keys, the Hints switch and the link "All topics".</td></tr>
+<tr><td>Hints and key</td><td>A dotted word opens a hint card on hover. The key <code>?</code> opens the pane for the element under the pointer, else for the page.</td></tr>
+</tbody>
+</table>
 <dl class="facts">
   <dt>URL</dt><dd>The panes have no URL of their own. The state is in the query <code>?pane=assistant</code> or <code>?help=prefixes</code>.</dd>
   <dt>API</dt><dd><code>POST /v1/assistant/advisories/{id}:run</code>, <code>POST /v1/assistant/chats</code>, <code>POST /v1/assistant/chats/{id}/messages</code>, <code>GET /v1/help/pages/{page}</code>, <code>GET /v1/help/topics/{id}</code></dd>
