@@ -88,6 +88,14 @@ Do not use inline styles or colours. The site CSS gives light and dark mode.
 Write in ASD-STE100 (Simplified Technical English). Use the story data of
 the home page for all examples.
 
+Keep the text compact: one home for each fact, the form that fits the type
+of information, and the limits of the text image (the skill `docs-steward`,
+section 2a). The check runs in CI:
+
+```sh
+mise run docs:text          # python3 tools/site/textcheck.py
+```
+
 ### Glossary
 
 The project words are in `docs/assets/glossary-data.js`: the word, its forms,
