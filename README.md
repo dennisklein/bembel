@@ -20,11 +20,11 @@ The source is in [`docs/`](docs/index.html):
 | Part | Chapters |
 |---|---|
 | I Foundations | [Decision](docs/design/decision.html) · [Architecture and stack](docs/design/architecture.html) · [Core model](docs/design/model.html) · [Glossary](docs/design/glossary.html) |
-| II Model mappings | [OpenNetAdmin](docs/design/map-ona.html) · [NetBox](docs/design/map-netbox.html) |
-| III How it works | [Allocation](docs/design/allocation.html) · [DNS](docs/design/dns.html) · [DHCP](docs/design/dhcp.html) · [Fabrics](docs/design/fabrics.html) · [Routing and firewall](docs/design/routing.html) · [Access control](docs/design/access.html) · [Assets](docs/design/assets.html) |
-| IV Interfaces | [REST API](docs/design/api.html) · [Web UI](docs/design/ui.html) · [Assistant and help](docs/design/assistant.html) · [Addressing pages](docs/design/ui-addr.html) · [DNS and DHCP pages](docs/design/ui-dns.html) · [Asset pages](docs/design/ui-assets.html) · [Access and integration pages](docs/design/ui-access.html) · [Mockup gallery](docs/design/mockups/index.html) |
-| V Integrations | [Virtual machines](docs/design/vms.html) · [OpenStack](docs/design/openstack.html) · [Kubernetes](docs/design/kubernetes.html) |
-| VI Operations | [Migration from ONA](docs/design/migration.html) · [Operations](docs/design/operations.html) · [Open questions](docs/design/questions.html) |
+| II How it works | [Allocation](docs/design/allocation.html) · [DNS](docs/design/dns.html) · [DHCP](docs/design/dhcp.html) · [Fabrics](docs/design/fabrics.html) · [Exports and delivery](docs/design/delivery.html) · [Routing and firewall](docs/design/routing.html) · [Access control](docs/design/access.html) · [Assets](docs/design/assets.html) |
+| III Programs and terminals | [REST API](docs/design/api.html) · [CLI](docs/design/cli.html) |
+| IV Web UI | [Web UI](docs/design/ui.html) · [Addressing pages](docs/design/ui-addr.html) · [DNS and DHCP pages](docs/design/ui-dns.html) · [Asset pages](docs/design/ui-assets.html) · [Access and integration pages](docs/design/ui-access.html) · [Assistant and help](docs/design/assistant.html) · [Mockup gallery](docs/design/mockups/index.html) |
+| V Integrations | [Virtual machines](docs/design/vms.html) · [OpenStack](docs/design/openstack.html) · [Kubernetes](docs/design/kubernetes.html) · [VPN and Wi-Fi](docs/design/vpn-wifi.html) · [NetBox](docs/design/map-netbox.html) |
+| VI Migration and operations | [OpenNetAdmin mapping](docs/design/map-ona.html) · [Migration from ONA](docs/design/migration.html) · [Operations](docs/design/operations.html) · [Open questions](docs/design/questions.html) |
 
 The OpenAPI sketch is in [`docs/design/api/openapi.yaml`](docs/design/api/openapi.yaml).
 

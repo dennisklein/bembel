@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CLI</title>
+<meta name="description" content="The bembel CLI: commands, global flags, settings, exit codes and terminal examples.">
+</head>
+<body>
+<h1>CLI</h1>
+<p class="lede">The CLI <code>bembel</code> is the same binary as the server. This chapter lists its commands, flags and exit codes, and shows terminal examples.</p>
+
+<h2 id="commands">Commands</h2>
+<p>The CLI is the same binary as the server. It is a thin shell over the generated Go client. It adds output formats, the device login, shell completion and the help system (<a href="assistant.html#help">help</a>). Global flags: <code>--server</code>, <code>-o table|json|yaml|name</code>, <code>--no-color</code>, <code>--idempotency-key</code>. Settings come from <code>~/.config/bembel/cli.yaml</code>, then <code>BEMBEL_SERVER</code> and <code>BEMBEL_TOKEN</code>.</p>
+<table>
+<thead><tr><th>Command</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td><code>bembel login</code> / <code>logout</code> / <code>whoami</code></td><td>Device login, forget tokens, show <code>/v1/me</code></td></tr>
+<tr><td><code>bembel prefix ls|show|create|edit|rm|free</code></td><td>Prefixes. <code>ls --vrf --within --depth --contains --status --tag</code></td></tr>
+<tr><td><code>bembel prefix allocate PARENT --length N --name NAME</code></td><td>Child prefix from a pool</td></tr>
+<tr><td><code>bembel address ls|show|allocate|confirm|renew|release|edit</code></td><td>Addresses and claims. <code>allocate --prefix CIDR --name FQDN --mac MAC --reservation</code>; <code>--claim-ttl 10m</code> makes a claim; <code>ls --status claimed</code> lists the claims</td></tr>
+<tr><td><code>bembel host ls|show|create|edit|rm</code></td><td>Hosts and interfaces. <code>--kind vm --runs-on hv-03</code> (<code>--kind</code> sets <code>host_kind</code>)</td></tr>
+<tr><td><code>bembel zone ls|show|create|rm</code></td><td>Zones. <code>rm</code> opens a change request</td></tr>
+<tr><td><code>bembel record ls|add|edit|rm ZONE</code></td><td>Manual records. <code>add ZONE ssh CNAME login --ttl 300</code></td></tr>
+<tr><td><code>bembel export bind|dhcpd|opensm|prefix-list|address-group|eduvpn</code></td><td>Build or fetch an export. See below.</td></tr>
+<tr><td><code>bembel apply -f FILE</code></td><td>Read a CSV or YAML file, show the plan, apply after a confirm (<a href="allocation.html#plan">plan and apply</a>). <code>--yes</code> skips the question, <code>--plan-only</code> stops after the plan.</td></tr>
+<tr><td><code>bembel address move</code>, <code>bembel interface move</code>, <code>bembel prefix renumber|resize|split</code></td><td>Moves (<a href="allocation.html#renumber">renumber</a>). <code>renumber</code> waits for <code>--confirm OPERATION</code> before phase 2.</td></tr>
+<tr><td><code>bembel record enable|disable ZONE NAME TYPE</code></td><td>Turn a manual record on or off without a delete</td></tr>
+<tr><td><code>bembel note add|ls|rm</code></td><td>Notes. <code>add host/cn-004 --level warn --pin "PSU 2 failed, ticket 8812"</code></td></tr>
+<tr><td><code>bembel observe import --format nmap-xml FILE</code></td><td>Send an nmap scan as observations</td></tr>
+<tr><td><code>bembel vni allocate|ls</code></td><td>VNIs from a VNI range</td></tr>
+<tr><td><code>bembel vpn profile ls|show</code>, <code>bembel vpn session ls --address IP --at TIME</code></td><td>VPN profiles and the session lookup (<a href="vpn-wifi.html#sessions">sessions</a>)</td></tr>
+<tr><td><code>bembel report NAME</code></td><td>Print a report as a table or CSV</td></tr>
+<tr><td><code>bembel admin break-glass --user NAME --reason TEXT</code></td><td>Emergency session when the IdP is down. Runs only on a server host (<a href="access.html#break-glass">break-glass</a>).</td></tr>
+<tr><td><code>bembel import ona|netbox</code></td><td>Import from a MariaDB dump, an ONA API or a NetBox API. <code>--dry-run</code> makes findings only.</td></tr>
+<tr><td><code>bembel sync fnt</code></td><td>Start and watch an FNT sync</td></tr>
+<tr><td><code>bembel vm prepare</code></td><td>Claim the addresses with <code>publish: true</code> (DNS, DHCP) and print cloud-init network config</td></tr>
+<tr><td><code>bembel access check [--explain] [--as SUBJECT] PERMISSION KIND/ID</code></td><td>Check a permission and explain it (<code>POST /v1/me/permissions:check</code>)</td></tr>
+<tr><td><code>bembel binding ls|create|delete</code>, <code>bembel token ls|create|revoke</code></td><td>Manage bindings and tokens</td></tr>
+<tr><td><code>bembel change ls|show|approve|reject|withdraw</code></td><td>Change requests</td></tr>
+<tr><td><code>bembel events tail</code></td><td>Follow the SSE stream</td></tr>
+<tr><td><code>bembel api METHOD PATH [-d JSON]</code></td><td>Raw call with auth, like <code>gh api</code></td></tr>
+<tr><td><code>bembel help [TOPIC]</code></td><td>Help topics (same text as the UI help pane)</td></tr>
+<tr><td><code>bembel mcp</code></td><td>MCP server for agents, over stdio or HTTP</td></tr>
+<tr><td><code>bembel serve</code></td><td>Run the server: API, UI, workers (<a href="architecture.html#deployment">deployment</a>)</td></tr>
+<tr><td><code>bembel migrate up|down|status</code></td><td>Database migrations (goose, embedded)</td></tr>
+</tbody></table>
+<p>Exit codes: 0 ok, 1 error from the server, 2 usage, 3 not found, 4 denied, 5 held for approval (the change request id is printed).</p>
+
+<h2 id="cli-examples">Terminal examples</h2>
+<p>Login, then look at the tree of Hall 2.</p>
+<pre class="term">$ bembel login
+Open https://id.example.org/realms/main/device and enter the code WXYZ-1234
+Waiting for approval... done.
+Logged in as kc:a.berger (groups: kc:hpc-ops), token valid 5 min, refresh 8 h.
+
+$ bembel prefix ls --vrf global --within 10.20.0.0/16 --depth 1
+CIDR            KIND       STATUS   NAME              VLAN  USED   OWNER
+10.20.0.0/22    subnet     active   hall2-infra        200   58%   hpc-ops
+10.20.4.0/22    subnet     active   kestrel-compute    204   92%   hpc-ops
+10.20.12.0/24   subnet     active   ceph-public        212   77%   hpc-ops
+10.20.16.0/22   container  planned  Hall 2 row C         -     -   hpc-ops
+10.20.20.0/24   subnet     active   kestrel-services   220   34%   hpc-ops
+10.20.24.0/21   container  active   osprey pods          -   36%   hpc-ops
+10.20.32.0/19   container  active   Hall 2 storage       -   52%   hpc-ops
+10.20.64.0/22   subnet     active   kestrel-k8s        264   12%   hpc-ops
+8 prefixes (a.berger sees only owner hpc-ops; 1 prefix hidden)</pre>
+<p>Allocate an address for the new compute node cn-622 (the same call as the curl example).</p>
+<pre class="term">$ bembel address allocate --prefix 10.20.4.0/22 \
+    --name cn-622.kestrel.example.org --host cn-622.kestrel.example.org \
+    --interface eno1 --mac 3c:ec:ef:7a:10:22 --reservation
+Allocated 10.20.4.213 in 10.20.4.0/22 (global)
+  fqdn          cn-622.kestrel.example.org
+  interface     eno1  3c:ec:ef:7a:10:22
+  dns           A, PTR (zone kestrel.example.org, 20.10.in-addr.arpa)
+  dhcp          reservation in scope kestrel-compute (dhcp-a)
+  idempotency   6f1c2f1e-4f52-4a64-9d0e-0c1c8c7a5b10
+
+$ bembel address allocate --prefix 10.20.8.0/24 --name gpu-009.osprey.example.org
+error: prefix 10.20.8.0/24 not found  (resource.not-found, req_01JAZ4P7QF)
+$ echo $?
+3</pre>
+<p>Prepare a VM on a Debian hypervisor, then build a BIND export for a check.</p>
+<pre class="term">$ bembel vm prepare --name vm-build-07 --subnet kestrel-services --mac auto --hypervisor hv-03
+Claimed 10.20.20.37 for vm-build-07.kestrel.example.org (expires 2026-11-05T09:20:00Z)
+Claimed 2001:db8:4200:220::37 (expires 2026-11-05T09:20:00Z)
+MAC            52:54:00:5e:3a:b1
+address        0197c3c4-0a10-7b00-9e11-1a2b3c4d5e6f  claimed, published
+cloud-init network-config (NoCloud):
+  version: 2
+  ethernets:
+    eth0:
+      match: {macaddress: "52:54:00:5e:3a:b1"}
+      addresses: ["10.20.20.37/24", "2001:db8:4200:220::37/64"]
+      routes: [{to: default, via: 10.20.20.1}, {to: "::/0", via: "2001:db8:4200:220::1"}]
+      nameservers: {addresses: [10.20.2.53, 10.20.2.54], search: [kestrel.example.org]}
+Define the domain with this MAC. The hook confirms the claim on "prepare".
+
+$ bembel export bind --server ns1.example.org --view internal --out /var/tmp/bind --check
+Built 4 zones, 62 118 records, serial 2026110401 (etag "9c1e...")
+named-checkzone: 4 zones ok
+Wrote /var/tmp/bind/named.conf.bembel and 4 zone files</pre>
+</body>
+</html>

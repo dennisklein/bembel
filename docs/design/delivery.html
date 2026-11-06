@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Exports and delivery</title>
+<meta name="description" content="How bembel-agent pulls a signed export bundle, verifies and checks it, installs it with a symlink swap, reports the deployment, and rolls back or pins a release.">
+</head>
+<body>
+<h1>Exports and delivery</h1>
+<p class="lede">bembel builds a signed bundle for each server. bembel-agent on the server pulls it, checks it and installs it. This chapter specifies the delivery for the BIND, dhcpd and OpenSM exports.</p>
+
+<h2 id="delivery">Delivery</h2>
+<p>A DNS server pulls its bundle. The pull works through firewalls, and the server keeps its last good state when bembel is down. A bundle has three parts: <code>bundle.tar</code>, <code>manifest.json</code> and a detached signature <code>manifest.json.sig</code> (Ed25519 over <code>manifest.json</code>). The manifest holds the sha256 of <code>bundle.tar</code> and of every file, so the signature covers all parts. The key pair belongs to the installation. The server config names the signing key (<code>exports.signing: {key_id: bembel-2026-1, key_file: /run/secrets/export-signing-key}</code>). The agent config lists the trusted public keys (<code>trust.keys: [{id: bembel-2026-1, public_key_file: /etc/bembel/keys/bembel-2026-1.pub}]</code>), up to two during a key rotation (<a href="operations.html#security">operations.html#security</a>).</p>
+
+<figure class="diagram wide">
+<svg viewBox="0 0 960 520" role="img" aria-labelledby="fig-seq-t">
+<title id="fig-seq-t">Delivery sequence between bembel, bembel-agent, named on ns1 and the secondaries</title>
+<rect class="box" x="60" y="20" width="150" height="44" rx="8"/>
+<text class="t-title" x="135" y="48" text-anchor="middle">bembel</text>
+<rect class="box-accent" x="330" y="20" width="170" height="44" rx="8"/>
+<text class="t-title t-on" x="415" y="48" text-anchor="middle">bembel-agent (ns1)</text>
+<rect class="box" x="590" y="20" width="130" height="44" rx="8"/>
+<text class="t-title" x="655" y="48" text-anchor="middle">named (ns1)</text>
+<rect class="box" x="790" y="20" width="140" height="44" rx="8"/>
+<text class="t-title" x="860" y="48" text-anchor="middle">ns2 · ns3</text>
+<path class="edge-muted" d="M135,64 L135,500"/>
+<path class="edge-muted" d="M415,64 L415,500"/>
+<path class="edge-muted" d="M655,64 L655,500"/>
+<path class="edge-muted" d="M860,64 L860,500"/>
+<path class="edge" d="M413,100 L137,100" marker-end="url(#arrow)"/>
+<text class="t-small t-mono" x="275" y="92" text-anchor="middle">GET …/bundle  If-None-Match: "b-9e1a07"</text>
+<path class="edge" d="M137,136 L413,136" marker-end="url(#arrow)"/>
+<text class="t-small t-mono" x="275" y="128" text-anchor="middle">200 ETag "b-9e2d41"  (or 304)</text>
+<rect class="box-soft" x="425" y="156" width="215" height="58" rx="8"/>
+<text class="t-small" x="435" y="176">verify signature, server, snapshot,</text>
+<text class="t-small" x="435" y="194">sha256; unpack to releases/b-9e2d41</text>
+<rect class="box-soft" x="425" y="228" width="215" height="58" rx="8"/>
+<text class="t-small" x="435" y="248">named-checkconf -z and named-</text>
+<text class="t-small" x="435" y="266">checkzone on a check copy</text>
+<rect class="box-soft" x="425" y="300" width="215" height="44" rx="8"/>
+<text class="t-small" x="435" y="326">install zones, swap current</text>
+<path class="edge" d="M417,372 L653,372" marker-end="url(#arrow)"/>
+<text class="t-small t-mono" x="535" y="364" text-anchor="middle">rndc reload ZONE in VIEW</text>
+<path class="edge" d="M657,404 L858,404" marker-end="url(#arrow)"/>
+<text class="t-small t-mono" x="758" y="396" text-anchor="middle">NOTIFY, then IXFR</text>
+<path class="edge" d="M413,448 L137,448" marker-end="url(#arrow)"/>
+<text class="t-small t-mono" x="275" y="440" text-anchor="middle">POST …/deployments  status ok</text>
+<text class="t-small t-muted" x="425" y="488">keep the last 5 releases and ona-final</text>
+</svg>
+<figcaption>The agent pulls, verifies, checks, installs, swaps and reloads. If a step fails, the symlink stays, the agent reports the error, and named keeps its zones.</figcaption>
+</figure>
+
+<p>The agent works in these steps.</p>
+<ol>
+  <li>Every 60 seconds (with jitter) the agent calls <code>GET /v1/dns-servers/ns1.example.org/bundle</code> with the header <code>If-None-Match</code> and its bearer token. bembel answers <code>304</code> when the ETag is the same.</li>
+  <li>On <code>200</code> the agent saves the three parts and makes these checks, in this order:
+    <ol>
+      <li>The signature of <code>manifest.json</code> is valid with the trusted key that <code>key_id</code> names.</li>
+      <li><code>kind</code> and <code>server</code> are equal to the identity in the agent config (<code>bind</code>, <code>ns1.example.org</code>). A bundle for another server is refused.</li>
+      <li><code>snapshot</code> is not lower than the snapshot of the current release. An older bundle is refused. A pin is a newer bundle (see below), so this rule has no exception. Only the local command <code>bembel-agent rollback</code> overrides it.</li>
+      <li>The sha256 of <code>bundle.tar</code> and of each file is equal to the manifest.</li>
+    </ol>
+    A refused bundle changes nothing: the current release stays. The agent reports <code>deploy.bundle-rejected</code> and counts it in <code>bembel_agent_bundle_rejected_total{reason}</code> (<code>signature</code>, <code>identity</code>, <code>rollback</code>, <code>hash</code>).</li>
+  <li>The agent unpacks the bundle to <code>/var/lib/bembel-agent/bind/releases/b-9e2d41/</code>. It writes a check copy to <code>releases/b-9e2d41/.check/</code>. In the check copy, the path prefix <code>/var/lib/bembel-agent/bind/current/</code> becomes <code>/var/lib/bembel-agent/bind/releases/b-9e2d41/</code>, and <code>/var/lib/bind/bembel/</code> becomes <code>/var/lib/bembel-agent/bind/releases/b-9e2d41/zones/</code>. The agent verifies that each rewritten file differs only in these prefixes. Then it runs <code>named-checkconf -z</code> on a copy of <code>/etc/bind/named.conf</code> whose bembel include points at <code>releases/b-9e2d41/.check/named.conf.bembel</code>, and <code>named-checkzone</code> with the flags of step 2 of the checks on <code>releases/b-9e2d41/zones/&lt;view&gt;/&lt;zone&gt;.zone</code> for each changed zone. So the checks read the new release, not the release behind <code>current</code>. The sandbox on the bembel side does the same with its unpack directory.</li>
+  <li>If the checks pass, the agent installs each changed zone file into <code>/var/lib/bind/bembel/&lt;view&gt;/</code>: it writes a temporary file in the same directory, calls fsync and renames it with <code>rename(2)</code>. Then it replaces the symlink <code>current</code> with a new symlink through <code>rename(2)</code>. Both steps are atomic.</li>
+  <li>The agent compares the manifest with the one of the last release. If <code>config_changed</code> is true, it runs <code>rndc reconfig</code>. For each zone with <code>changed: true</code> it runs <code>rndc reload ZONE in VIEW</code>.</li>
+  <li>The agent sends the status to <code>POST /v1/dns-servers/ns1.example.org/deployments</code>: the bundle id, the time, the result per zone and the serial that <code>named</code> answers.</li>
+  <li>The agent keeps the last 5 releases and the release <code>ona-final</code>, and removes older ones.</li>
+</ol>
+
+<p>The signature protects the transport and the ingress path. It does not protect against a compromised bembel pod that holds the signing key. The same checks apply to the dhcpd and OpenSM bundles (<a href="dhcp.html#delivery">dhcp.html#delivery</a>, <a href="fabrics.html#opensm">fabrics.html#opensm</a>).</p>
+
+<h3 id="paths">Paths on the server</h3>
+<table class="compact">
+<thead><tr><th>Path</th><th>Owner and use</th></tr></thead>
+<tbody>
+<tr><td><code>/var/lib/bembel-agent/bind/releases/&lt;bundle&gt;/</code></td><td>The agent. One directory per release, the staging area. The agent keeps the last 5 and <code>ona-final</code>.</td></tr>
+<tr><td><code>/var/lib/bembel-agent/bind/current</code></td><td>The agent. A symlink to <code>releases/&lt;bundle&gt;</code>. named reads only <code>named.conf.bembel</code>, <code>acls.conf</code> and <code>views/*.conf</code> through it.</td></tr>
+<tr><td><code>/var/lib/bind/bembel/&lt;view&gt;/&lt;zone&gt;.zone</code></td><td>The zone files. Directory <code>root:bind</code>, mode 2775. The agent user is in the group <code>bind</code>. Every generated <code>file</code> statement uses this stable path, the DNSSEC stanza too.</td></tr>
+<tr><td><code>/var/lib/bind/bembel/&lt;view&gt;/&lt;zone&gt;.zone.jnl</code>, <code>.signed</code>, <code>.signed.jnl</code></td><td>named. The journal of <code>ixfr-from-differences</code> and the files of inline signing stay over bundles. The agent removes them only when the zone leaves the bundle.</td></tr>
+<tr><td><code>/etc/bind/bembel-tsig.conf</code></td><td>The administrator. The TSIG keys of the views.</td></tr>
+</tbody>
+</table>
+<p>named never needs write access to <code>/var/lib/bembel-agent</code>. On Debian and Ubuntu the AppArmor profile of named allows <code>/var/lib/bind/**</code> already. The agent adds the line <code>/var/lib/bembel-agent/bind/** r,</code> to <code>/etc/apparmor.d/local/usr.sbin.named</code>. With SELinux the config tree has the type <code>named_conf_t</code> and the zone directory <code>named_cache_t</code>. A pre-flight check at agent start makes sure that the user <code>bind</code> can write <code>/var/lib/bind/bembel/</code> and read the config tree. A failure is a deployment error.</p>
+
+<h3 id="rollback">Rollback and pin</h3>
+<p>If a step from 3 to 5 fails, the agent keeps the old symlink (or swaps back to the previous release) and reports the error. This swap back during a failed apply, before any reload, needs no new serial, because no server saw the new serial.</p>
+<p>All other rollbacks bring the content back and move the serial up. An older release holds lower serials. If ns1 loaded them, ns2 and ns3 would keep the newer, bad data with no time limit: the zone does not expire, because ns1 still answers their SOA queries.</p>
+<ul>
+  <li><strong>Pin.</strong> <code>PUT /v1/dns-servers/ns1.example.org/pin</code> with <code>{"bundle": "b-5e08c3", "reason": "…"}</code> needs <code>export:build</code>. bembel builds a new bundle (new id, new snapshot, new ETag) with the zone bodies of the named bundle. Each zone whose body differs gets the serial <code>max(highest serial that bembel published for this zone and view, highest served serial) + 1</code>. The bundle goes through the normal checks, step 4 too. While the pin is set, data changes do not change the bundle of this server. <code>DELETE /v1/dns-servers/ns1.example.org/pin</code> lifts it (204). The next export uses a serial above the stamped one. This is the way to hold a server on known good content while a fix is made.</li>
+  <li><strong>Local emergency rollback.</strong> <code>bembel-agent rollback --to b-5e08c3</code> works without bembel, from the local releases. The agent installs the zone content of that release and rewrites the SOA serial of each changed zone to the served serial plus one. It runs <code>named-checkzone</code>, swaps and reloads. Then it reports the new serials in <code>POST /v1/dns-servers/ns1.example.org/deployments</code>, and bembel raises its stored serial.</li>
+  <li><strong>Rollback to ONA.</strong> <code>bembel-agent rollback --to ona-final</code> gives each ONA zone the serial <code>max(ONA serial, served serial + 1)</code>. While the source of the agent is <code>ona</code>, it re-stamps every later ONA build in the same way. No RFC 1982 reset is needed.</li>
+</ul>
+
+<p>The deployment status gives a drift view. The server page in the UI shows the bundle id of each server, the age of the last pull, and the serial per zone that the server answers against the serial that bembel expects. The metric <code>bembel_export_last_pull_timestamp_seconds</code> has the alert rule <code>BembelExportNotPulled</code> (<a href="operations.html#alerts">operations.html#alerts</a>).</p>
+
+<aside class="callout why">
+<p class="callout-title">Why pull and not push</p>
+<p>A pull needs no inbound firewall rule on the DNS servers. The agent can run on a server that bembel cannot reach. A broken bembel leaves the servers with the last good bundle. The ONA script wrote files in place and checked them afterwards, so a bad zone was already live on disk. The agent checks first and swaps after.</p>
+</aside>
+
+<h3 id="explainer">One change from address to name server</h3>
+<figure class="diagram wide explainer">
+<svg viewBox="0 0 960 420" role="img" aria-labelledby="fig-exp-t">
+<title id="fig-exp-t">One change: an address is allocated, bembel derives records, bumps two serials, builds a bundle, the agent pulls it and named reloads</title>
+<rect class="box" x="16" y="40" width="206" height="110" rx="8"/>
+<text class="t-title" x="30" y="64">address</text>
+<text class="t-small t-mono" x="30" y="86">vm-ci-04</text>
+<text class="t-small t-mono" x="30" y="106">10.20.4.77</text>
+<text class="t-small t-muted" x="30" y="128">claimed, publish: true</text>
+<rect class="box-soft" data-f="1-5" x="262" y="40" width="226" height="110" rx="8"/>
+<text class="t-title" data-f="1-5" x="276" y="64">derived records</text>
+<text class="t-small t-mono" data-f="1-5" x="276" y="86">A  vm-ci-04 → 10.20.4.77</text>
+<text class="t-small t-mono" data-f="1-5" x="276" y="106">PTR 77.4 → vm-ci-04…</text>
+<text class="t-small t-muted" data-f="1-5" x="276" y="128">no one edits these</text>
+<rect class="box-warn" data-f="2-5" x="528" y="40" width="200" height="110" rx="8"/>
+<text class="t-title" data-f="2-5" x="542" y="64">serials</text>
+<text class="t-small t-mono" data-f="2-5" x="542" y="86">kestrel…  …03 → …04</text>
+<text class="t-small t-mono" data-f="2-5" x="542" y="106">20.10.in-… …02 → …03</text>
+<text class="t-small t-muted" data-f="2-5" x="542" y="128">other zones: no change</text>
+<rect class="box-accent" data-f="3-5" x="768" y="40" width="176" height="110" rx="8"/>
+<text class="t-title t-on" data-f="3-5" x="782" y="64">bundle</text>
+<text class="t-small t-mono t-on" data-f="3-5" x="782" y="86">b-9e2d41</text>
+<text class="t-small t-on" data-f="3-5" x="782" y="106">signed, new ETag</text>
+<text class="t-small t-on" data-f="3-5" x="782" y="128">2 zones changed</text>
+<path class="edge" data-f="1-5" d="M222,95 L260,95" marker-end="url(#arrow)"/>
+<path class="edge" data-f="2-5" d="M488,95 L526,95" marker-end="url(#arrow)"/>
+<path class="edge" data-f="3-5" d="M728,95 L766,95" marker-end="url(#arrow)"/>
+<path class="edge-accent" data-f="1" d="M222,95 L260,95" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" data-f="2" d="M488,95 L526,95" marker-end="url(#arrow-accent)"/>
+<path class="edge-accent" data-f="3" d="M728,95 L766,95" marker-end="url(#arrow-accent)"/>
+<rect class="box" data-f="4-5" x="262" y="260" width="226" height="110" rx="8"/>
+<text class="t-title" data-f="4-5" x="276" y="284">bembel-agent (ns1)</text>
+<text class="t-small" data-f="4-5" x="276" y="306">GET with If-None-Match</text>
+<text class="t-small" data-f="4-5" x="276" y="326">verify, checks, swap</text>
+<text class="t-small t-muted" data-f="4-5" x="276" y="348">release b-9e2d41</text>
+<rect class="box-ok" data-f="5" x="528" y="260" width="200" height="110" rx="8"/>
+<text class="t-title" data-f="5" x="542" y="284">named (ns1)</text>
+<text class="t-small t-mono" data-f="5" x="542" y="306">rndc reload kestrel…</text>
+<text class="t-small t-mono" data-f="5" x="542" y="326">rndc reload 20.10…</text>
+<text class="t-small t-muted" data-f="5" x="542" y="348">NOTIFY ns2, ns3</text>
+<rect class="box-muted" data-f="5" x="768" y="260" width="176" height="110" rx="8"/>
+<text class="t-title" data-f="5" x="782" y="284">ns2 · ns3</text>
+<text class="t-small" data-f="5" x="782" y="306">IXFR from old serial</text>
+<text class="t-small t-muted" data-f="5" x="782" y="326">answer vm-ci-04</text>
+<path class="edge" data-f="4-5" d="M856,150 L856,200 L375,200 L375,258" marker-end="url(#arrow)"/>
+<path class="edge-accent" data-f="4" d="M856,150 L856,200 L375,200 L375,258" marker-end="url(#arrow-accent)"/>
+<path class="edge" data-f="5" d="M488,315 L526,315" marker-end="url(#arrow)"/>
+<path class="edge-accent" data-f="5" d="M488,315 L526,315" marker-end="url(#arrow-accent)"/>
+<path class="edge" data-f="5" d="M728,315 L766,315" marker-end="url(#arrow)"/>
+<text class="t-small t-muted" data-f="4-5" x="620" y="192" text-anchor="middle">pull, 60 s</text>
+</svg>
+<script type="application/json" class="steps">["A user runs bembel vm prepare for vm-ci-04. It claims the address 10.20.4.77 in kestrel-compute with the FQDN vm-ci-04.kestrel.example.org and publish: true, so the claim makes records.", "bembel derives two records from the address: the A record in kestrel.example.org and the PTR record in 20.10.in-addr.arpa. A user cannot edit them.", "The next export finds that the body of two zones changed. It raises the serial of kestrel.example.org to 2026110404 and of 20.10.in-addr.arpa to 2026110403. All other zones keep their serial.", "The export builds the bundle b-9e2d41, runs named-checkzone and named-checkconf -z, signs the manifest and sets the new ETag.", "bembel-agent on ns1 calls GET with If-None-Match, gets 200, verifies the signed manifest and the files, runs the checks again on a check copy, installs the two zone files and swaps the symlink current.", "The agent runs rndc reload for the two changed zones. named sends NOTIFY to ns2 and ns3. They fetch the change by IXFR and answer for vm-ci-04 within seconds."]</script>
+<figcaption>From address to answer. Two zones change, so only two zones reload.</figcaption>
+</figure>
+</body>
+</html>
