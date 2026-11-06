@@ -7,7 +7,7 @@
 </head>
 <body>
 <h1>Fabrics</h1>
-<p class="lede">An HPC site has more than one kind of network. A compute node sits on Ethernet, on InfiniBand and on a lossless Ethernet fabric for RoCEv2 at the same time. This chapter describes the fabric object, what each kind adds to the model, how IPv4 and IPv6 live together, and how bembel gives the data to OpenSM and to the tools that configure switches.</p>
+<p class="lede">An HPC site has more than one kind of network. A compute node sits on Ethernet, on InfiniBand and on a lossless Ethernet fabric for RoCEv2 at the same time. This chapter covers the fabric kinds, dual stack, partitions, GUIDs, the OpenSM export and the tools that read fabric data.</p>
 <ul class="keypoints">
   <li>A fabric is the L2 technology domain of a subnet. It has the kind <code>ethernet</code>, <code>ethernet-roce</code> or <code>infiniband</code>.</li>
   <li>Ethernet adds the VLAN and the VLAN domain. RoCEv2 adds a QoS profile: DSCP 26, PFC priority 3, ECN and CNP DSCP 48. InfiniBand adds the IB partition, the port GUID and the 20-byte IPoIB address.</li>
@@ -123,18 +123,25 @@
   "owner": "hpc-ops"
 }</code></pre>
 
-<p>A fabric belongs to a site and to a team. The fabric has a default VRF. A subnet can use a different VRF, but the check <code>fabric-vrf-mismatch</code> warns about it. A fabric is not a VRF. A VRF separates address spaces. A fabric describes the wire.</p>
+<p>A fabric belongs to a site and to a team. The fabric has a default VRF. A subnet can use a different VRF, but the check <code>fabric-vrf-mismatch</code> warns about it. A fabric is not a VRF: a VRF separates address spaces, and a fabric describes the wire.</p>
 
 <h2 id="dual-stack">Dual stack</h2>
-<p>IPv6 is a first-class family in bembel. An IPv4 prefix and an IPv6 prefix live in the same tree, and every feature works for both. A dual stack network is a pair of two subnets: one IPv4 and one IPv6. The pair shares the VLAN or partition, the fabric, the site and the owner. In the story, the pair for kestrel-compute is 10.20.4.0/22 and 2001:db8:4200:204::/64 on VLAN 204.</p>
-<ul>
-  <li><strong>The link.</strong> Each subnet of the pair has the field <code>twin_id</code> that names the other; both rows point to each other. The twin is a subnet of the other family, and both share the VLAN or partition, the fabric and the site (<a href="model.html#prefix">model.html#prefix</a>). The UI shows both as one network with two address tabs. A change of the VLAN on one changes the other in the same transaction, after a confirm.</li>
-  <li><strong>The host.</strong> An interface has an address of each family. The host primary FQDN gets an A and an AAAA record (<a href="dns.html#derived">dns.html#derived</a>).</li>
-  <li><strong>Allocation.</strong> A static address is allocated as for IPv4. In a /64 the allocator takes the next free address in a range with the purpose <code>static</code>. A large space makes a linear search useless, so it also accepts <code>strategy: "hint"</code> with <code>hint: "2001:db8:4200:204::44"</code>, or <code>strategy: "random"</code> (<a href="allocation.html#strategies">allocation.html#strategies</a>).</li>
-  <li><strong>SLAAC and EUI-64.</strong> A client that uses SLAAC builds its own address. bembel observes these addresses from neighbour tables (switch sync, host agent) and shows them in the status <code>observed</code>. An observed address does not use up an allocation, and it does not make DNS records. For cn-004 with MAC <code>3c:ec:ef:12:0a:44</code>, the EUI-64 address is <code>2001:db8:4200:204:3eec:efff:fe12:a44</code>. The first byte changes from 3c to 3e (the universal/local bit).</li>
-  <li><strong>DHCPv6.</strong> A scope for the IPv6 subnet writes <code>subnet6</code> and <code>range6</code> in <code>dhcpd6.conf</code>. A reservation needs a DUID (<a href="dhcp.html#dhcpv6">dhcp.html#dhcpv6</a>).</li>
-  <li><strong>Reverse zones.</strong> The IPv6 subnet has a nibble zone <code>4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa</code> (<a href="dns.html#reverse">dns.html#reverse</a>).</li>
-</ul>
+<p>IPv6 is a first-class family in bembel. IPv4 and IPv6 prefixes live in the same tree, and every feature works for both. A dual stack network is a pair of two subnets: one IPv4 and one IPv6. The pair shares the VLAN or partition, the fabric, the site and the owner.</p>
+<p>In the story, the pair for kestrel-compute is 10.20.4.0/22 and 2001:db8:4200:204::/64 on VLAN 204.</p>
+<table class="compact">
+<thead><tr><th>Topic</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td>Link</td><td>Each subnet of the pair has the field <code>twin_id</code> that names the other; both rows point to each other. The twin is a subnet of the other family. Both share the VLAN or partition, the fabric and the site (<a href="model.html#prefix">model.html#prefix</a>).</td></tr>
+<tr><td>UI and VLAN change</td><td>The UI shows both subnets as one network with two address tabs. A change of the VLAN on one changes the other in the same transaction, after a confirm.</td></tr>
+<tr><td>Host</td><td>An interface has an address of each family. The host primary FQDN gets an A and an AAAA record (<a href="dns.html#derived">dns.html#derived</a>).</td></tr>
+<tr><td>Allocation</td><td>A static address is allocated as for IPv4. In a /64 the allocator takes the next free address in a range with the purpose <code>static</code>.</td></tr>
+<tr><td>Allocation strategies</td><td>A large space makes a linear search useless. The allocator also accepts <code>strategy: "hint"</code> with <code>hint: "2001:db8:4200:204::44"</code>, or <code>strategy: "random"</code> (<a href="allocation.html#strategies">allocation.html#strategies</a>).</td></tr>
+<tr><td>SLAAC and EUI-64</td><td>A client that uses SLAAC builds its own address. bembel observes it in neighbour tables (switch sync, host agent) and shows the status <code>observed</code>. An observed address does not use up an allocation and makes no DNS records.</td></tr>
+<tr><td>EUI-64 example</td><td>For cn-004 with MAC <code>3c:ec:ef:12:0a:44</code>, the EUI-64 address is <code>2001:db8:4200:204:3eec:efff:fe12:a44</code>. The first byte changes from 3c to 3e (the universal/local bit).</td></tr>
+<tr><td>DHCPv6</td><td>A scope for the IPv6 subnet writes <code>subnet6</code> and <code>range6</code> in <code>dhcpd6.conf</code>. A reservation needs a DUID (<a href="dhcp.html#dhcpv6">dhcp.html#dhcpv6</a>).</td></tr>
+<tr><td>Reverse zones</td><td>The IPv6 subnet has a nibble zone <code>4.0.2.0.0.0.2.4.8.b.d.0.1.0.0.2.ip6.arpa</code> (<a href="dns.html#reverse">dns.html#reverse</a>).</td></tr>
+</tbody>
+</table>
 <table class="compact">
 <thead><tr><th>Item</th><th>IPv4</th><th>IPv6</th></tr></thead>
 <tbody>
@@ -147,7 +154,7 @@
 </table>
 
 <h2 id="ethernet">Ethernet</h2>
-<p>An <code>ethernet</code> fabric has VLANs. A VLAN has a VID from 1 to 4094 and lives in a VLAN domain. The domain is the scope in which a VID is unique. The domain <code>campus-hall2</code> holds VLAN 204 (kestrel-compute), 208 (osprey-gpu) and 212 (ceph-public). Two domains can hold the same VID. This maps to the ONA table <code>vlan_campus</code> and to the NetBox VLAN group.</p>
+<p>An <code>ethernet</code> fabric has VLANs. A VLAN has a VID from 1 to 4094 and lives in a VLAN domain, the scope in which a VID is unique. The domain <code>campus-hall2</code> holds VLAN 204 (kestrel-compute), 208 (osprey-gpu) and 212 (ceph-public). Two domains can hold the same VID. This maps to the ONA table <code>vlan_campus</code> and to the NetBox VLAN group.</p>
 <table class="compact">
 <thead><tr><th>Object</th><th>Fields</th><th>Rule</th></tr></thead>
 <tbody>
@@ -157,10 +164,11 @@
 <tr><td>Interface</td><td>name, MAC, port link</td><td>The MAC is unique in the VRF. A duplicate MAC is an import finding.</td></tr>
 </tbody>
 </table>
-<p>The port link joins the interface to a switch port from the asset mirror (<a href="assets.html">assets.html</a>). The switch port is the data that a switch tool needs: it knows the VLAN of a port from the subnets of the interfaces that are connected to it.</p>
+<p>The port link joins the interface to a switch port from the asset mirror (<a href="assets.html">assets.html</a>). The switch port is the data that a switch tool needs. The tool knows the VLAN of a port from the subnets of the interfaces on it.</p>
 
 <h2 id="roce">Ethernet with RoCEv2</h2>
-<p>RoCEv2 carries InfiniBand transport over UDP and IP on Ethernet. It needs a lossless path for the RoCE traffic class. A fabric of kind <code>ethernet-roce</code> has the same VLANs as Ethernet and adds a QoS profile. The profile is the one place for the values that switch config and host config must share. If the two sides differ, RoCE performance falls or the fabric drops packets.</p>
+<p>RoCEv2 carries InfiniBand transport over UDP and IP on Ethernet. It needs a lossless path for the RoCE traffic class. A fabric of kind <code>ethernet-roce</code> has the same VLANs as Ethernet and adds a QoS profile.</p>
+<p>The profile is the one place for the values that switch config and host config must share. If the two sides differ, RoCE performance falls or the fabric drops packets.</p>
 
 <table class="compact">
 <thead><tr><th>Field</th><th>Story value</th><th>Meaning</th></tr></thead>
@@ -187,7 +195,8 @@
 
 <aside class="callout why">
 <p class="callout-title">Why the profile is data</p>
-<p>The values are few, but the places that use them are many: every switch, every NIC and every RoCE host tool. A typical fault is one switch with another DSCP. When the profile is one object in bembel, the automation reads the same numbers everywhere, and a diff shows which device differs. bembel stores the intent. It does not push it.</p>
+<p>The values are few, but many places use them: every switch, every NIC and every RoCE host tool. A typical fault is one switch with another DSCP.</p>
+<p>When the profile is one object in bembel, the automation reads the same numbers everywhere, and a diff shows which device differs. bembel stores the intent. It does not push it.</p>
 </aside>
 
 <h3 id="rails">Rail-optimised GPU fabrics</h3>
@@ -255,9 +264,10 @@
 <h3 id="roce-addresses">How a RoCE host gets its addresses</h3>
 <p>A RoCE NIC has a static address, not a DHCP address. The address belongs to the rail and the NIC. The steps are:</p>
 <ol>
-  <li>The host exists with its interfaces <code>roce1</code> to <code>roce8</code>, each with the NIC MAC and a port link to its leaf port.</li>
+  <li>The host exists with the interfaces <code>roce1</code> to <code>roce8</code>. Each has the NIC MAC and a port link to its leaf port.</li>
   <li>For each rail, an automation calls the allocation of the rail subnet for the interface.</li>
-  <li>The result gives the address, the prefix length and the gateway of the rail. The host automation writes them to the NIC config with a rule for source-based routing: traffic from <code>10.110.n.11</code> leaves through <code>roce n</code>.</li>
+  <li>The result gives the address, the prefix length and the gateway of the rail.</li>
+  <li>The host automation writes them to the NIC config with a source-based routing rule. Traffic from <code>10.110.n.11</code> leaves through <code>roce n</code>.</li>
 </ol>
 <pre><code class="language-bash">for n in 1 2 3 4 5 6 7 8; do
   curl -s -X POST \
@@ -272,7 +282,8 @@ done</code></pre>
 <p>The key <code>Idempotency-Key</code> makes the loop safe to repeat (<a href="allocation.html#idempotency">allocation.html#idempotency</a>). With <code>on_conflict: "fail"</code> a taken hint address gives 409 <code>address.conflict</code>, so a wrong address never goes to the NIC unnoticed. A user who prefers DHCP can add a reservation instead. The pool can be empty. The reservation then stays valid for the rail.</p>
 
 <h2 id="infiniband">InfiniBand</h2>
-<p>An <code>infiniband</code> fabric is managed by a subnet manager (SM). OpenSM is the SM of the story (<code>kestrel-ib</code>, NDR). The SM gives each port a LID and applies the partitions. IP over InfiniBand (IPoIB) carries IP packets on an IB partition. For bembel, an IPoIB network is a normal subnet with the fabric <code>infiniband</code> and a partition. The VRF is <code>hpc-fabric</code> and the prefix is 10.100.0.0/16. Pure RDMA partitions have no IPoIB and no subnet.</p>
+<p>An <code>infiniband</code> fabric is managed by a subnet manager (SM). OpenSM is the SM of the story (<code>kestrel-ib</code>, NDR). The SM gives each port a LID and applies the partitions.</p>
+<p>IP over InfiniBand (IPoIB) carries IP packets on an IB partition. For bembel, an IPoIB network is a normal subnet with the fabric <code>infiniband</code> and a partition. The VRF is <code>hpc-fabric</code> and the prefix is 10.100.0.0/16. Pure RDMA partitions have no IPoIB and no subnet.</p>
 <table class="compact">
 <thead><tr><th>Item</th><th>In bembel</th><th>Source</th></tr></thead>
 <tbody>
@@ -287,16 +298,28 @@ done</code></pre>
 <p>The MTU of an IB partition is a code. The IB MTU of 2048 bytes gives an IPoIB datagram MTU of 2044. The IB MTU of 4096 gives 4092. bembel stores the IB MTU and computes the IPoIB value. The DHCP scope uses the IPoIB value for <code>option interface-mtu</code> (<a href="dhcp.html#export">dhcp.html#export</a>).</p>
 
 <h2 id="partitions">Partitions</h2>
-<p>An IB partition limits which ports can talk to each other. It is like a VLAN. A port that is not in a partition cannot send to the members of it. The partition key (P_Key) has 16 bits. The lower 15 bits give the partition number, the <em>base key</em>. The top bit is not a property of the partition. It is the membership of one port in the P_Key table of that port: 1 for full, 0 for limited.</p>
+<p>An IB partition limits which ports can talk to each other. It is like a VLAN. A port that is not in a partition cannot send to the members of it.</p>
+<p>The partition key (P_Key) has 16 bits. The lower 15 bits give the partition number, the <em>base key</em>. The top bit is not a property of the partition. It is the membership of one port in the P_Key table of that port: 1 for full, 0 for limited.</p>
 <ul>
-  <li>bembel stores the base key: <code>ib_partition.pkey integer NOT NULL CHECK (pkey BETWEEN 1 AND 32767)</code>, with <code>UNIQUE (fabric_id, pkey)</code>. The allowed base keys are <code>0x0001</code> to <code>0x7ffe</code>. The key <code>0x7fff</code> is the default partition. bembel keeps it, because OpenSM needs it, but a user cannot change or remove it.</li>
+  <li>bembel stores the base key: <code>ib_partition.pkey integer NOT NULL CHECK (pkey BETWEEN 1 AND 32767)</code>, with <code>UNIQUE (fabric_id, pkey)</code>. The allowed base keys are <code>0x0001</code> to <code>0x7ffe</code>.</li>
+  <li>The key <code>0x7fff</code> is the default partition. bembel keeps it, because OpenSM needs it, but a user cannot change or remove it.</li>
   <li>The API writes the key as a string of four hexadecimal digits, for example <code>"0x0001"</code> (pattern <code>^0x[0-9a-f]{4}$</code>). An input with the top bit set is normalised to the base key, so one partition has one spelling.</li>
-  <li>The membership (<code>full</code> or <code>limited</code>) is on each member row. The 16-bit form with the top bit is only a derived value of a full member, for example in the name of the Linux child interface <code>ib0.8001</code>.</li>
-  <li>A full member talks to full and to limited members. Two limited members cannot talk to each other with that P_Key. Limited membership restricts only traffic that uses that partition's P_Key. In kestrel-lustre, cn-004 and cn-005 cannot talk to each other with P_Key 0x0002. They still talk as full members of Default (0x7fff) and of kestrel-ipoib (0x0001). A partition isolates ports only when they share no other partition where either is a full member.</li>
+  <li>The membership (<code>full</code> or <code>limited</code>) is on each member row. The 16-bit form with the top bit is only a derived value of a full member. An example is the name of the Linux child interface <code>ib0.8001</code>.</li>
   <li>The story partition <code>kestrel-ipoib</code> has the P_Key <code>0x0001</code>. The interface <code>ib0</code> of cn-004 is a full member, so its P_Key table entry has the top bit set.</li>
   <li>The flag <code>ipoib</code> tells OpenSM to create the IPoIB broadcast group for the partition. A partition with this flag has a subnet. A partition without it carries RDMA only.</li>
   <li>MTU and rate limit the multicast group of the partition. Every member must support them. The rate value is the minimum, not the speed of the NDR links.</li>
 </ul>
+
+<p>Two ports talk with a P_Key as follows:</p>
+<table class="compact">
+<thead><tr><th>Port A</th><th>Port B</th><th>Talk with that P_Key</th></tr></thead>
+<tbody>
+<tr><td>full</td><td>full</td><td>Yes</td></tr>
+<tr><td>full</td><td>limited</td><td>Yes</td></tr>
+<tr><td>limited</td><td>limited</td><td>No</td></tr>
+</tbody>
+</table>
+<p>Limited membership restricts only traffic that uses that partition's P_Key. In kestrel-lustre, cn-004 and cn-005 cannot talk to each other with P_Key 0x0002. They still talk as full members of Default (0x7fff) and of kestrel-ipoib (0x0001). A partition isolates ports only when they share no other partition where either is a full member.</p>
 <pre><code class="language-json">{
   "kind": "ib-partition",
   "fabric": "kestrel-ib",
@@ -313,8 +336,10 @@ done</code></pre>
     { "interface": "oss-01/ib0", "membership": "full" }
   ]
 }</code></pre>
-<p>Membership comes from two sources. An interface with an address in an IPoIB subnet of the partition is a full member by rule. The user can add further memberships by hand, for example the limited membership of a compute node in a storage partition. The list <code>members</code> shows both with the source of each. The field <code>default_membership</code> is the membership that bembel gives a member that is added without an explicit one.</p>
-<p>The DHCP servers dhcp1 and dhcp2 have the child interface <code>ib0.8001</code> with the addresses 10.100.0.67 and 10.100.0.68, so they are full members of kestrel-ipoib by this rule. An IPoIB subnet has no router and no relay, so a client reaches a DHCP server only through such an attached interface (<a href="dhcp.html#reach">dhcp.html#reach</a>). The port GUIDs <code>0c42a10300710067</code> (dhcp1) and <code>0c42a10300710068</code> (dhcp2) are therefore in the OpenSM export.</p>
+<p>Membership comes from two sources. An interface with an address in an IPoIB subnet of the partition is a full member by rule. The user can add further memberships by hand, for example the limited membership of a compute node in a storage partition. The list <code>members</code> shows both with the source of each.</p>
+<p>The field <code>default_membership</code> is the membership that bembel gives a member that is added without an explicit one.</p>
+<p>The DHCP servers dhcp1 and dhcp2 have the child interface <code>ib0.8001</code> with the addresses 10.100.0.67 and 10.100.0.68. By this rule they are full members of kestrel-ipoib.</p>
+<p>An IPoIB subnet has no router and no relay. A client reaches a DHCP server only through such an attached interface (<a href="dhcp.html#reach">dhcp.html#reach</a>). The port GUIDs <code>0c42a10300710067</code> (dhcp1) and <code>0c42a10300710068</code> (dhcp2) are therefore in the OpenSM export.</p>
 
 <figure class="diagram wide">
 <svg viewBox="0 0 960 380" role="img" aria-labelledby="fig-part-t">
@@ -355,7 +380,7 @@ done</code></pre>
 </figure>
 
 <h2 id="guids">GUIDs and addresses</h2>
-<p>An Ethernet interface has a MAC. An InfiniBand interface has several identifiers. bembel stores those that people and tools use.</p>
+<p>An Ethernet interface has a MAC. An InfiniBand interface has several identifiers. bembel stores those that users and tools use.</p>
 <table class="compact">
 <thead><tr><th>Identifier</th><th>Size</th><th>Example (cn-004 ib0)</th><th>Use</th></tr></thead>
 <tbody>
@@ -367,14 +392,15 @@ done</code></pre>
 </tbody>
 </table>
 <ul>
-  <li>The GUID is written as 16 lowercase hexadecimal digits, without <code>0x</code> and without colons, in the UI, the API and the text. An input with colons or <code>0x</code> is accepted and normalised. bembel stores the 8 bytes. Only the OpenSM export writes the <code>0x</code> form. The DHCP client identifier and the IPoIB hardware address keep their forms with colons.</li>
+  <li>The GUID is written as 16 lowercase hexadecimal digits, without <code>0x</code> and without colons, in the UI, the API and the text. An input with colons or <code>0x</code> is accepted and normalised. bembel stores the 8 bytes.</li>
+  <li>Only the OpenSM export writes the <code>0x</code> form. The DHCP client identifier and the IPoIB hardware address keep their forms with colons.</li>
   <li>The port GUID is unique in the fabric. The database enforces this.</li>
   <li>The 20-byte hardware address and the LID are never typed by a user. The host agent sends the address. The SM sweep sends the LID with the time of the observation.</li>
   <li>A GUID that appears in the SM and is unknown to bembel is listed in "unknown ports" of the fabric page.</li>
 </ul>
 
 <h2 id="opensm">The OpenSM export</h2>
-<p>The command <code>bembel export opensm --fabric kestrel-ib</code> writes the OpenSM partition file. It is the same export mechanism as for BIND and dhcpd: a deterministic render, checks, a signed bundle, and an agent on the SM host that pulls it. The delivery target is a <em>subnet manager</em> object of the fabric (<code>/v1/fabrics/kestrel-ib/subnet-managers</code>).</p>
+<p>The command <code>bembel export opensm --fabric kestrel-ib</code> writes the OpenSM partition file. It uses the export mechanism of BIND and dhcpd (<a href="delivery.html#delivery">delivery.html#delivery</a>): a deterministic render, checks, a signed bundle and a pull agent on the SM host. The delivery target is a <em>subnet manager</em> object of the fabric (<code>/v1/fabrics/kestrel-ib/subnet-managers</code>).</p>
 <pre><code class="language-plaintext"># partitions.conf for fabric kestrel-ib, generated by bembel
 # bundle b-3a91c4. Do not edit.
 
@@ -395,13 +421,21 @@ kestrel-lustre=0x0002, rate=16, mtu=5, defmember=limited :
     0x0c42a1030071a2c8=limited, # cn-005 ib0
     0x0c42a10300a3f160=full,    # oss-01 ib0
     0x0c42a10300a3f1a0=full ;   # oss-02 ib0</code></pre>
-<ul>
-  <li><strong>Header.</strong> The partition name is the bembel partition name. The base key follows the name; OpenSM takes the membership from the <code>=full</code> and <code>=limited</code> suffixes, not from the key. The flags are <code>ipoib</code> (only if the partition has it), <code>rate</code> and <code>mtu</code> as OpenSM codes (<code>mtu=5</code> is 4096 bytes), and <code>defmember</code>. <code>defmember</code> is the membership OpenSM gives to entries of this partition's list that have no <code>=full</code>, <code>=limited</code> or <code>=both</code> suffix. bembel writes an explicit suffix on every GUID, so the flag has no effect on listed ports. A port that is not listed, and not matched by a keyword such as <code>ALL</code>, <code>ALL_CAS</code>, <code>ALL_SWITCHES</code> or <code>SELF</code>, is not a member of the partition. bembel writes the field <code>default_membership</code> as <code>defmember</code>.</li>
-  <li><strong>Members.</strong> Each member is a port GUID with <code>=full</code> or <code>=limited</code>. The comment gives the host and the interface name. The list is sorted by GUID.</li>
-  <li><strong>Rate.</strong> bembel stores the rate in Gbps. The generator maps it to the IBTA rate code. A speed without a code stops the export with an error. The value 16 in the example is the code for 100 Gbps.</li>
-  <li><strong>Default.</strong> The default partition is always written. Its content is a setting of the fabric. The story uses <code>ALL=full</code>, so every port is a full member of 0x7fff and the ports of the fabric can reach each other with that key. A fabric that wants real isolation can set a hardened Default: <code>Default=0x7fff, rate=16, mtu=5 : ALL_SWITCHES=full, SELF=full, ALL_CAS=limited ;</code>. It has no <code>ipoib</code> flag, because limited host ports cannot use the IPoIB broadcast group with each other. This is an option, not a check.</li>
-  <li><strong>Only IB interfaces.</strong> An interface without a port GUID is not a member. The export writes a comment line for it, and the fabric page shows a finding.</li>
-</ul>
+<table class="compact">
+<thead><tr><th>Element</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td>Name and key</td><td>The partition name is the bembel partition name. The base key follows the name. OpenSM takes the membership from the <code>=full</code> and <code>=limited</code> suffixes, not from the key.</td></tr>
+<tr><td>Flags</td><td><code>ipoib</code> (only if the partition has it), <code>rate</code> and <code>mtu</code> as OpenSM codes (<code>mtu=5</code> is 4096 bytes), and <code>defmember</code>.</td></tr>
+<tr><td><code>defmember</code></td><td>The membership OpenSM gives to entries of this partition's list that have no <code>=full</code>, <code>=limited</code> or <code>=both</code> suffix. bembel writes the field <code>default_membership</code> as <code>defmember</code>.</td></tr>
+<tr><td>Effect of <code>defmember</code></td><td>None on listed ports, because bembel writes an explicit suffix on every GUID.</td></tr>
+<tr><td>Unlisted ports</td><td>A port is not a member when it is not listed and no keyword matches it. The keywords are <code>ALL</code>, <code>ALL_CAS</code>, <code>ALL_SWITCHES</code> and <code>SELF</code>.</td></tr>
+<tr><td>Members</td><td>Each member is a port GUID with <code>=full</code> or <code>=limited</code>. The comment gives the host and the interface name. The list is sorted by GUID.</td></tr>
+<tr><td>Rate</td><td>bembel stores the rate in Gbps. The generator maps it to the IBTA rate code. A speed without a code stops the export with an error. The value 16 in the example is the code for 100 Gbps.</td></tr>
+<tr><td>Default partition</td><td>Always written. Its content is a setting of the fabric. The story uses <code>ALL=full</code>. Every port is then a full member of 0x7fff, and the ports of the fabric can reach each other with that key.</td></tr>
+<tr><td>Hardened Default</td><td>For real isolation, a fabric can set <code>Default=0x7fff, rate=16, mtu=5 : ALL_SWITCHES=full, SELF=full, ALL_CAS=limited ;</code>. It has no <code>ipoib</code> flag, because limited host ports cannot use the IPoIB broadcast group with each other. This is an option, not a check.</td></tr>
+<tr><td>Only IB interfaces</td><td>An interface without a port GUID is not a member. The export writes a comment line for it, and the fabric page shows a finding.</td></tr>
+</tbody>
+</table>
 <aside class="callout note">
 <p class="callout-title">What the record has not checked</p>
 <p>The syntax above follows the OpenSM manual from memory. The rate codes and the exact reload behaviour were not verified in this sandbox. A golden-file test against a lab OpenSM decides the final form. The generator is the single place to fix.</p>
@@ -417,7 +451,12 @@ kestrel-lustre=0x0002, rate=16, mtu=5, defmember=limited :
   <li>A partition with an <code>ipoib</code> flag and no full member gives a warning.</li>
   <li>The mass change guard holds a bundle that removes more than N % of the memberships.</li>
 </ul>
-<p>The agent on the SM host pulls the bundle in the usual way and runs the same checks as the DNS agent (<a href="dns.html#delivery">dns.html#delivery</a>): the signature of <code>manifest.json</code> with the key named by <code>key_id</code>, the kind <code>opensm</code> and the name of its subnet manager, a snapshot not lower than that of the current release, and the sha256 of each file. A refused bundle leaves the current release in place. Then it swaps the release link, and sends a hang-up signal to OpenSM so that it reads the file again. The agent reports the result. A failed read leaves the old release in place.</p>
+<p>The agent on the SM host pulls the bundle in the usual way and runs the common checks (<a href="delivery.html#delivery">delivery.html#delivery</a>). The manifest has the kind <code>opensm</code> and the name of the subnet manager of the agent. After the checks the agent does these steps:</p>
+<ol>
+  <li>It swaps the release link.</li>
+  <li>It sends a hang-up signal to OpenSM, so that OpenSM reads the file again.</li>
+  <li>It reports the result. A failed read leaves the old release in place.</li>
+</ol>
 
 <h2 id="consume">How switch and host tools consume fabric data</h2>
 <p>bembel does not configure devices. It gives the values to the tools that do: Ansible, Nornir, vendor tools. These tools use the public REST API. The call <code>GET /v1/fabrics/{id}/intent</code> returns the data of one fabric in a form that a template can use.</p>
@@ -436,7 +475,8 @@ kestrel-lustre=0x0002, rate=16, mtu=5, defmember=limited :
       "host": "gpu-001", "interface": "roce1", "mac": "b8:3f:d2:9a:01:01" }
   ]
 }</code></pre>
-<p>A VLAN of an EVPN overlay has its VNI in <code>vni</code>. The rails of <code>osprey-roce</code> are routed at the leaf and have no VNI. The list <code>ports</code> is the join of the interface, its port link and the asset mirror. The data for a switch, then, is: which port is on which VLAN, with which MTU and which QoS values. A generic template for a leaf switch:</p>
+<p>A VLAN of an EVPN overlay has its VNI in <code>vni</code>. The rails of <code>osprey-roce</code> are routed at the leaf and have no VNI. The list <code>ports</code> is the join of the interface, its port link and the asset mirror. The data for a switch is then: which port is on which VLAN, with which MTU and which QoS values.</p>
+<p>A generic template for a leaf switch:</p>
 <pre><code class="language-plaintext">{% for v in intent.vlans %}
 vlan {{ v.vid }}
   name {{ v.name }}
@@ -450,12 +490,15 @@ interface {{ p.port }}
   priority-flow-control priority {{ intent.qos.roce_priority }} on
 {% endfor %}</code></pre>
 <p>The syntax is not a real vendor language. It shows which fields the template reads. A real template uses the commands of its vendor.</p>
-<ul>
-  <li><strong>Change events.</strong> bembel sends a CloudEvents event, for example <code>fabric.changed</code>, to a webhook. A CI job for the network repository can build and review a change.</li>
-  <li><strong>Routing and firewall.</strong> The prefix lists and the address groups come from the routing feeds (<a href="routing.html">routing.html</a>). A route target or a static route for a rail uses the same subnets.</li>
-  <li><strong>Hosts.</strong> A host tool reads <code>GET /v1/hosts/gpu-001</code> for the interface addresses and the QoS profile of each RoCE interface. It sets the type of service 104 and the PFC on the NIC.</li>
-  <li><strong>Drift.</strong> A device scanner can compare the running VLAN or QoS values with the intent and post the result as a finding. The result is a data input to bembel, not a write to the fabric.</li>
-</ul>
+<table class="compact">
+<thead><tr><th>Use</th><th>How the tool uses the data</th></tr></thead>
+<tbody>
+<tr><td>Change events</td><td>bembel sends a CloudEvents event, for example <code>fabric.changed</code>, to a webhook. A CI job for the network repository can build and review a change.</td></tr>
+<tr><td>Routing and firewall</td><td>The prefix lists and the address groups come from the routing feeds (<a href="routing.html">routing.html</a>). A route target or a static route for a rail uses the same subnets.</td></tr>
+<tr><td>Hosts</td><td>A host tool reads <code>GET /v1/hosts/gpu-001</code> for the interface addresses and the QoS profile of each RoCE interface. It sets the type of service 104 and the PFC on the NIC.</td></tr>
+<tr><td>Drift</td><td>A device scanner can compare the running VLAN or QoS values with the intent and post the result as a finding. The result is a data input to bembel, not a write to the fabric.</td></tr>
+</tbody>
+</table>
 
 <h2 id="example">Example: the Kestrel cluster</h2>
 <p>The host <code>cn-004.kestrel.example.org</code> sits in rack A01 (U10–11). It has three interfaces on three networks. The host <code>gpu-001</code> sits in rack A02 and has one Ethernet interface and 8 RoCE interfaces.</p>
@@ -504,6 +547,6 @@ interface {{ p.port }}
 </tbody>
 </table>
 <p>For <code>gpu-001</code>, the BIND export adds the eight names <code>gpu-001-roce1</code> to <code>gpu-001-roce8</code>. The reverse zone for each rail is a /24 zone, for example <code>3.110.10.in-addr.arpa</code> for rail 3. The switch tools get 8 ports on 8 leaves, each with its VLAN and the RoCE QoS profile of <code>osprey-roce</code>.</p>
-<p>The story also shows why separate fabrics help the user. A search for the subnet 10.110.8.0/24 finds the fabric, the VLAN 3108, the 8 hosts on rail 8 and the leaf port of each one. A search for the GUID finds the interface, the host, the rack and the partitions of the port.</p>
+<p>Separate fabrics help the user to search. A search for the subnet 10.110.8.0/24 finds the fabric, the VLAN 3108, the 8 hosts on rail 8 and the leaf port of each one. A search for the GUID finds the interface, the host, the rack and the partitions of the port.</p>
 </body>
 </html>
